@@ -171,6 +171,38 @@ async function getOrderFill(orderId) {
   return 0;
 }
 
+// BitGet locks newly purchased assets against immediate resale (anti-wash-trading).
+// This retries the sell, parsing the actually-available amount from the error
+// message until the lock lifts or we time out.
+async function placeSellWithRetry(qty, maxRetries = 12, retryDelayMs = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const size = (Math.floor(qty * 10000) / 10000).toFixed(4);
+    const res = await placeOrder("sell", size);
+
+    if (res.code === "00000")
+      return { ok: true, res, soldQty: parseFloat(size) };
+
+    // Parse available qty from lock error: "0.001234XRP can be used at most"
+    const lockMatch = res.msg?.match(/([\d.]+)XRP can be used at most/i);
+    if (lockMatch) {
+      const available = parseFloat(lockMatch[1]);
+      console.log(
+        `  🔒 Lock active — only ${available} XRP tradeable. Retry ${attempt}/${maxRetries} in ${retryDelayMs / 1000}s...`,
+      );
+      await new Promise((r) => setTimeout(r, retryDelayMs));
+      continue;
+    }
+
+    // Any other error — don't retry
+    return { ok: false, res, soldQty: 0 };
+  }
+  return {
+    ok: false,
+    res: { msg: "Sell lock never lifted after retries" },
+    soldQty: 0,
+  };
+}
+
 // ── Main loop ───────────────────────────────────────────────────
 async function main() {
   console.log(`\n🤖 BTC Scalper — VWAP + RSI(3) + EMA(8)`);
@@ -233,25 +265,42 @@ async function main() {
     }
 
     console.log(`  → ${label}`);
-    const res = await placeOrder(side, size);
-    const ok = res.code === "00000";
-    const orderId = res.data?.orderId;
-
     entry.side = side;
     entry.size = size;
-    entry.orderId = orderId || res.msg;
-    entry.orderPlaced = ok;
 
-    if (ok) {
-      console.log(`  ✅ ORDER PLACED — ${orderId}`);
-      if (side === "buy") {
+    if (side === "buy") {
+      const res = await placeOrder("buy", size);
+      const ok = res.code === "00000";
+      const orderId = res.data?.orderId;
+      entry.orderId = orderId || res.msg;
+      entry.orderPlaced = ok;
+
+      if (ok) {
+        console.log(`  ✅ BUY PLACED — ${orderId}`);
         lastBuyXrpQty = await getOrderFill(orderId);
-        console.log(`  📦 Filled: ${lastBuyXrpQty.toFixed(4)} XRP`);
+        console.log(
+          `  📦 Filled: ${lastBuyXrpQty.toFixed(4)} XRP — waiting for lock to clear...`,
+        );
         entry.filledQty = lastBuyXrpQty;
+      } else {
+        console.log(`  ❌ Rejected: ${res.msg}`);
+        holding = "usdt";
       }
     } else {
-      console.log(`  ❌ Rejected: ${res.msg}`);
-      holding = holding === "usdt" ? "xrp" : "usdt";
+      // Use retry loop — handles BitGet's anti-wash-trading lock automatically
+      const { ok, res, soldQty } = await placeSellWithRetry(lastBuyXrpQty);
+      entry.orderId = res.data?.orderId || res.msg;
+      entry.orderPlaced = ok;
+
+      if (ok) {
+        console.log(
+          `  ✅ SELL PLACED — ${entry.orderId} (${soldQty.toFixed(4)} XRP)`,
+        );
+        lastBuyXrpQty = 0;
+      } else {
+        console.log(`  ❌ Sell failed: ${res.msg}`);
+        holding = "xrp"; // still holding
+      }
     }
 
     log.push(entry);
