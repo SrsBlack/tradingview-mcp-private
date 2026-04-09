@@ -38,10 +38,13 @@ PAPER_SYMBOL_SPECS: dict[str, SymbolSpec] = {
     # Forex
     "EURUSD": SymbolSpec(name="EURUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=500.0, volume_step=0.01),
     "GBPUSD": SymbolSpec(name="GBPUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=500.0, volume_step=0.01),
-    # Indices / Commodities
+    # Gold / Oil
     "XAUUSD": SymbolSpec(name="XAUUSD", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=100.0, volume_step=0.01),
-    "US100":  SymbolSpec(name="US100", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=100.0, volume_step=0.01),
-    "US500":  SymbolSpec(name="US500", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=100.0, volume_step=0.01),
+    "UKOIL":  SymbolSpec(name="UKOIL",  tick_size=0.01, tick_value=0.01, volume_min=0.1,  volume_max=500.0, volume_step=0.1),
+    # Indices — FTMO naming
+    "US30":   SymbolSpec(name="US30",   tick_size=1.0,  tick_value=1.0,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
+    "US100":  SymbolSpec(name="US100",  tick_size=0.1,  tick_value=0.1,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
+    "US500":  SymbolSpec(name="US500",  tick_size=0.1,  tick_value=0.1,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
 }
 
 

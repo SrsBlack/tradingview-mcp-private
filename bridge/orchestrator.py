@@ -32,6 +32,7 @@ from bridge.decision_types import TradeDecision
 from bridge.paper_executor import PaperExecutor
 from bridge.live_executor import LiveExecutor
 from bridge.session_store import SessionStore
+from bridge.state_store import StateStore
 from bridge.risk_bridge import RiskBridge
 from bridge.alerts import BridgeAlerts
 from bridge.strategy_engine import StrategyEngine, signal_to_decision
@@ -133,7 +134,7 @@ def _utc_hour(dt: datetime) -> int:
 # Each entry is a list of (start_utc, end_utc) tuples
 _SYMBOL_SESSIONS: dict[str, list[tuple[int, int]]] = {
     # Indices — London open + NY session only (futures market hours)
-    "CBOT:YM1!":  [(7, 21)],           # London 7 UTC + NY close 21 UTC
+    "CBOT:YM1!":  [(7, 22)],           # London 7 UTC + NY close 22 UTC (futures close 5pm ET = 21:00 UTC EDT)
     # Forex — London + NY (7am-5pm UTC)
     "OANDA:EURUSD": [(7, 17)],
     # Crypto — 24/7
@@ -213,15 +214,22 @@ class LiveExecutorAdapter:
     def daily_pnl(self) -> float:
         return round(self.balance - self.initial_balance, 2)
 
-    def open_position(self, decision: TradeDecision) -> dict:
-        """Submit trade to MT5 and mirror state."""
+    def open_position(self, decision: TradeDecision, lot_size: float | None = None) -> dict:
+        """Submit trade to MT5 and mirror state.
+
+        Args:
+            decision: Trade decision from Claude
+            lot_size: Pre-calculated lot size from RiskBridge (preferred).
+                      If not provided, falls back to internal calculation.
+        """
         if not decision.is_trade:
             return {"success": False, "ticket": 0, "message": "Not a trade"}
 
-        # Calculate lot size from risk %
-        risk_amount = self.balance * decision.risk_pct
-        risk_dist = abs(decision.entry_price - decision.sl_price)
-        lot_size = round(risk_amount / risk_dist, 4) if risk_dist > 0 else 0.01
+        # Use pre-calculated lot size from RiskBridge if provided
+        if lot_size is None:
+            risk_amount = self.balance * decision.risk_pct
+            risk_dist = abs(decision.entry_price - decision.sl_price)
+            lot_size = round(risk_amount / risk_dist, 4) if risk_dist > 0 else 0.01
 
         # Run async submit_trade in a dedicated thread with its own event loop
         # (safe from any async context — threads always get a fresh loop)
@@ -403,6 +411,7 @@ class Orchestrator:
         else:
             self.executor = PaperExecutor(initial_balance=initial_balance)
         self.session = SessionStore()
+        self.state_store = StateStore()
         self.tv_client = TVClient()
         self.risk_bridge = RiskBridge()
         self.alerts = BridgeAlerts()
@@ -439,17 +448,76 @@ class Orchestrator:
     async def run(self) -> None:
         """Start the orchestrator with all concurrent loops."""
         self._running = True
+
+        # --- Restore state from previous session (if same day, same mode) ---
+        restored_positions = self.state_store.restore_into(self.executor, self.mode)
+
+        # --- Load today's closed trades from session store for display ---
+        today_trades = self._load_todays_trades()
+
+        # --- Startup banner ---
         knowledge_loaded = bool(self._knowledge.get("symbol_profiles"))
-        print(f"\n{'='*60}", flush=True)
+        n_profiles = len(self._knowledge.get("symbol_profiles", {}))
+        W = 62
+        print(f"\n{'='*W}", flush=True)
         print(f"  Auto-Trading Bridge — {self.mode.upper()} MODE", flush=True)
-        print(f"  Symbols: {', '.join(self.symbols)}", flush=True)
-        print(f"  Balance: ${self.executor.balance:,.2f}", flush=True)
-        print(f"  Analysis interval: {self.analysis_interval}s", flush=True)
-        print(f"  Strategy knowledge: {'LOADED' if knowledge_loaded else 'NOT FOUND'}", flush=True)
-        if knowledge_loaded:
-            n_profiles = len(self._knowledge.get("symbol_profiles", {}))
-            print(f"  Symbol profiles: {n_profiles} | Backtest-informed decisions: ON", flush=True)
-        print(f"{'='*60}\n", flush=True)
+        print(f"  Started : {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}", flush=True)
+        print(f"  Symbols : {', '.join(self.symbols)}", flush=True)
+        print(f"  Balance : ${self.executor.balance:,.2f}  "
+              f"(initial=${self.executor.initial_balance:,.2f})", flush=True)
+        daily_pnl = self.executor.balance - self.executor.initial_balance
+        pnl_sign = "+" if daily_pnl >= 0 else ""
+        print(f"  Daily P&L: {pnl_sign}${daily_pnl:,.2f}  "
+              f"W={self.executor.wins} L={self.executor.losses}", flush=True)
+        print(f"  Strategy: {'LOADED' if knowledge_loaded else 'NOT FOUND'} "
+              f"({n_profiles} profiles)", flush=True)
+        print(f"  Interval: {self.analysis_interval}s", flush=True)
+
+        # Restored open positions
+        if restored_positions:
+            print(f"\n  RESTORED {len(restored_positions)} OPEN POSITION(S):", flush=True)
+            for p in restored_positions:
+                opened = p.get("opened_at", "")[:16].replace("T", " ")
+                print(
+                    f"    #{p['ticket']} {p['direction']} {p['symbol']}  "
+                    f"Entry={p['entry_price']:,.4f}  SL={p['sl_price']:,.4f}  "
+                    f"Grade={p.get('ict_grade','?')}  @ {opened} UTC",
+                    flush=True,
+                )
+        else:
+            print(f"\n  No open positions restored.", flush=True)
+
+        # Today's closed trades
+        closed = [t for t in today_trades if t.get("event") == "CLOSE"]
+        opens  = [t for t in today_trades if t.get("event") == "OPEN"]
+        if today_trades:
+            print(f"\n  TODAY'S TRADES ({len(opens)} opened, {len(closed)} closed):", flush=True)
+            for t in today_trades:
+                evt = t.get("event", "?")
+                sym = t.get("symbol", "")
+                ts  = t.get("timestamp", "")[:16].replace("T", " ")
+                if evt == "OPEN":
+                    print(
+                        f"    OPEN  #{t.get('ticket','')} {t.get('direction','')} {sym}"
+                        f"  @ {t.get('entry_price', t.get('entry', '')):,.4f}"
+                        f"  Grade={t.get('ict_grade','?')}  {ts} UTC",
+                        flush=True,
+                    )
+                elif evt == "CLOSE":
+                    pnl = t.get("pnl", 0)
+                    sign = "+" if pnl >= 0 else ""
+                    result = "WIN " if pnl >= 0 else "LOSS"
+                    print(
+                        f"    {result} #{t.get('ticket','')} {t.get('direction','')} {sym}"
+                        f"  Entry={t.get('entry','')}  Exit={t.get('exit','')}  "
+                        f"PnL={sign}${pnl:.2f} ({t.get('r_multiple',0):+.1f}R)"
+                        f"  {ts} UTC",
+                        flush=True,
+                    )
+        else:
+            print(f"\n  No trades today yet.", flush=True)
+
+        print(f"{'='*W}\n", flush=True)
 
         if self.single_cycle:
             await self._analysis_cycle()
@@ -597,7 +665,10 @@ class Orchestrator:
 
         print(
             f"  [{symbol}] Grade {analysis.grade} ({analysis.total_score:.0f}/100) "
-            f"{analysis.direction} | {len(analysis.confluence_factors)} confluence{ea_info}",
+            f"{analysis.direction} | {len(analysis.confluence_factors)} confluence{ea_info} | "
+            f"struct={analysis.structure_score:.0f} ob={analysis.ob_score:.0f} fvg={analysis.fvg_score:.0f} "
+            f"sess={analysis.session_score:.0f} ote={analysis.ote_score:.0f} smt={analysis.smt_score:.0f} "
+            f"sweep={'Y' if analysis.sweep_detected else 'N'} kz={'Y' if analysis.is_kill_zone else 'N'}",
             flush=True,
         )
 
@@ -665,11 +736,13 @@ class Orchestrator:
             self._kill_switch_triggered = True
             self._kill_switch_date = _now_utc().strftime("%Y-%m-%d")
             print(f"[KILL SWITCH] Daily loss limit 2% reached ({daily_pnl_pct:.2%}). Trading HALTED.", flush=True)
-            asyncio.get_event_loop().call_soon(
-                lambda: asyncio.ensure_future(self.alerts.send_raw(
+            try:
+                loop = asyncio.get_running_loop()
+                loop.call_soon_threadsafe(asyncio.ensure_future, self.alerts.send_raw(
                     f"🛑 *KILL SWITCH: Daily loss limit 2% reached* ({daily_pnl_pct:.2%})\nTrading paused until midnight UTC."
                 ))
-            )
+            except RuntimeError:
+                pass
             return
 
         # Execute if it's a trade
@@ -699,10 +772,29 @@ class Orchestrator:
 
             print(f"  [{symbol}] Risk: {risk_msg}", flush=True)
 
-            result = self.executor.open_position(decision)
+            result = self.executor.open_position(decision, lot_size=lot_size)
             if result["success"]:
                 print(f"  [{symbol}] OPENED: {result['message']}", flush=True)
-                self.session.log_trade({"event": "OPEN", **result})
+                # Log full trade detail — not just the result dict
+                self.session.log_trade({
+                    "event": "OPEN",
+                    "ticket": result["ticket"],
+                    "symbol": decision.symbol,
+                    "direction": decision.action,
+                    "entry_price": decision.entry_price,
+                    "sl_price": decision.sl_price,
+                    "tp_price": decision.tp_price,
+                    "tp2_price": decision.tp2_price,
+                    "lot_size": lot_size,
+                    "risk_pct": decision.risk_pct,
+                    "ict_grade": decision.grade,
+                    "ict_score": decision.ict_score,
+                    "trade_type": decision.trade_type,
+                    "confidence": decision.confidence,
+                    "reasoning": decision.reasoning,
+                    "mode": self.mode,
+                })
+                self.state_store.save(self.executor, self.mode)
                 # Draw trade levels on TradingView chart (save IDs to remove on close)
                 try:
                     entity_ids = self.tv_client.draw_trade(
@@ -722,18 +814,20 @@ class Orchestrator:
                     pass
                 # Send alert (fire-and-forget)
                 _dec, _lot, _ticket = decision, lot_size, result["ticket"]
-                asyncio.get_event_loop().call_soon(
-                    lambda d=_dec, l=_lot, t=_ticket: asyncio.ensure_future(
+                try:
+                    _loop = asyncio.get_running_loop()
+                    _loop.call_soon_threadsafe(asyncio.ensure_future,
                         self.alerts.send_trade_open(
-                            symbol=d.symbol, direction=d.action,
-                            entry_price=d.entry_price, sl_price=d.sl_price,
-                            tp_price=d.tp_price, tp2_price=d.tp2_price,
-                            lot_size=l, grade=d.grade, score=d.ict_score,
-                            confidence=d.confidence, reasoning=d.reasoning,
-                            ticket=t, mode=self.mode,
+                            symbol=_dec.symbol, direction=_dec.action,
+                            entry_price=_dec.entry_price, sl_price=_dec.sl_price,
+                            tp_price=_dec.tp_price, tp2_price=_dec.tp2_price,
+                            lot_size=_lot, grade=_dec.grade, score=_dec.ict_score,
+                            confidence=_dec.confidence, reasoning=_dec.reasoning,
+                            ticket=_ticket, mode=self.mode,
                         )
                     )
-                )
+                except RuntimeError:
+                    pass
             else:
                 print(f"  [{symbol}] Rejected: {result['message']}", flush=True)
 
@@ -748,7 +842,7 @@ class Orchestrator:
         while self._running:
             if self.executor.open_positions:
                 try:
-                    events = await asyncio.get_event_loop().run_in_executor(
+                    events = await asyncio.get_running_loop().run_in_executor(
                         None, self._check_positions_sync
                     )
                     for event in events:
@@ -760,6 +854,7 @@ class Orchestrator:
                             flush=True,
                         )
                         self.session.log_trade({"event": "CLOSE", **event})
+                        self.state_store.save(self.executor, self.mode)
                         # Remove only this trade's chart lines (never touches other drawings)
                         ticket = event.get("ticket")
                         if ticket and ticket in self._trade_drawings:
@@ -782,14 +877,22 @@ class Orchestrator:
     def _check_positions_sync(self) -> list[dict]:
         """Get current prices and check positions."""
         prices: dict[str, float] = {}
+        target_sym = None
         for pos in self.executor.open_positions.values():
             try:
+                target_sym = pos.symbol.split(":")[-1]
                 self.tv_client.set_symbol(pos.symbol)
-                time.sleep(0.5)
-                quote = self.tv_client.get_quote()
-                price = quote.get("last") or quote.get("lp") or quote.get("close", 0)
-                if price:
-                    prices[pos.symbol] = float(price)
+                # Poll until chart confirms the symbol — up to 5s
+                price = 0.0
+                for _ in range(5):
+                    time.sleep(1.0)
+                    quote = self.tv_client.get_quote()
+                    chart_sym = quote.get("symbol", "").split(":")[-1]
+                    if chart_sym == target_sym:
+                        price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                        break
+                if price > 0:
+                    prices[pos.symbol] = price
             except TVClientError:
                 pass
 
@@ -829,8 +932,9 @@ class Orchestrator:
                 flush=True,
             )
 
-            # Save periodic snapshot
+            # Save periodic snapshot + persist state for restart recovery
             self.session.save_snapshot(summary)
+            self.state_store.save(self.executor, self.mode)
 
             # Daily summary at 5 PM ET — fires once per day, does NOT stop the loop
             # (system runs 24/7 for crypto; summary is informational only)
@@ -840,6 +944,23 @@ class Orchestrator:
                 self._last_eod_date = et_date
                 self._save_end_of_day()
                 print("[HEALTH] 5pm ET — daily summary sent.", flush=True)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _load_todays_trades(self) -> list[dict]:
+        """Load today's trade events from the session store for the startup banner."""
+        try:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            session_file = Path.home() / ".tradingview-mcp" / "sessions" / f"{today}.json"
+            if not session_file.exists():
+                return []
+            data = json.loads(session_file.read_text(encoding="utf-8"))
+            return [t for t in data.get("trades", [])
+                    if t.get("event") in ("OPEN", "CLOSE")]
+        except Exception:
+            return []
 
     # ------------------------------------------------------------------
     # End of day
@@ -856,12 +977,9 @@ class Orchestrator:
 
         # Send daily summary alert (best-effort)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(self.alerts.send_daily_summary(summary, self.mode))
-            else:
-                loop.run_until_complete(self.alerts.send_daily_summary(summary, self.mode))
-        except Exception:
+            loop = asyncio.get_running_loop()
+            asyncio.ensure_future(self.alerts.send_daily_summary(summary, self.mode))
+        except RuntimeError:
             pass
 
 
@@ -894,14 +1012,42 @@ def main():
         single_cycle=args.single or args.interval == 0,
     )
 
-    # Graceful shutdown on Ctrl+C
-    def handle_signal(sig, frame):
-        print("\n[SIGNAL] Received interrupt, shutting down...", flush=True)
-        orch.stop()
+    async def _run_with_shutdown():
+        loop = asyncio.get_running_loop()
 
-    signal.signal(signal.SIGINT, handle_signal)
+        # Cancel all tasks on SIGINT/SIGTERM — works on Windows too
+        def _request_shutdown():
+            print("\n[SIGNAL] Ctrl+C received — shutting down cleanly...", flush=True)
+            orch.stop()
+            for task in asyncio.all_tasks(loop):
+                task.cancel()
 
-    asyncio.run(orch.run())
+        # Windows: signal module only supports SIGINT in main thread via add_signal_handler on Unix.
+        # Use signal.signal() which works on Windows for SIGINT.
+        import signal as _signal
+        _signal.signal(_signal.SIGINT, lambda s, f: loop.call_soon_threadsafe(_request_shutdown))
+        if hasattr(_signal, "SIGTERM"):
+            _signal.signal(_signal.SIGTERM, lambda s, f: loop.call_soon_threadsafe(_request_shutdown))
+
+        try:
+            await orch.run()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            print("[ORCH] Saving session and exiting...", flush=True)
+            orch._save_end_of_day()
+            # Print final account summary
+            summary = orch.executor.get_account_summary()
+            print(
+                f"\n[SESSION END]\n"
+                f"  Balance : ${summary['balance']:,.2f}\n"
+                f"  Daily P&L: {summary['daily_pnl_pct']}\n"
+                f"  Trades  : W={summary['wins']} L={summary['losses']}\n"
+                f"  Cycles  : {orch._cycle_count}\n",
+                flush=True,
+            )
+
+    asyncio.run(_run_with_shutdown())
 
 
 if __name__ == "__main__":

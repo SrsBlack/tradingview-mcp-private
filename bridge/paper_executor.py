@@ -72,9 +72,14 @@ class PaperExecutor:
     # Open position
     # ------------------------------------------------------------------
 
-    def open_position(self, decision: TradeDecision) -> dict:
+    def open_position(self, decision: TradeDecision, lot_size: float | None = None) -> dict:
         """
         Open a paper position from a trade decision.
+
+        Args:
+            decision: Trade decision from Claude
+            lot_size: Pre-calculated lot size from RiskBridge (preferred).
+                      If not provided, falls back to internal calculation.
 
         Returns:
             {"success": bool, "ticket": int, "message": str}
@@ -95,14 +100,13 @@ class PaperExecutor:
         ticket = self._next_ticket
         self._next_ticket += 1
 
-        # Calculate lot size from risk %
-        risk_amount = self.balance * decision.risk_pct
-        risk_distance = abs(decision.entry_price - decision.sl_price)
-        if risk_distance <= 0:
-            return {"success": False, "ticket": 0, "message": "Invalid SL distance"}
-
-        # For crypto/forex, lot_size represents notional units
-        lot_size = round(risk_amount / risk_distance, 4)
+        # Use pre-calculated lot size from RiskBridge if provided
+        if lot_size is None:
+            risk_amount = self.balance * decision.risk_pct
+            risk_distance = abs(decision.entry_price - decision.sl_price)
+            if risk_distance <= 0:
+                return {"success": False, "ticket": 0, "message": "Invalid SL distance"}
+            lot_size = round(risk_amount / risk_distance, 4)
 
         position = PaperPosition(
             ticket=ticket,

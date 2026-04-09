@@ -216,6 +216,15 @@ class TVClient:
             color_sl = "#F44336"      # red
             color_tp = "#4CAF50"      # green
 
+            # Entry arrow — points toward price action (up for BUY, down for SELL)
+            arrow = "▲" if direction == "BUY" else "▼"
+            arrow_color = "#00E676" if direction == "BUY" else "#FF1744"
+            r = self.draw_shape("text", entry,
+                                text=f"{arrow} #{ticket} {grade} {direction}",
+                                overrides={"color": arrow_color, "fontsize": 14, "bold": True})
+            if r.get("entity_id"):
+                entity_ids.append(r["entity_id"])
+
             r = self.draw_shape("horizontal_line", entry,
                                 text=f"#{ticket} {symbol} ENTRY {direction} {grade}",
                                 overrides={"linecolor": color_entry, "linewidth": 2})

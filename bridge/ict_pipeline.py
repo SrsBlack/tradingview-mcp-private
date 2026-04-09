@@ -416,53 +416,51 @@ class ICTPipeline:
         except TVClientError:
             pass
 
+        # At this point the chart is confirmed on the correct symbol.
+        # All subsequent OHLCV fetches switch timeframe only (switch=False for symbol).
+        # This prevents re-triggering a symbol switch that could race with stale data.
+
+        def _fetch_tf(timeframe: str, count: int) -> pd.DataFrame | None:
+            """Switch to timeframe (symbol already correct) and fetch OHLCV."""
+            try:
+                self.client.set_timeframe(timeframe)
+                time.sleep(1.5)  # wait for bars to reload on new timeframe
+                raw = self.client.get_ohlcv(switch=False, count=count)
+                # Verify the returned data isn't from the wrong symbol by checking
+                # that the current quote symbol still matches our target
+                try:
+                    q = self.client.get_quote()
+                    live_sym = q.get("symbol", "").split(":")[-1]
+                    if live_sym and live_sym != target_sym:
+                        print(f"[WARN] Symbol drift on {timeframe}: expected {target_sym}, got {live_sym} — discarding", flush=True)
+                        return None
+                except Exception:
+                    pass
+                df = bars_to_dataframe(raw)
+                valid, _ = validate_dataframe(df)
+                return df if valid else None
+            except TVClientError:
+                return None
+
         # Check H4 cache
         cached = self._h4_cache.get(symbol)
         if cached and (time.time() - cached[1]) < self._H4_CACHE_TTL:
             dfs["H4"] = cached[0]
         else:
-            # Fetch H4
-            try:
-                raw = self.client.get_ohlcv(
-                    symbol=symbol,
-                    timeframe=cfg.htf,
-                    count=cfg.bar_counts.get(cfg.htf, 200),
-                )
-                df = bars_to_dataframe(raw)
-                valid, reason = validate_dataframe(df)
-                if valid:
-                    dfs["H4"] = df
-                    self._h4_cache[symbol] = (df, time.time())
-            except TVClientError:
-                pass  # will log single summary below if all TFs fail
+            df = _fetch_tf(cfg.htf, cfg.bar_counts.get(cfg.htf, 200))
+            if df is not None:
+                dfs["H4"] = df
+                self._h4_cache[symbol] = (df, time.time())
 
-        # Fetch H1 — chart is already on correct symbol, only switch timeframe
-        try:
-            raw = self.client.get_ohlcv(
-                timeframe=cfg.itf,
-                count=cfg.bar_counts.get(cfg.itf, 200),
-                switch=True,
-            )
-            df = bars_to_dataframe(raw)
-            valid, _ = validate_dataframe(df)
-            if valid:
-                dfs["H1"] = df
-        except TVClientError:
-            pass
+        # Fetch H1
+        df = _fetch_tf(cfg.itf, cfg.bar_counts.get(cfg.itf, 200))
+        if df is not None:
+            dfs["H1"] = df
 
-        # Fetch M15 — chart is already on correct symbol, only switch timeframe
-        try:
-            raw = self.client.get_ohlcv(
-                timeframe=cfg.ltf,
-                count=cfg.bar_counts.get(cfg.ltf, 200),
-                switch=True,
-            )
-            df = bars_to_dataframe(raw)
-            valid, _ = validate_dataframe(df)
-            if valid:
-                dfs["M15"] = df
-        except TVClientError:
-            pass
+        # Fetch M15
+        df = _fetch_tf(cfg.ltf, cfg.bar_counts.get(cfg.ltf, 200))
+        if df is not None:
+            dfs["M15"] = df
 
         return dfs
 
