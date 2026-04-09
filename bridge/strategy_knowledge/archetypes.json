@@ -1,0 +1,320 @@
+{
+  "_description": "Strategy archetypes group related strategies by trade logic. The decision engine selects the right archetype based on market regime + session + ICT signals, then evaluates specific strategies within that archetype.",
+  "_created": "2026-04-08",
+
+  "archetypes": {
+    "REVERSAL": {
+      "description": "Fade exhausted moves after liquidity is taken. Buy below lows, sell above highs.",
+      "when_to_use": "After liquidity sweep confirmed + CHoCH/MSS on LTF + price in discount/premium zone",
+      "regime_fit": ["trending_exhaustion", "volatile", "range_extreme"],
+      "risk_reward_minimum": 2.0,
+      "strategies": [
+        {
+          "id": "ICT_Reversal",
+          "name": "ICT Reversal (Liquidity Sweep + CHoCH)",
+          "source": "existing",
+          "triggers": ["Liquidity sweep to HSL/SSL", "CHoCH confirmed", "Order Block mitigation"],
+          "timeframes": ["M15", "H1", "H4"],
+          "entry": "Enter at breaker block or OB after CHoCH confirms on LTF",
+          "stop": "Beyond the swept high/low",
+          "target": "Next HTF liquidity level (prior swing high/low)"
+        },
+        {
+          "id": "AMD_Distribution",
+          "name": "AMD Distribution Phase",
+          "source": "chartfanatics_amd",
+          "triggers": ["Accumulation range identified", "Manipulation sweep completed", "Displacement candle with FVG"],
+          "timeframes": ["M5", "M15", "H1"],
+          "entry": "Retrace into FVG left by displacement candle",
+          "stop": "Above manipulation spike high/low",
+          "target": "Partial at swing levels, trail remainder",
+          "time_filter": "9:50-10:10 ET or 10:50-11:10 ET",
+          "max_trades_per_session": 2
+        },
+        {
+          "id": "Mean_Reversion",
+          "name": "Mean Reversion (Extreme Displacement)",
+          "source": "chartfanatics_breitstein",
+          "triggers": ["Price >2 standard deviations from 20 EMA", "Volume spike (>2x average)", "Multiple consecutive same-direction candles", "Structure break confirms reversal"],
+          "timeframes": ["H1", "H4", "D1"],
+          "entry": "After structure break confirms reversal (break above prior bar high for longs)",
+          "stop": "Below capitulation low (longs) / above parabolic high (shorts)",
+          "target": "20 EMA (first target), then trail"
+        },
+        {
+          "id": "Failed_Auction",
+          "name": "Failed Auction (Auction Market Theory)",
+          "source": "chartfanatics_amt",
+          "triggers": ["Price moves aggressively to one side", "Fails to attract follow-through", "Opposing side absorbs pressure"],
+          "timeframes": ["M15", "H1"],
+          "entry": "When opposing side takes clear control (absorption confirmed)",
+          "stop": "Beyond the failed auction extreme",
+          "target": "Return to fair value / prior balance area"
+        },
+        {
+          "id": "Liquidity_Grab_Reversal",
+          "name": "Liquidity Grab Reversal",
+          "source": "chartfanatics_marco",
+          "triggers": ["Key high/low that price respected and moved away from", "Price returns and trades through the level", "Internal structure confirms trap"],
+          "timeframes": ["M15", "H1", "H4"],
+          "entry": "After liquidity is taken and price reclaims the level",
+          "stop": "Below swept low (longs) / above swept high (shorts)",
+          "target": "Opposing liquidity (next major high/low)"
+        }
+      ]
+    },
+
+    "CONTINUATION": {
+      "description": "Join existing trend after healthy pullback. Trade with structure, not against it.",
+      "when_to_use": "Clear BOS confirmed + pullback to discount (longs) or premium (shorts) + FVG/OB behind price",
+      "regime_fit": ["trending", "strong_momentum"],
+      "risk_reward_minimum": 1.5,
+      "strategies": [
+        {
+          "id": "ICT_Continuation",
+          "name": "ICT Continuation (BOS + FVG)",
+          "source": "existing",
+          "triggers": ["Break of Structure confirmed", "Bullish/Bearish FVG behind", "No IFVG (no inversion)"],
+          "timeframes": ["M15", "H1", "H4"],
+          "entry": "Pullback into FVG zone",
+          "stop": "Beyond the FVG",
+          "target": "Next structure level"
+        },
+        {
+          "id": "Structure_OTE",
+          "name": "Structure + OTE Pullback",
+          "source": "chartfanatics_tradermayne",
+          "triggers": ["HTF market structure break (MSB)", "Pullback to 50%+ of range (discount/premium)", "LTF liquidity sweep + breaker block"],
+          "timeframes": ["M15", "H1", "H4"],
+          "entry": "At breaker block after MSB on LTF, inside discount zone (longs) or premium zone (shorts)",
+          "stop": "Below swept lows (longs) / above swept highs (shorts)",
+          "target": "Next HTF external liquidity (prior swing high/low)",
+          "minimum_rr": 2.0
+        },
+        {
+          "id": "PO3_OTE_ADR",
+          "name": "PO3, OTE + ADR (Market Maker Model)",
+          "source": "chartfanatics_nbb",
+          "triggers": ["Price at PD Array (PDH/PDL, FVG, OB, weekly levels)", "SMR pattern confirmed (15M/30M)", "Displacement candle with body close past level", "Fibonacci retracement to 0.50-0.79 zone"],
+          "timeframes": ["M15", "M30", "H1", "H4", "D1"],
+          "entry": "Limit order at OTE zone (0.62 or 0.705 Fibonacci level preferred)",
+          "stop": "At 1.0 Fibonacci level (swing extreme) or 0.90 for tighter risk",
+          "target": "0.0 Fibonacci level, then trail if momentum continues",
+          "time_filter": "London Open (2-5am ET) or NY Open (7-10am ET)",
+          "be_rule": "Move to breakeven when price closes past 0.20 Fibonacci level",
+          "applicable_markets": ["forex"]
+        },
+        {
+          "id": "Trendline_Bounce",
+          "name": "Trendline Bounce",
+          "source": "chartfanatics_tori",
+          "triggers": ["2-3 touchpoint trendline identified", "Price reaches trendline", "Candle confirms rejection"],
+          "timeframes": ["H4", "D1"],
+          "entry": "At trendline touch with confirmation candle",
+          "stop": "Below trendline (close below = exit)",
+          "target": "Prior swing high/low"
+        },
+        {
+          "id": "Break_Retest",
+          "name": "Break & Retest",
+          "source": "chartfanatics_desiano",
+          "triggers": ["Major level broken with momentum", "Price pulls back to retest the level", "Confirmation candle (wick into level, close in trade direction)"],
+          "timeframes": ["M15", "H1", "H4"],
+          "entry": "After confirmation candle at retest zone",
+          "stop": "Beyond invalidation point (below level for longs)",
+          "target": "TP1 at prior high/low, then trail",
+          "partial_tp": "25-50% at TP1"
+        }
+      ]
+    },
+
+    "LIQUIDITY": {
+      "description": "Trade where institutional orders cluster. Enter after liquidity events, target liquidity pools.",
+      "when_to_use": "Clear liquidity levels identified + sweep event occurs + LTF confirms direction",
+      "regime_fit": ["ranging", "volatile", "pre_breakout"],
+      "risk_reward_minimum": 2.0,
+      "strategies": [
+        {
+          "id": "Liquidity_Run",
+          "name": "Liquidity Run (Displacement + Draw)",
+          "source": "existing",
+          "triggers": ["Large displacement move", "Draw-on-liquidity identified", "Retracement to FVG"],
+          "timeframes": ["H1", "H4", "D1"],
+          "entry": "At FVG during retracement toward draw-on-liquidity",
+          "stop": "Beyond the displacement candle",
+          "target": "The draw-on-liquidity target"
+        },
+        {
+          "id": "Order_Block_Bounce",
+          "name": "Order Block Bounce",
+          "source": "existing",
+          "triggers": ["Price touches OB zone", "High-quality OB (no prior fills)", "Candlestick rejection"],
+          "timeframes": ["M15", "H1", "H4"],
+          "entry": "At OB with rejection confirmation",
+          "stop": "Beyond the OB zone",
+          "target": "Next liquidity level"
+        },
+        {
+          "id": "Intraday_Liquidity_Volatility",
+          "name": "Intraday Liquidity & Volatility Model",
+          "source": "chartfanatics_jadecap",
+          "triggers": ["PDH/PDL or Asian/London high/low swept during NY", "LTF confirms via FVG/MSS/Turtle Soup/Breaker Block"],
+          "timeframes": ["M5", "M15", "H1"],
+          "entry": "After liquidity raid + LTF confirmation between 9:30-11:30 ET",
+          "stop": "Above swept high (shorts) / below swept low (longs)",
+          "target": "Opposite session liquidity zones or HTF FVGs",
+          "time_filter": "9:30-11:30 ET"
+        },
+        {
+          "id": "Low_Volume_Node",
+          "name": "Low Volume Node",
+          "source": "chartfanatics_rosato",
+          "triggers": ["Volume profile shows LVN zone", "Price returns to LVN", "Order flow confirms defender at level"],
+          "timeframes": ["M5", "M15"],
+          "entry": "At LVN with order flow confirmation",
+          "stop": "Beyond the LVN or recent swing",
+          "target": "Next high-volume area or LVN",
+          "requires": "volume_profile_data"
+        }
+      ]
+    },
+
+    "TIMING": {
+      "description": "Time-specific setups that only work in narrow windows. These are precision entries.",
+      "when_to_use": "When the exact time window is active AND the pattern forms",
+      "regime_fit": ["all"],
+      "risk_reward_minimum": 2.5,
+      "strategies": [
+        {
+          "id": "Trident_High_RR",
+          "name": "Trident / Unique High RR (London Kill Zone)",
+          "source": "chartfanatics_tgcapital",
+          "triggers": ["3-candle FVG on 30M chart (2:30-4:00 AM ET)", "FVG 50% level marked", "Small doji candle wicks into FVG 50%", "Confirmation candle closes below doji high", "EMA stack (5/9/13/21) aligned in direction + price relative to 200 EMA"],
+          "timeframes": ["M30"],
+          "entry": "On confirmation candle close or limit at FVG 50%",
+          "stop": "Below FVG candle low (standard) or no hard stop for Gold",
+          "target": "Ride trend via daily chart structure, exit when EMAs reverse",
+          "time_filter": "3:00-6:30 AM ET only",
+          "valid_pairs": ["USDJPY", "EURUSD", "GBPUSD", "NZDUSD", "USDCAD", "XAUUSD"],
+          "win_rate_claimed": "~90% when all rules followed",
+          "notes": "Very selective — may only appear a few times per year per pair. But when it hits, massive R:R."
+        },
+        {
+          "id": "SMT_Divergence_PO3",
+          "name": "SMT Divergence + PO3 (10 AM Manipulation)",
+          "source": "chartfanatics_traderkane",
+          "triggers": ["Daily/4H/1H align around same 50% level", "Manipulation move around 10:00 AM ET", "SMT divergence (NQ vs ES, or BTC vs ETH)", "Price rejects inversion zone"],
+          "timeframes": ["M3", "M5", "M15", "H1", "H4", "D1"],
+          "entry": "Sell stop below inversion zone (shorts) or buy stop above (longs)",
+          "stop": "Above/below the SMT divergence extreme",
+          "target": "50% level of H1 dealing range",
+          "be_rule": "Move to breakeven once hourly candle confirms direction",
+          "time_filter": "Around 10:00 AM ET",
+          "smt_pairs": {"US100.cash": "US30.cash", "BTCUSD": "ETHUSD", "EURUSD": "GBPUSD", "XAUUSD": "XAGUSD"}
+        },
+        {
+          "id": "Silver_Bullet",
+          "name": "Silver Bullet (Asian Open Reversal)",
+          "source": "existing_ict",
+          "triggers": ["M5 spike at Asian open", "Reversal candle pattern"],
+          "timeframes": ["M5"],
+          "entry": "On reversal confirmation",
+          "stop": "Beyond the spike",
+          "target": "Asian session range"
+        }
+      ]
+    }
+  },
+
+  "confluence_filters": {
+    "_description": "These are NOT standalone strategies. They modify confidence scores of archetype strategies.",
+    "filters": [
+      {
+        "id": "volume_profile_edge",
+        "name": "Volume Profile Edge Alignment",
+        "source": "chartfanatics_vp",
+        "condition": "Price at HVA/LVA boundary with signal candle",
+        "effect": "+5 to ICT score when aligned, -5 when price is mid-HVA",
+        "requires": "volume_profile_data"
+      },
+      {
+        "id": "ema_stack_confirm",
+        "name": "EMA Stack Confirmation",
+        "source": "chartfanatics_trident",
+        "condition": "5/9/13/21 EMAs stacked in trade direction + price above/below 200 EMA",
+        "effect": "+8 to ICT score when fully aligned, 0 when mixed, -5 when opposing"
+      },
+      {
+        "id": "mean_reversion_warning",
+        "name": "Mean Reversion Warning",
+        "source": "chartfanatics_breitstein",
+        "condition": "Price >2 standard deviations from 20 EMA + 3+ consecutive same-direction candles",
+        "effect": "-10 to continuation strategies, +10 to reversal strategies. If >3 SD, flag as 'extreme — reversal only'."
+      },
+      {
+        "id": "backtest_confidence",
+        "name": "Backtest Performance Multiplier",
+        "source": "mt5_reports",
+        "condition": "MT5 Sharpe ratio for this symbol's optimal EA config",
+        "effect": "Sharpe > 15: +5, Sharpe > 10: +3, Sharpe > 5: +1, No data: -3"
+      },
+      {
+        "id": "regime_match",
+        "name": "Regime-Strategy Match",
+        "source": "new_regime_classifier",
+        "condition": "Current regime matches strategy archetype's regime_fit",
+        "effect": "+5 when matched, -8 when mismatched (e.g., reversal strategy in strong trend)"
+      },
+      {
+        "id": "adr_exhaustion",
+        "name": "ADR Exhaustion Check",
+        "source": "chartfanatics_multiple",
+        "condition": "Price has moved >80% of Average Daily Range",
+        "effect": "-10 to continuation strategies targeting further extension. +5 to reversal strategies."
+      },
+      {
+        "id": "bb_regime",
+        "name": "Bollinger Band Regime Classification",
+        "source": "chartfanatics_crudele",
+        "condition": "BB(20,3SD) band width classifies market: contracting=consolidation, expanding=trend, contracting-after-peak=mean-reversion",
+        "effect": "Consolidation: favor range strategies, avoid breakout. Expansion: favor continuation, avoid reversal. Mean-reversion: favor reversal at 30% Fib of BB peak-to-peak."
+      },
+      {
+        "id": "vix_es_divergence",
+        "name": "VIX/ES Divergence (Index Only)",
+        "source": "chartfanatics_oneil",
+        "condition": "ES breaks PDL + VIX reaches PDH = confirmed institutional hedging. ES breaks PDL but NQ holds + VIX weak = false breakdown.",
+        "effect": "Confirmed: +8 to short signals on indices. False: -10 to short signals (likely reversal). 1% rule: both ES and VIX up 1%+ = fragile strength, avoid longs at resistance.",
+        "applicable_symbols": ["US30.cash", "US100.cash"]
+      },
+      {
+        "id": "consecutive_candle_filter",
+        "name": "Consecutive Candle / First Red Day Filter",
+        "source": "chartfanatics_temiz_williams",
+        "condition": "3+ consecutive same-direction candles with expanding range and volume = potential exhaustion",
+        "effect": "+5 to reversal strategies (First Red Day pattern). -5 to continuation entries on the last candle of a streak. If parabolic acceleration detected: flag as reversal-only."
+      },
+      {
+        "id": "universal_three_step",
+        "name": "Universal Three-Step Validation",
+        "source": "chartfanatics_traveling_trader",
+        "condition": "Check if current signal follows the three-step pattern: 1) Liquidity Catalyst (sweep, break, shift), 2) Displacement (decisive confirming move), 3) Retracement (pullback to entry zone)",
+        "effect": "+10 if all 3 steps confirmed. -5 if entering on step 1 or 2 (too early, no retracement yet). 'No Liquidity Catalyst = No Trade' applies as hard filter."
+      },
+      {
+        "id": "dual_tf_ma_alignment",
+        "name": "Dual Timeframe MA Alignment",
+        "source": "chartfanatics_dhall",
+        "condition": "Price above/below 21+50 EMA on BOTH daily and intraday timeframe in trade direction",
+        "effect": "+6 when fully aligned on both TFs. -4 when conflicting (daily bullish but intraday below MAs)."
+      },
+      {
+        "id": "pattern_degradation",
+        "name": "Pattern Degradation Filter",
+        "source": "chartfanatics_silfrain",
+        "condition": "Track consecutive similar setups on same symbol. 1st-2nd occurrence = strongest. 3rd = moderate. 4th+ = weakening.",
+        "effect": "1st-2nd: no adjustment. 3rd: -3. 4th: -6. 5th+: -10 (trend likely exhausting)."
+      }
+    ]
+  }
+}

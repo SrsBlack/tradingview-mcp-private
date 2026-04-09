@@ -1,0 +1,326 @@
+{
+  "_description": "Per-symbol strategy profiles derived from MT5 backtests (375K passes) + ChartFanatics strategy fit analysis. Used by confluence_scorer and session_router.",
+  "_created": "2026-04-08",
+  "_sources": ["MT5 reports (41 XML files)", "ChartFanatics (33 strategies)", "trading-ai-v2 EA ensemble"],
+
+  "EURUSD": {
+    "asset_class": "forex",
+    "mt5_metrics": {
+      "profit_factor": 2.208,
+      "sharpe_ratio": 18.52,
+      "max_drawdown_pct": 7.95,
+      "net_profit": 103426,
+      "total_passes": 25186,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "high"
+    },
+    "scoring_weights": {
+      "structure": 0.22,
+      "liquidity": 0.18,
+      "order_block": 0.08,
+      "fvg": 0.08,
+      "ote": 0.06,
+      "session": 0.12,
+      "po3_phase": 0.06,
+      "kill_zone": 0.05,
+      "smt": 0.02,
+      "regime": 0.05,
+      "ema_stack": 0.03,
+      "adr_status": 0.03,
+      "trendline": 0.01,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "PO3_OTE_ADR",
+      "Trendline_Break_Pocket",
+      "Structure_OTE",
+      "Intraday_Liquidity_Volatility"
+    ],
+    "best_sessions": ["london_open", "ny_open"],
+    "regime_fit": ["trending"],
+    "smt_pair": "GBPUSD",
+    "risk_profile": {
+      "grade_a_risk_pct": 1.0,
+      "grade_b_risk_pct": 0.6,
+      "grade_c_risk_pct": 0.3,
+      "backtest_confidence_multiplier": 1.4
+    },
+    "notes": "Best overall performer. Sharpe 18.52 is exceptional. Session timing critical — London and NY dominate. PO3+OTE+ADR strategy was literally designed for this pair."
+  },
+
+  "US30.cash": {
+    "asset_class": "index",
+    "mt5_metrics": {
+      "profit_factor": 2.009,
+      "sharpe_ratio": 17.39,
+      "max_drawdown_pct": 14.24,
+      "net_profit": 55371,
+      "total_passes": 70960,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "secondary_ea": "StructureOTE_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "high"
+    },
+    "scoring_weights": {
+      "structure": 0.20,
+      "liquidity": 0.16,
+      "order_block": 0.10,
+      "fvg": 0.10,
+      "ote": 0.05,
+      "session": 0.10,
+      "po3_phase": 0.06,
+      "kill_zone": 0.06,
+      "smt": 0.02,
+      "regime": 0.05,
+      "ema_stack": 0.04,
+      "adr_status": 0.03,
+      "trendline": 0.02,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "AMD_Model",
+      "Break_Retest",
+      "Auction_Market_Theory",
+      "Structure_OTE"
+    ],
+    "best_sessions": ["ny_open"],
+    "regime_fit": ["trending", "momentum_burst"],
+    "smt_pair": "US100.cash",
+    "risk_profile": {
+      "grade_a_risk_pct": 0.75,
+      "grade_b_risk_pct": 0.45,
+      "grade_c_risk_pct": 0.2,
+      "backtest_confidence_multiplier": 1.3
+    },
+    "notes": "Second best Sharpe. Higher DD (14.24%) warrants conservative sizing. AMD Model 9:50-10:10 ET window is prime. StructureOTE_EA validated with 54K trades."
+  },
+
+  "BTCUSD": {
+    "asset_class": "crypto",
+    "mt5_metrics": {
+      "profit_factor": 2.27,
+      "sharpe_ratio": null,
+      "max_drawdown_pct": null,
+      "net_profit": null,
+      "total_passes": 8476,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "medium"
+    },
+    "scoring_weights": {
+      "structure": 0.22,
+      "liquidity": 0.18,
+      "order_block": 0.12,
+      "fvg": 0.10,
+      "ote": 0.08,
+      "session": 0.04,
+      "po3_phase": 0.04,
+      "kill_zone": 0.02,
+      "smt": 0.05,
+      "regime": 0.06,
+      "ema_stack": 0.04,
+      "adr_status": 0.02,
+      "trendline": 0.02,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "ICT_Reversal",
+      "Liquidity_Run",
+      "Structure_OTE",
+      "ICT_Continuation"
+    ],
+    "best_sessions": ["ny_open", "london_open", "all"],
+    "regime_fit": ["trending", "ranging", "volatile"],
+    "smt_pair": "ETHUSD",
+    "risk_profile": {
+      "grade_a_risk_pct": 1.0,
+      "grade_b_risk_pct": 0.5,
+      "grade_c_risk_pct": 0.25,
+      "backtest_confidence_multiplier": 1.0
+    },
+    "notes": "24/7 market — session timing less critical but NY/London overlap still strongest. SMT with ETH is high-value signal. PF 2.27 is decent but not exceptional."
+  },
+
+  "ETHUSD": {
+    "asset_class": "crypto",
+    "mt5_metrics": {
+      "profit_factor": 2.98,
+      "sharpe_ratio": null,
+      "max_drawdown_pct": null,
+      "net_profit": null,
+      "total_passes": 7459,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "medium"
+    },
+    "scoring_weights": {
+      "structure": 0.22,
+      "liquidity": 0.18,
+      "order_block": 0.12,
+      "fvg": 0.10,
+      "ote": 0.06,
+      "session": 0.04,
+      "po3_phase": 0.04,
+      "kill_zone": 0.02,
+      "smt": 0.06,
+      "regime": 0.06,
+      "ema_stack": 0.04,
+      "adr_status": 0.03,
+      "trendline": 0.02,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "ICT_Reversal",
+      "SMT_Divergence_PO3",
+      "Liquidity_Run",
+      "ICT_Continuation"
+    ],
+    "best_sessions": ["ny_open", "london_open", "all"],
+    "regime_fit": ["trending", "ranging", "volatile"],
+    "smt_pair": "BTCUSD",
+    "risk_profile": {
+      "grade_a_risk_pct": 1.0,
+      "grade_b_risk_pct": 0.5,
+      "grade_c_risk_pct": 0.25,
+      "backtest_confidence_multiplier": 1.1
+    },
+    "notes": "PF 2.98 is strongest crypto. SMT divergence with BTC is primary edge — when ETH makes new high but BTC doesn't, that's a high-conviction short signal."
+  },
+
+  "SOLUSD": {
+    "asset_class": "crypto",
+    "mt5_metrics": {
+      "profit_factor": 4.224,
+      "sharpe_ratio": null,
+      "max_drawdown_pct": null,
+      "net_profit": null,
+      "total_passes": 10198,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "low"
+    },
+    "scoring_weights": {
+      "structure": 0.25,
+      "liquidity": 0.20,
+      "order_block": 0.12,
+      "fvg": 0.10,
+      "ote": 0.08,
+      "session": 0.03,
+      "po3_phase": 0.03,
+      "kill_zone": 0.02,
+      "smt": 0.02,
+      "regime": 0.06,
+      "ema_stack": 0.04,
+      "adr_status": 0.02,
+      "trendline": 0.02,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "ICT_Continuation",
+      "Liquidity_Run",
+      "ICT_Reversal"
+    ],
+    "best_sessions": ["all"],
+    "regime_fit": ["trending"],
+    "smt_pair": null,
+    "risk_profile": {
+      "grade_a_risk_pct": 0.5,
+      "grade_b_risk_pct": 0.3,
+      "grade_c_risk_pct": 0.15,
+      "backtest_confidence_multiplier": 0.7
+    },
+    "notes": "PF 4.224 looks great but only 1 optimization file (10K passes). Needs more backtesting. Conservative sizing until validated. No SMT pair."
+  },
+
+  "XAUUSD": {
+    "asset_class": "commodity",
+    "mt5_metrics": {
+      "profit_factor": null,
+      "sharpe_ratio": 9.57,
+      "max_drawdown_pct": null,
+      "net_profit": null,
+      "total_passes": 19637,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "high"
+    },
+    "scoring_weights": {
+      "structure": 0.18,
+      "liquidity": 0.20,
+      "order_block": 0.10,
+      "fvg": 0.08,
+      "ote": 0.05,
+      "session": 0.10,
+      "po3_phase": 0.05,
+      "kill_zone": 0.05,
+      "smt": 0.02,
+      "regime": 0.05,
+      "ema_stack": 0.03,
+      "adr_status": 0.06,
+      "trendline": 0.02,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "Intraday_Liquidity_Volatility",
+      "Trident_High_RR",
+      "AMD_Model",
+      "Liquidity_Strategy"
+    ],
+    "best_sessions": ["london_open", "ny_open"],
+    "regime_fit": ["trending", "volatile"],
+    "smt_pair": "XAGUSD",
+    "risk_profile": {
+      "grade_a_risk_pct": 0.75,
+      "grade_b_risk_pct": 0.45,
+      "grade_c_risk_pct": 0.2,
+      "backtest_confidence_multiplier": 1.2
+    },
+    "notes": "Highly volatile — ADR exhaustion filter is critical. London Kill Zone (3-6:30am ET) is prime time for Trident pattern. SMT with XAGUSD. Conservative sizing due to volatility."
+  },
+
+  "UKOIL.cash": {
+    "asset_class": "commodity",
+    "mt5_metrics": {
+      "profit_factor": null,
+      "sharpe_ratio": 9.48,
+      "max_drawdown_pct": null,
+      "net_profit": null,
+      "total_passes": 27969,
+      "primary_ea": "TrendFollowingPurgeRevert_EA",
+      "optimal_timeframe": "H1",
+      "confidence": "high"
+    },
+    "scoring_weights": {
+      "structure": 0.22,
+      "liquidity": 0.16,
+      "order_block": 0.10,
+      "fvg": 0.10,
+      "ote": 0.06,
+      "session": 0.08,
+      "po3_phase": 0.05,
+      "kill_zone": 0.04,
+      "smt": 0.02,
+      "regime": 0.07,
+      "ema_stack": 0.04,
+      "adr_status": 0.03,
+      "trendline": 0.02,
+      "backtest_pf": 0.01
+    },
+    "primary_strategies": [
+      "ICT_Continuation",
+      "Break_Retest",
+      "Structure_OTE"
+    ],
+    "best_sessions": ["london_open", "ny_open"],
+    "regime_fit": ["trending"],
+    "smt_pair": null,
+    "risk_profile": {
+      "grade_a_risk_pct": 1.0,
+      "grade_b_risk_pct": 0.5,
+      "grade_c_risk_pct": 0.25,
+      "backtest_confidence_multiplier": 1.2
+    },
+    "notes": "Stable Sharpe 9.48. Commodity cycles favor trend continuation strategies. London + NY overlap is prime window."
+  }
+}

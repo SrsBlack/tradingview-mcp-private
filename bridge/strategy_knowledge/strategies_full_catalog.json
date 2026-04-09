@@ -1,0 +1,803 @@
+{
+  "_description": "Complete catalog of all 33 ChartFanatics strategies with detailed rules. Organized by automation applicability tier. Used as reference by Claude decision layer and future strategy modules.",
+  "_created": "2026-04-08",
+  "_source": "https://www.chartfanatics.com/strategies",
+
+  "tier_1_ict_native": {
+    "_description": "Directly map to existing ICT pipeline. No new analysis modules needed — just new combination rules.",
+    "strategies": [
+      {
+        "id": "Structure_OTE",
+        "name": "Structure + OTE",
+        "instructor": "Trader Mayne",
+        "markets": ["futures", "forex", "crypto"],
+        "style": "swing",
+        "timeframes": {"htf": ["W1", "D1", "H12", "H4"], "ltf": ["H1", "M15", "M5"]},
+        "entry": {
+          "rules": [
+            "Identify clear market structure break (MSB) on HTF establishing trend",
+            "Mark range from swing low to swing high (uptrend) or high to low (downtrend)",
+            "Identify 50% midpoint dividing premium/discount zones",
+            "Mark POI: Order Block or Breaker Block where pullbacks occur",
+            "Wait for engineered liquidity (swing low/high formation) on LTF inside POI",
+            "Identify liquidity sweep (stop run) on LTF",
+            "Enter at breaker block after MSB on LTF"
+          ],
+          "long": "Buy higher lows in discount zones",
+          "short": "Sell lower highs in premium zones"
+        },
+        "exit": {
+          "stop": "Below swept lows (longs) / above swept highs (shorts)",
+          "target": "Next HTF external liquidity (previous swing high/low)",
+          "minimum_rr": 2.0
+        },
+        "indicators": ["order_blocks", "market_structure_break", "breaker_blocks", "fvg", "liquidity_sweeps"],
+        "ict_concepts": ["MSB", "OB", "breaker", "FVG", "liquidity_sweep", "premium_discount"],
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "SMT_Divergence_PO3",
+        "name": "SMT Divergence + PO3",
+        "instructor": "Trader Kane",
+        "markets": ["futures", "crypto"],
+        "style": "scalping",
+        "timeframes": {"bias": ["D1", "H4", "H1"], "entry": ["M3", "M5"]},
+        "entry": {
+          "rules": [
+            "All three timeframes (D1, H4, H1) align around same 50% level",
+            "Manipulation move occurs around 10:00 AM ET",
+            "SMT divergence appears (e.g. NQ new high but ES doesn't, or BTC new high but ETH doesn't)",
+            "Price rejects inversion zone (prior imbalance acting as S/R)"
+          ],
+          "trigger": "Sell stop below inversion zone (shorts) or buy stop above (longs)"
+        },
+        "exit": {
+          "stop": "Above/below the SMT divergence extreme",
+          "target": "50% level of H1 dealing range",
+          "be_rule": "Move to breakeven once hourly candle confirms direction"
+        },
+        "indicators": ["smt_divergence", "po3_phases", "inversion_zones", "50pct_level"],
+        "ict_concepts": ["SMT", "PO3", "manipulation", "inversion_zone"],
+        "smt_pairs": {"US100.cash": "US30.cash", "BTCUSD": "ETHUSD", "EURUSD": "GBPUSD", "XAUUSD": "XAGUSD"},
+        "time_filter": "~10:00 AM ET",
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "PO3_OTE_ADR",
+        "name": "PO3, OTE + ADR (Market Maker Model)",
+        "instructor": "NBB Trader",
+        "markets": ["forex"],
+        "style": "swing",
+        "timeframes": {"bias": ["D1", "H4"], "confirm": ["M15", "M30"], "refine": ["M5"]},
+        "entry": {
+          "rules": [
+            "Price must open near a PD Array (PDH/PDL, FVG, OB, weekly levels, breaker/mitigation blocks)",
+            "Establish daily bias beforehand (bullish or bearish ONLY — never trade both ways)",
+            "Confirm via Smart Money Reversal (SMR): high -> low -> higher high -> lower low on 15M/30M",
+            "Displacement candle must close with body (not wick) past key level",
+            "Draw Fibonacci from swing high to low",
+            "Enter ONLY at OTE retracement: 0.50, 0.62, 0.705, or 0.79 level",
+            "Reject entries above 50% retracement (insufficient R:R)"
+          ],
+          "trigger": "Limit order at 0.62 or 0.705 Fibonacci level preferred"
+        },
+        "exit": {
+          "stop": "1.0 Fibonacci level (swing extreme) or 0.90 for tighter risk",
+          "target": "0.0 Fibonacci level, then trail if momentum continues",
+          "be_rule": "Move to breakeven when price closes past 0.20 Fibonacci level",
+          "fixed_rr": {"0.62_entry": 2.38, "0.705_entry": 3.75, "0.50_entry": 1.63}
+        },
+        "indicators": ["fibonacci", "breaker_blocks", "fvg", "order_blocks", "mitigation_blocks"],
+        "ict_concepts": ["market_maker_model", "SMR", "OTE", "PD_arrays", "liquidity_sweep"],
+        "time_filter": "London Open (2-5am ET) or NY Open (7-10am ET)",
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "AMD_Model",
+        "name": "AMD Model (Accumulation-Manipulation-Distribution)",
+        "instructor": "Tanja Trades",
+        "markets": ["futures"],
+        "style": "day_trading",
+        "timeframes": {"context": ["H1", "H4", "D1"], "entry": ["M1", "M5", "M15"]},
+        "entry": {
+          "rules": [
+            "Identify Accumulation phase: price moves sideways, builds liquidity, traps traders in chop",
+            "Wait for Manipulation: sharp move sweeping liquidity above or below range",
+            "Require Displacement: strong break of swing high/low leaving FVG behind",
+            "Enter on retrace into the valid FVG",
+            "Never chase — if no retracement, skip the trade"
+          ],
+          "trigger": "Entry on retrace into FVG left by displacement candle"
+        },
+        "exit": {
+          "stop": "Above manipulation spike high/low",
+          "target": "Partial at swing levels or next FVG, trail remainder",
+          "management": "Trail stops to protect profits when price confirms move"
+        },
+        "indicators": ["fvg", "swing_highs_lows", "liquidity_sweeps", "displacement"],
+        "ict_concepts": ["accumulation", "manipulation", "distribution", "FVG", "displacement"],
+        "time_filter": "9:50-10:10 ET and 10:50-11:10 ET",
+        "max_trades_per_session": 2,
+        "loss_rule": "2 losses = stop for the day",
+        "high_prob_days": ["CPI", "NFP", "GDP", "FOMC", "PPI"],
+        "avoid": ["bank_holidays", "pre_holiday_sessions", "no_clear_bias"],
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Liquidity_Strategy",
+        "name": "Liquidity Strategy",
+        "instructor": "Marco Trades",
+        "markets": ["futures", "forex", "crypto"],
+        "style": "all",
+        "timeframes": {"all": "fractal — works on all timeframes"},
+        "entry": {
+          "rules": [
+            "Identify a high/low that price respected and moved away from (creates resting liquidity)",
+            "Wait for price to return and trade through that level (liquidity taken)",
+            "Confirm with internal structure or false reaction (trap confirmed)",
+            "Execute AFTER liquidity is taken, never before",
+            "Buy below lows, sell above highs"
+          ]
+        },
+        "exit": {
+          "stop": "Below swept low (longs) / above swept high (shorts)",
+          "target": "Opposing liquidity at next major highs/lows",
+          "partials": "Only at actual liquidity zones, not arbitrary R-multiples"
+        },
+        "indicators": ["none — pure price action"],
+        "ict_concepts": ["liquidity_sweeps", "liquidity_pools", "equal_highs_lows", "internal_structure"],
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Intraday_Liquidity_Volatility",
+        "name": "Intraday Liquidity & Volatility Model",
+        "instructor": "Jade Cap",
+        "markets": ["forex", "futures"],
+        "style": "day_trading",
+        "timeframes": {"bias": ["D1"], "confirm": ["H1"], "entry": ["M15", "M5"]},
+        "entry": {
+          "rules": [
+            "Establish daily bias from daily chart (recent highs, lows, inefficiencies)",
+            "Mark session liquidity: PDH/PDL, Asian High/Low, London High/Low",
+            "Wait for key session level to be taken out during NY session (liquidity raid)",
+            "Confirm on LTF (15M/5M) via: FVG, MSS, Turtle Soup, or Breaker Block",
+            "Enter between 9:30-11:30 AM ET"
+          ]
+        },
+        "exit": {
+          "stop": "Just above swept high (shorts) / below swept low (longs)",
+          "target": "Opposite session liquidity zones, FVGs, or equal highs/lows"
+        },
+        "indicators": ["fvg", "mss", "turtle_soup", "breaker_block", "session_levels"],
+        "ict_concepts": ["liquidity_grabs", "FVG", "MSS", "session_structure"],
+        "time_filter": "9:30-11:30 AM ET",
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Trident_High_RR",
+        "name": "Unique High RR / Trident Pattern",
+        "instructor": "TG Capital",
+        "markets": ["forex"],
+        "style": "swing",
+        "timeframes": {"entry": ["M30"], "bias": ["D1"]},
+        "entry": {
+          "rules": [
+            "3-candle FVG must form on 30M chart between 2:30-4:00 AM ET",
+            "Mark FVG 50% midpoint (reaction zone)",
+            "Small doji candle must form next, wicking into FVG 50% zone",
+            "Confirmation candle must close below doji high (above = invalid)",
+            "EMA stack (5/9/13/21) must be clearly stacked in trade direction",
+            "200 EMA determines bias: above = longs only, below = shorts only"
+          ],
+          "trigger": "On confirmation candle close or limit at FVG 50%"
+        },
+        "exit": {
+          "stop": "Below the FVG candle low (standard); no hard stop for Gold",
+          "target": "Ride trend via daily chart structure; exit when EMAs reverse"
+        },
+        "indicators": ["ema_5_9_13_21_200", "fvg", "doji_candle"],
+        "ict_concepts": ["FVG", "displacement", "ema_stack"],
+        "valid_pairs": ["USDJPY", "EURUSD", "GBPUSD", "NZDUSD", "USDCAD", "XAUUSD"],
+        "time_filter": "3:00-6:30 AM ET only",
+        "win_rate_claimed": "~90%",
+        "frequency": "handful of times per year per pair",
+        "auto_applicability": "HIGH"
+      }
+    ]
+  },
+
+  "tier_2_price_action": {
+    "_description": "Need minor analysis additions (trendline detection, key level scoring).",
+    "strategies": [
+      {
+        "id": "Break_Retest",
+        "name": "Break & Retest",
+        "instructor": "Vincent Desiano",
+        "markets": ["stocks", "futures", "options"],
+        "style": "day_trading",
+        "timeframes": {"all": "intraday and swing"},
+        "entry": {
+          "rules": [
+            "Mark major prior level (PDH/PDL, premarket high/low, supply/demand zone)",
+            "Wait for clean break with momentum (do NOT enter during break)",
+            "Wait for pullback to retest the zone (battle zone)",
+            "Confirmation candle: wicks into level and closes in trade direction"
+          ]
+        },
+        "exit": {
+          "stop": "Beyond invalidation point (below level for longs, above for shorts)",
+          "target": "TP1 at prior high/low, then trail",
+          "partial_tp": "25-50% at TP1"
+        },
+        "indicators": ["pdh_pdl", "premarket_levels", "supply_demand_zones"],
+        "ntz": "Mark no-trade zone between PDH and premarket low — avoid trading inside",
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Trendline_Break_Pocket",
+        "name": "Trendline Break Pocket",
+        "instructor": "Ali Crooks",
+        "markets": ["forex"],
+        "style": "swing",
+        "timeframes": {"analysis": ["D1", "W1"], "trigger": ["D1", "H4"]},
+        "entry": {
+          "rules": [
+            "Price reaches HTF key level (support/resistance zone, identified by frequency + proximity)",
+            "Properly defined trendline broken",
+            "Last swing in old direction broken (momentum confirmation)",
+            "Entry Type 1 (primary): Pullback to 21 EMA",
+            "Entry Type 2: Consolidation breakout (min 2 highs and 2 lows)"
+          ]
+        },
+        "exit": {
+          "stop": "Half the distance to target (2R structure)",
+          "target": "High/low formed after momentum break",
+          "requirement": "No major level blocking the 2R target path (clean-air rule)"
+        },
+        "indicators": ["21_ema", "trendlines", "key_levels"],
+        "optional_filters": ["MACD_divergence", "retail_sentiment_contrary"],
+        "win_rate": "~58% at 2:1 ratio",
+        "overshoot_rule": "One overshoot acceptable; two voids the setup",
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Trendline_Strategy",
+        "name": "Trendline Strategy",
+        "instructor": "Tori Trades",
+        "markets": ["stocks", "futures", "forex"],
+        "style": "swing",
+        "timeframes": {"primary": ["H4"], "context": ["D1", "W1"]},
+        "entry": {
+          "setups": [
+            {"type": "Trendline Bounce", "rules": ["2-3 clear touchpoints", "1+ week between first touch and entry", "Enter at trendline test"]},
+            {"type": "Two-Touch Break", "rules": ["Exactly 2 touchpoints before break", "1+ week of data", "Break must be close to safety line"]},
+            {"type": "Three-Touch Break", "rules": ["3+ touchpoints", "1+ week of data", "Enter on break with clear safety line"]}
+          ]
+        },
+        "exit": {
+          "stop": "Safety line (opposing trendline). Close if price closes through safety line.",
+          "management": "Trail stop along trendline as new swing points form"
+        },
+        "indicators": ["none — pure price action with manual trendlines"],
+        "auto_applicability": "MEDIUM"
+      },
+      {
+        "id": "Measured_Move_Trend",
+        "name": "Measured Move Trend Strategy",
+        "instructor": "Marci Silfrain",
+        "markets": ["stocks", "futures", "crypto"],
+        "style": "swing",
+        "timeframes": {"all": "all — higher TF more reliable"},
+        "entry": {
+          "rules": [
+            "Identify clear trend with consistent higher highs/lows or lower highs/lows",
+            "Draw trendline across pullback highs (shorts) or pullback lows (longs)",
+            "Identify candle with most extreme price within structure",
+            "Measure vertical distance from extreme candle to trendline",
+            "Wait for pullback to reject trendline",
+            "Enter as price moves back toward trend direction after rejection"
+          ]
+        },
+        "exit": {
+          "stop": "Above trendline or recent swing high (shorts) / below trendline or swing low (longs)",
+          "target": "Measured move projection (same distance from extreme to trendline)"
+        },
+        "indicators": ["trendlines", "bollinger_bands_context"],
+        "pattern_degradation": "1st and 2nd patterns strongest; 4th-5th patterns exhaust — reduce or avoid",
+        "auto_applicability": "MEDIUM-HIGH"
+      }
+    ]
+  },
+
+  "tier_3_order_flow_volume": {
+    "_description": "Need volume profile data or order flow feeds.",
+    "strategies": [
+      {
+        "id": "OrderFlow_Trading",
+        "name": "OrderFlow Trading Masterclass",
+        "instructor": "Carmine Rosato",
+        "markets": ["futures", "stocks"],
+        "style": "day_trading",
+        "signals": ["absorption", "liquidity_wall", "stop_runs"],
+        "entry": {
+          "framework": "Context (market structure) + Location (historical reaction level) + Confirmation (order flow)",
+          "setups": [
+            "Absorption Short: aggressive buyers fail at resistance, passive sellers absorb",
+            "Stop Run + Reclaim Long: flush below support triggering stops, then reclaim"
+          ]
+        },
+        "indicators": ["DOM", "heatmap", "footprint_chart", "delta"],
+        "auto_applicability": "MEDIUM",
+        "requires": "real-time order flow data"
+      },
+      {
+        "id": "Volume_Profile",
+        "name": "Volume Profile Strategy",
+        "instructor": "Forrest Knight",
+        "markets": ["futures", "options"],
+        "style": "day_trading_swing",
+        "timeframes": {"bias": ["W1", "D1"], "execution": ["H4", "H1"]},
+        "entry": {
+          "rules": [
+            "Price touches volume profile edge (HVA to LVA transition)",
+            "Alignment with ONH, ONL, PDH, or PDL",
+            "Signal candle with wick rejecting area and closing in trade direction",
+            "Wait for candle close — no front-running",
+            "Volatility variant: limit order at 50-80% wick retrace"
+          ]
+        },
+        "exit": {
+          "stop": "Beyond signal candle wick or HVA edge",
+          "target": "Edge-to-edge (next high-volume shelf). POC retest common."
+        },
+        "indicators": ["session_volume_profile", "visible_range_volume_profile", "pdh_pdl", "onh_onl"],
+        "auto_applicability": "MEDIUM-HIGH"
+      },
+      {
+        "id": "Low_Volume_Node",
+        "name": "Low Volume Node",
+        "instructor": "Carmine Rosato",
+        "markets": ["futures"],
+        "style": "scalping",
+        "entry": {
+          "rules": [
+            "Mark clear supply/demand/S&R level with prior consolidation then impulsive move away",
+            "Use volume-by-price to find LVN zones (price moved quickly, little volume)",
+            "Wait for price return to LVN zone",
+            "Verify with order flow (heatmap, footprint, delta showing defenders)"
+          ]
+        },
+        "exit": {
+          "stop": "Beyond LVN or recent swing",
+          "target": "Next HVA, LVN, or S/R level"
+        },
+        "indicators": ["volume_by_price", "heatmap", "footprint", "delta"],
+        "auto_applicability": "MEDIUM",
+        "requires": "volume profile data"
+      },
+      {
+        "id": "Auction_Market_Theory_Cimitan",
+        "name": "Auction Market Theory",
+        "instructor": "Andrea Cimitan",
+        "markets": ["futures"],
+        "style": "day_trading",
+        "setups": [
+          {"name": "Failed Auction Below (Reversal Long)", "trigger": "Aggressive sellers fail, buyers absorb"},
+          {"name": "Failed Auction Above (Reversal Short)", "trigger": "Aggressive buyers fail, sellers absorb"},
+          {"name": "Breakout with Acceptance (Continuation)", "trigger": "Price holds at new level, participation continues"}
+        ],
+        "core_filter": "Is the aggressive side being accepted or absorbed?",
+        "indicators": ["order_flow", "volume_profile", "opening_range"],
+        "auto_applicability": "MEDIUM"
+      },
+      {
+        "id": "Auction_Market_Valentini",
+        "name": "Auction Market Strategy",
+        "instructor": "Fabio Valentini",
+        "markets": ["futures"],
+        "style": "scalping",
+        "timeframes": {"bias": ["D1"], "entry": ["M5"]},
+        "entry": {
+          "models": [
+            {"name": "Trend Continuation", "rules": ["Market out of balance with displacement", "Identify impulse leg", "Apply VP to locate LVNs", "Enter when price returns to LVN WITH aggressive order flow (footprint imbalance)"]},
+            {"name": "Mean Reversion", "rules": ["Market in balance/consolidation", "Price pushes out then FAILS and reclaims", "Wait for pullback into reclaim leg LVN", "Enter on pullback with order flow confirmation"]}
+          ],
+          "all_conditions_required": true
+        },
+        "exit": {
+          "stop": "Just beyond aggressive print with 1-2 tick buffer",
+          "target": "Previous balance POC",
+          "typical_rr": "2.5:1 to 5:1"
+        },
+        "risk": "0.25% to 0.5% per trade",
+        "indicators": ["volume_profile_lvn_poc", "footprint", "CVD"],
+        "auto_applicability": "MEDIUM"
+      },
+      {
+        "id": "Market_Auction_Theory_Dhall",
+        "name": "Market Auction Theory",
+        "instructor": "Rajan Dhall",
+        "markets": ["stocks", "futures", "crypto"],
+        "style": "scalping",
+        "timeframes": {"bias": ["D1"], "entry": ["M5"]},
+        "entry": {
+          "rules": [
+            "Daily chart shows clear directional trend",
+            "5-min chart mirrors daily trend",
+            "Price aligns with 21/50 EMA on both timeframes",
+            "Identify congestion zones on 5-min (prior consolidation areas)",
+            "Wait for price to return to congestion zone",
+            "Enter when price rejects zone in direction of trend (rejection candle)"
+          ]
+        },
+        "exit": {
+          "stop": "Just beyond rejection candle's high/low",
+          "minimum_rr": 2.0
+        },
+        "indicators": ["21_ema", "50_ema", "congestion_zones", "rejection_candles"],
+        "time_filter": "First hour after open preferred",
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Market_DNA",
+        "name": "Market DNA Strategy",
+        "instructor": "Jay Awtani",
+        "markets": ["stocks", "futures"],
+        "style": "day_trading",
+        "entry": {
+          "long": "Aggressive buyers absorb sell orders at DNA zone (tape confirms repeated buyer aggression)",
+          "short": "Aggressive sellers absorb buy orders at DNA zone (sellers repeatedly hit bids)"
+        },
+        "exit": {
+          "partial": "At first strong reaction or intraday pivot",
+          "trail": "Behind newly formed aggressive zones",
+          "full_exit": "When opposing side dominance confirmed on tape"
+        },
+        "indicators": ["level_2_orderbook", "tape_reading", "liquidity_zones"],
+        "minimum_rr": 3.0,
+        "requires": "centralized data — avoid forex (unreliable volume/depth)",
+        "auto_applicability": "LOW"
+      }
+    ]
+  },
+
+  "tier_4_momentum_reversion": {
+    "_description": "Complementary signals — mean reversion, momentum exhaustion, catalyst-driven.",
+    "strategies": [
+      {
+        "id": "Mean_Reversion",
+        "name": "Mean Reversion Strategy",
+        "instructor": "Lance Breitstein",
+        "markets": ["stocks"],
+        "style": "day_trading",
+        "entry": {
+          "conditions": [
+            "Large rapid price move (minutes/hours, not months)",
+            "Extreme volume spike indicating capitulation",
+            "Price displaced far from 20 EMA",
+            "Multiple consecutive same-direction candles"
+          ],
+          "long_trigger": "Break above prior bar high after downtrend structure break",
+          "short_trigger": "Break below prior bar low after uptrend structure break",
+          "principle": "Wait for confirmation that move has turned — don't predict reversals"
+        },
+        "exit": {
+          "stop": "Below capitulation low (longs) / above parabolic high (shorts)",
+          "target": "20 EMA (first target)",
+          "trail": "Below prior bar lows (longs) / above prior bar highs (shorts)"
+        },
+        "indicators": ["20_ema", "bollinger_bands", "volume"],
+        "auto_applicability": "HIGH"
+      },
+      {
+        "id": "Episodic_Pivot",
+        "name": "Episodic Pivot Strategy",
+        "instructor": "Pradeep Bonde",
+        "markets": ["stocks"],
+        "style": "swing",
+        "entry": {
+          "setups": [
+            {"name": "Classical Growth EP", "trigger": "Triple-digit sales growth + large gap with heavy volume", "hold": "2-4 weeks"},
+            {"name": "Turnaround EP", "trigger": "Credible shift from declining to improving earnings", "hold": "months"},
+            {"name": "Story/Thematic EP", "trigger": "Powerful narrative + extreme volume", "hold": "5-6 days"},
+            {"name": "EP 9 Million", "trigger": "Volume >9M shares with clear trend", "hold": "variable"},
+            {"name": "Delayed Reaction EP", "trigger": "Secondary move after consolidation post-catalyst", "hold": "tight stops"},
+            {"name": "Sugar Babies", "trigger": "Volume breakouts on habitual runners with 40-50% swings", "hold": "5-6 days"}
+          ]
+        },
+        "exit": {
+          "stop": "Below Day 1 opening-range low or nearest swing low",
+          "trail": "Below daily swing lows as trend develops"
+        },
+        "indicators": ["volume", "price_gaps", "swing_structure"],
+        "auto_applicability": "MEDIUM",
+        "notes": "Stock-specific (catalyst/earnings driven). Crypto equivalent = exchange listing pumps, major protocol upgrades."
+      },
+      {
+        "id": "Parabolic_Short",
+        "name": "Parabolic Short Strategy",
+        "instructor": "Marios Stamatoudis",
+        "markets": ["stocks"],
+        "style": "day_trading",
+        "entry": {
+          "conditions": [
+            "Strong prior move from recent base (small-caps ~200%, mid-caps ~100%, large-caps ~50%)",
+            "Acceleration structure: expanding candles, steep slope, possible gaps",
+            "Exhaustion day: price stops making higher highs, forms lower highs/lows, loses VWAP"
+          ],
+          "entries_ranked": [
+            "Earliest: Break of upward structure with lower highs/lows (higher risk)",
+            "Stronger: Break structure AND lose VWAP simultaneously",
+            "Best: Price attempts VWAP reclaim and FAILS"
+          ]
+        },
+        "exit": {
+          "stop": "High of the day or most recent lower high",
+          "management": "Partial profits once favorable; close before end of day — no overnight holds",
+          "add": "Risk-free add at VWAP retest once stop is at break-even"
+        },
+        "indicators": ["VWAP", "20_day_ma"],
+        "auto_applicability": "MEDIUM",
+        "useful_concepts": "VWAP reclaim-fail pattern applicable to any liquid market. Exhaustion day detection (lower highs forming) programmable."
+      },
+      {
+        "id": "First_Red_Day_Williams",
+        "name": "First Red Day (Kyle Williams)",
+        "instructor": "Kyle Williams",
+        "markets": ["stocks"],
+        "style": "day_trading",
+        "entry": {
+          "rules": [
+            "Minimum 2-3 consecutive green days preceding",
+            "80-100%+ price extension from start of run",
+            "Expanding daily volume throughout advance",
+            "Expanding daily range showing acceleration",
+            "Aggressive: short before breaking prior day's close, stop at ATH",
+            "Standard: wait for crack below prior day's close, add on failed bounces",
+            "Conservative: wait for breakdown, short on failed lower high"
+          ]
+        },
+        "exit": {
+          "target": "Minimum -10% daily decline for small caps; VWAP as magnet",
+          "management": "Cover into weakness; scale out; trail using 15-min chart high"
+        },
+        "indicators": ["VWAP", "volume", "prior_day_close"],
+        "risk": "Max 3-5 attempts per stock; scale by grade (A+/A/B/C)",
+        "auto_applicability": "MEDIUM-HIGH",
+        "useful_concepts": "Consecutive green days + extension % + volume expansion are fully quantifiable. Prior day's close break is clean trigger."
+      },
+      {
+        "id": "First_Red_Day_Temiz",
+        "name": "First Red Day (Alex Temiz variant)",
+        "instructor": "Alex Temiz",
+        "markets": ["stocks"],
+        "style": "day_trading",
+        "entry": {
+          "rules": [
+            "3+ consecutive strong green days with parabolic move",
+            "Each day ideally stronger than previous",
+            "Stock must show extension and hype",
+            "Draw line at previous day's close",
+            "Starter position when stock breaks below low of day",
+            "Main position on break below previous day's close"
+          ],
+          "variants": {
+            "gap_up": "Gaps up after run, pushes higher at open, then fades",
+            "gap_down": "Gaps down; wait for bounce toward PDC that fails"
+          }
+        },
+        "exit": {
+          "invalidation": "If price reclaims PDC and holds above it: cut immediately",
+          "management": "Lock in gains by covering portions into weakness"
+        },
+        "indicators": ["prior_day_close", "price_action"],
+        "auto_applicability": "HIGH",
+        "useful_concepts": "Very clean rule-based system. PDC as invalidation is one of the cleanest stop rules."
+      }
+    ]
+  },
+
+  "tier_5_systematic_meta": {
+    "_description": "Systematic/algorithmic frameworks, psychological meta-strategies, and educational content.",
+    "strategies": [
+      {
+        "id": "Algorithmic_Strategy",
+        "name": "Algorithmic Strategy",
+        "instructor": "Naoufel Taief",
+        "markets": ["stocks", "futures"],
+        "style": "systematic",
+        "framework": {
+          "max_rules_per_strategy": "2-3 (avoid curve-fitting)",
+          "building_blocks": ["RSI", "ATR", "volatility_measures", "price_patterns", "volume"],
+          "mandatory_exits": ["stop_loss", "profit_target"],
+          "stop_types": ["percentage", "ATR_based", "indicator_based"],
+          "position_sizing": "5-25% of account per strategy, avg loss ~0.5%"
+        },
+        "key_principle": "The more rules added, the more likely the system fits past data and fails live",
+        "auto_applicability": "HIGH (as design principle)"
+      },
+      {
+        "id": "Futures_Trading_Crudele",
+        "name": "Futures Trading Strategy",
+        "instructor": "Anthony Crudele",
+        "markets": ["futures"],
+        "style": "swing",
+        "timeframes": {"decisions": ["D1"], "execution": ["M60", "M30", "M3"]},
+        "entry": {
+          "regimes": [
+            {"name": "Consolidation", "condition": "BB contracting", "action": "Trade both directions at range edges; stay out of middle"},
+            {"name": "Expansion", "condition": "BB expanding", "action": "ONE direction only; enter after breakout confirmation"},
+            {"name": "Mean Reversion", "condition": "BB contracting after peak", "action": "Wait for daily close below 30% Fib line of BB peak-to-peak; target 50% level"}
+          ]
+        },
+        "exit": {
+          "expansion": "Scale out at weekly highs/lows, prior BB peaks",
+          "mean_reversion": "Exit at 50% level, then hands-in-pocket zone"
+        },
+        "indicators": ["bollinger_bands_20_3SD", "MA_8_21_34", "RSI_optional", "anchored_VWAP"],
+        "auto_applicability": "HIGH",
+        "useful_concepts": "BB regime classification is fully programmable. Three-state machine (consolidation/expansion/mean reversion) maps cleanly to algorithmic logic."
+      },
+      {
+        "id": "VIX_Futures",
+        "name": "VIX Futures Strategy",
+        "instructor": "Dylan O'Neil",
+        "markets": ["futures"],
+        "style": "day_trading_swing",
+        "entry": {
+          "setups": [
+            {"name": "ES breaks PDL + VIX confirms", "trigger": "ES below PDL while VIX reaches/exceeds PDH = real institutional hedging; short ES"},
+            {"name": "VIX Double Bottom", "trigger": "VIX double bottom at contract lows = bounce pressure on ES"},
+            {"name": "VIX Moves First", "trigger": "VIX reaches PDH BEFORE ES breaks PDL = early warning"},
+            {"name": "Relative Strength Divergence", "trigger": "ES breaks PDL but NQ holds + VIX weak = avoid short"}
+          ],
+          "one_pct_rule": "ES up 1%+ AND VIX up 1%+ = fragile strength. ES down 1%+ AND VIX down 1%+ = weak selling."
+        },
+        "indicators": ["VIX", "ES_PDH_PDL", "NQ_relative_strength"],
+        "auto_applicability": "HIGH",
+        "useful_concepts": "VIX/ES correlation fully quantifiable. 1% divergence rule is clean filter. For crypto: maps to funding rate / open interest divergence."
+      },
+      {
+        "id": "Real_Simple",
+        "name": "Real Simple Strategy",
+        "instructor": "Ariel Hernandez",
+        "markets": ["stocks"],
+        "style": "swing",
+        "timeframes": {"setup": ["D1"], "entry": ["M5"]},
+        "entry": {
+          "setups": [
+            {"name": "Episodic Pivot", "trigger": "Large gap up on earnings + volume multiples above avg; enter on 5-min ORB"},
+            {"name": "High Volume Close", "trigger": "Gap day + above-avg volume; enter on break through prior HVC"},
+            {"name": "Flat Base Breakout", "trigger": "Horizontal consolidation, tight 10/20 MAs, shrinking ranges; enter above resistance"},
+            {"name": "Undercut & Rally", "trigger": "Quick undercut of prior low then reversal; enter on reclaim"},
+            {"name": "MA Undercut & Rally", "trigger": "Dip below 10/20/50 MA then reclaim with volume"},
+            {"name": "High Tight Flag", "trigger": "50-100% advance + tight 2-5 week flag + contracting volume; enter on break"}
+          ]
+        },
+        "exit": {
+          "trim": "Into strength after 3-5 strong days",
+          "trail": "10/20-day moving averages",
+          "hard_exit": "Close below key level on high volume or bearish reversal candle"
+        },
+        "risk": "0.5-1% of equity per trade",
+        "auto_applicability": "HIGH",
+        "useful_concepts": "All 6 setups have quantifiable triggers. Flat Base Breakout and Undercut & Rally are universal patterns."
+      },
+      {
+        "id": "Universal_Strategy",
+        "name": "Universal Strategy",
+        "instructor": "Traveling Trader",
+        "markets": ["stocks", "options", "futures", "forex", "crypto"],
+        "style": "swing_day",
+        "entry": {
+          "three_step_framework": [
+            "1. Liquidity Catalyst: sweep of equal highs/lows, major S/R break, trendline break, MSS, or sharp rejection",
+            "2. Displacement: decisive move confirming the catalyst mattered",
+            "3. Retracement: enter ONLY on pullback to broken S/R, FVG, prior swing, trendline retest, or 21 EMA"
+          ],
+          "golden_rule": "No Liquidity Catalyst, No Trade"
+        },
+        "exit": {
+          "stop": "Beyond price level that invalidates the narrative (structure-based, not arbitrary)",
+          "target": "Liquidity pools, prior highs/lows, imbalance fills, trapped trader zones"
+        },
+        "indicators": ["21_ema", "trendlines", "S_R", "fvg", "order_blocks"],
+        "auto_applicability": "HIGH",
+        "useful_concepts": "Three-step framework (catalyst -> displacement -> retracement) is extremely automation-friendly. Directly applicable to all markets in our pipeline."
+      },
+      {
+        "id": "Support_Resistance",
+        "name": "Support and Resistance",
+        "instructor": "Brando Elite",
+        "markets": ["options"],
+        "style": "swing",
+        "entry": {
+          "rules": [
+            "Identify major S/R from past highs/lows on daily/weekly charts",
+            "Focus on psychological round numbers (5000, 6000 SPX)",
+            "Price must reach key level concurrent with major catalyst (FOMC, CPI, earnings)",
+            "Confirm via strong bounce/rejection, multi-day hold, or sentiment shift"
+          ]
+        },
+        "exit": {
+          "sizing": "Risk only what you're comfortable losing completely (size for zero)",
+          "target": "5x-10x+ returns on options"
+        },
+        "win_rate_claimed": "~80% when technicals and news align",
+        "auto_applicability": "LOW"
+      },
+      {
+        "id": "Five_Stage_Framework",
+        "name": "5 Stage Trading Framework",
+        "instructor": "Umar Ashraf",
+        "markets": ["all"],
+        "type": "trader_development_roadmap",
+        "stages": ["Novice (2-4wk)", "Developing (4-6wk)", "Intermediate (longest)", "Advanced", "Pro"],
+        "auto_applicability": "NONE — meta-framework for trader growth"
+      },
+      {
+        "id": "Options_Masterclass",
+        "name": "Options Trading Masterclass",
+        "instructor": "Usman Ashraf",
+        "markets": ["options"],
+        "type": "educational",
+        "topics": ["calls_puts", "greeks", "IV", "strike_selection", "theta_decay"],
+        "auto_applicability": "NONE — educational reference only"
+      },
+      {
+        "id": "Full_Psychology",
+        "name": "Full Psychology Masterclass",
+        "instructor": "Jared Tendler",
+        "markets": ["all"],
+        "type": "psychological_framework",
+        "key_concepts": {
+          "yerkes_dodson": "Optimal performance at moderate emotional arousal",
+          "progressive_shutdown": "At 60% emotion retain awareness; at 80%+ cannot stop poor decisions",
+          "circuit_breakers": "2 consecutive losses = stop; emotional carryover = no trade"
+        },
+        "auto_applicability": "LOW (direct) / HIGH (meta-rules)",
+        "useful_concepts": "Validates automation over discretion. Maps to: max consecutive loss limits, daily DD circuit breakers, session-based trading windows."
+      },
+      {
+        "id": "Shorting_Strategy",
+        "name": "Shorting Strategy",
+        "instructor": "Kris Verma",
+        "markets": ["stocks"],
+        "style": "day_trading",
+        "setups": [
+          {"name": "Gap-Up Short with Fade", "trigger": "Sharp pre-market gap on low volume; below open by 10AM; short into bounces"},
+          {"name": "Backside Parabolic Short", "trigger": "Large move completed; upper wicks, failed pushes; volume declining; short bounces during fade"},
+          {"name": "Multi-Halt Exhaustion", "trigger": "4-5 up-halts on low-float stock; enter after halt exhaustion; conservative sizing"}
+        ],
+        "time_filter": "4:00 AM - 10:00 AM primary; reduced edge after 12:00 PM",
+        "10am_rule": "Below open = hold; above open = reduce risk or exit",
+        "recycling_framework": "Partial profits into drops, re-enter on failed bounces into resistance",
+        "auto_applicability": "LOW-MEDIUM",
+        "useful_concepts": "Recycling framework (partial profit + re-entry on bounce failure) useful for any market."
+      }
+    ]
+  },
+
+  "automation_summary": {
+    "HIGH": [
+      "Structure_OTE", "SMT_Divergence_PO3", "PO3_OTE_ADR", "AMD_Model",
+      "Liquidity_Strategy", "Intraday_Liquidity_Volatility", "Trident_High_RR",
+      "Break_Retest", "Trendline_Break_Pocket", "Mean_Reversion",
+      "Universal_Strategy", "Market_Auction_Theory_Dhall", "First_Red_Day_Temiz",
+      "VIX_Futures", "Real_Simple", "Futures_Trading_Crudele"
+    ],
+    "MEDIUM_HIGH": [
+      "First_Red_Day_Williams", "Measured_Move_Trend", "Volume_Profile"
+    ],
+    "MEDIUM": [
+      "OrderFlow_Trading", "Low_Volume_Node", "Auction_Market_Theory_Cimitan",
+      "Auction_Market_Valentini", "Episodic_Pivot", "Parabolic_Short"
+    ],
+    "LOW": [
+      "Market_DNA", "Shorting_Strategy", "Support_Resistance", "Full_Psychology"
+    ],
+    "NONE": [
+      "Five_Stage_Framework", "Options_Masterclass"
+    ]
+  }
+}

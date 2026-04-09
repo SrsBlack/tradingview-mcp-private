@@ -1,0 +1,414 @@
+"""
+Paper Trading Executor — simulates MT5 fills with position tracking.
+
+Fills at current price, tracks positions in memory + JSONL log,
+applies trailing stops and partial TP.
+
+Usage:
+    from bridge.paper_executor import PaperExecutor
+    executor = PaperExecutor(initial_balance=10000)
+    result = executor.open_position(decision)
+    executor.check_positions(current_prices)
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from bridge.decision_types import TradeDecision, PaperPosition, ClosedPosition
+
+
+# ---------------------------------------------------------------------------
+# Paper Executor
+# ---------------------------------------------------------------------------
+
+class PaperExecutor:
+    """
+    Simulates trade execution for paper trading mode.
+
+    Features:
+    - Instant fills at current price
+    - Position tracking with floating P&L
+    - Trailing stop management
+    - Partial TP at first target
+    - JSONL trade log
+    - Account balance tracking
+    """
+
+    def __init__(
+        self,
+        initial_balance: float = 10_000.0,
+        max_positions: int = 3,
+        log_dir: Path | None = None,
+    ):
+        self.balance = initial_balance
+        self.initial_balance = initial_balance
+        self.peak_balance = initial_balance
+        self.max_positions = max_positions
+
+        self.open_positions: dict[int, PaperPosition] = {}
+        self.closed_positions: list[ClosedPosition] = []
+        self._next_ticket = 100_001
+
+        # Logging
+        self.log_dir = log_dir or Path(__file__).resolve().parent.parent / "logs"
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        self.trade_log = self.log_dir / f"paper_trades_{session_id}.jsonl"
+
+        # Stats
+        self.wins = 0
+        self.losses = 0
+        self.consecutive_losses = 0
+        self.grade_a_wins = 0
+        self.grade_a_losses = 0
+
+    # ------------------------------------------------------------------
+    # Open position
+    # ------------------------------------------------------------------
+
+    def open_position(self, decision: TradeDecision) -> dict:
+        """
+        Open a paper position from a trade decision.
+
+        Returns:
+            {"success": bool, "ticket": int, "message": str}
+        """
+        if not decision.is_trade:
+            return {"success": False, "ticket": 0, "message": "Decision is not a trade"}
+
+        if len(self.open_positions) >= self.max_positions:
+            return {"success": False, "ticket": 0,
+                    "message": f"Max {self.max_positions} positions reached"}
+
+        # Check for duplicate symbol
+        for pos in self.open_positions.values():
+            if pos.symbol == decision.symbol:
+                return {"success": False, "ticket": 0,
+                        "message": f"Already have open position on {decision.symbol}"}
+
+        ticket = self._next_ticket
+        self._next_ticket += 1
+
+        # Calculate lot size from risk %
+        risk_amount = self.balance * decision.risk_pct
+        risk_distance = abs(decision.entry_price - decision.sl_price)
+        if risk_distance <= 0:
+            return {"success": False, "ticket": 0, "message": "Invalid SL distance"}
+
+        # For crypto/forex, lot_size represents notional units
+        lot_size = round(risk_amount / risk_distance, 4)
+
+        position = PaperPosition(
+            ticket=ticket,
+            symbol=decision.symbol,
+            direction=decision.action,
+            entry_price=decision.entry_price,
+            sl_price=decision.sl_price,
+            tp_price=decision.tp_price,
+            tp2_price=decision.tp2_price,
+            trade_type=decision.trade_type,
+            lot_size=lot_size,
+            risk_pct=decision.risk_pct,
+            opened_at=datetime.now(timezone.utc).isoformat(),
+            ict_grade=decision.grade,
+            ict_score=decision.ict_score,
+            reasoning=decision.reasoning,
+            current_price=decision.entry_price,
+            trailing_sl=decision.sl_price,
+        )
+
+        self.open_positions[ticket] = position
+        self._log_event("OPEN", position.to_dict())
+
+        return {
+            "success": True,
+            "ticket": ticket,
+            "message": f"{decision.action} {decision.symbol} @ {decision.entry_price:.2f} "
+                       f"SL={decision.sl_price:.2f} TP={decision.tp_price:.2f} "
+                       f"Size={lot_size:.4f}",
+        }
+
+    # ------------------------------------------------------------------
+    # Check positions (price updates, SL/TP/trailing)
+    # ------------------------------------------------------------------
+
+    def check_positions(self, current_prices: dict[str, float]) -> list[dict]:
+        """
+        Update all open positions with current prices.
+        Closes positions that hit SL, TP, or trailing SL.
+
+        Args:
+            current_prices: {"BTCUSD": 69000.0, ...}
+
+        Returns:
+            List of close events (if any).
+        """
+        events: list[dict] = []
+        to_close: list[tuple[int, str, float]] = []  # (ticket, reason, exit_price)
+
+        for ticket, pos in self.open_positions.items():
+            price = current_prices.get(pos.symbol)
+            if price is None:
+                continue
+
+            pos.current_price = price
+
+            # Calculate floating P&L
+            if pos.direction == "BUY":
+                pos.floating_pnl = (price - pos.entry_price) * pos.lot_size
+            else:
+                pos.floating_pnl = (pos.entry_price - price) * pos.lot_size
+
+            # Check TP1 hit (partial close at 50%)
+            if not pos.tp1_hit and pos.tp2_price > 0:
+                if pos.direction == "BUY" and price >= pos.tp_price:
+                    pos.tp1_hit = True
+                    partial_pnl = (pos.tp_price - pos.entry_price) * (pos.lot_size * 0.5)
+                    self.balance += partial_pnl
+                    pos.lot_size = round(pos.lot_size * 0.5, 4)
+                    pos.trailing_sl = pos.entry_price  # move to breakeven
+                    self._log_event("PARTIAL_CLOSE", {
+                        "ticket": ticket, "symbol": pos.symbol,
+                        "exit_price": pos.tp_price, "pnl": round(partial_pnl, 2),
+                        "reason": "TP1_PARTIAL", "remaining_lots": pos.lot_size,
+                    })
+                    print(f"  [PARTIAL] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} partial PnL={partial_pnl:+.2f}", flush=True)
+                elif pos.direction == "SELL" and price <= pos.tp_price:
+                    pos.tp1_hit = True
+                    partial_pnl = (pos.entry_price - pos.tp_price) * (pos.lot_size * 0.5)
+                    self.balance += partial_pnl
+                    pos.lot_size = round(pos.lot_size * 0.5, 4)
+                    pos.trailing_sl = pos.entry_price  # move to breakeven
+                    self._log_event("PARTIAL_CLOSE", {
+                        "ticket": ticket, "symbol": pos.symbol,
+                        "exit_price": pos.tp_price, "pnl": round(partial_pnl, 2),
+                        "reason": "TP1_PARTIAL", "remaining_lots": pos.lot_size,
+                    })
+                    print(f"  [PARTIAL] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} partial PnL={partial_pnl:+.2f}", flush=True)
+
+            # Check TP2 hit (full close of remaining)
+            tp_final = pos.tp2_price if (pos.tp2_price > 0 and pos.tp1_hit) else pos.tp_price
+            if pos.direction == "BUY" and price >= tp_final:
+                to_close.append((ticket, "TP2" if pos.tp1_hit else "TP", tp_final))
+                continue
+            elif pos.direction == "SELL" and price <= tp_final:
+                to_close.append((ticket, "TP2" if pos.tp1_hit else "TP", tp_final))
+                continue
+
+            # Check SL hit
+            if pos.direction == "BUY" and price <= pos.sl_price:
+                to_close.append((ticket, "SL", pos.sl_price))
+                continue
+            elif pos.direction == "SELL" and price >= pos.sl_price:
+                to_close.append((ticket, "SL", pos.sl_price))
+                continue
+
+            # Check trailing SL
+            if pos.trailing_sl != pos.sl_price:
+                if pos.direction == "BUY" and price <= pos.trailing_sl:
+                    to_close.append((ticket, "TRAILING_SL", pos.trailing_sl))
+                    continue
+                elif pos.direction == "SELL" and price >= pos.trailing_sl:
+                    to_close.append((ticket, "TRAILING_SL", pos.trailing_sl))
+                    continue
+
+            # Update trailing stop (move to breakeven at 1R, trail at 0.5R increments)
+            self._update_trailing_stop(pos)
+
+        # Close positions
+        for ticket, reason, exit_price in to_close:
+            event = self._close_position(ticket, reason, exit_price)
+            if event:
+                events.append(event)
+
+        return events
+
+    def _update_trailing_stop(self, pos: PaperPosition) -> None:
+        """Move trailing stop based on R-multiple progress."""
+        r = pos.r_multiple
+        risk = abs(pos.entry_price - pos.sl_price)
+
+        if r >= 1.0:
+            # Move to breakeven at 1R
+            new_sl = pos.entry_price
+            if pos.direction == "BUY":
+                # Trail at 0.5R increments above breakeven
+                trail_level = pos.entry_price + (r - 0.5) * risk
+                new_sl = max(new_sl, trail_level)
+                if new_sl > pos.trailing_sl:
+                    pos.trailing_sl = round(new_sl, 5)
+            else:
+                trail_level = pos.entry_price - (r - 0.5) * risk
+                new_sl = min(new_sl, trail_level)
+                if new_sl < pos.trailing_sl:
+                    pos.trailing_sl = round(new_sl, 5)
+
+    # ------------------------------------------------------------------
+    # Close position
+    # ------------------------------------------------------------------
+
+    def _close_position(self, ticket: int, reason: str, exit_price: float) -> dict | None:
+        """Close a position and record the result."""
+        pos = self.open_positions.pop(ticket, None)
+        if pos is None:
+            return None
+
+        if pos.direction == "BUY":
+            pnl = (exit_price - pos.entry_price) * pos.lot_size
+        else:
+            pnl = (pos.entry_price - exit_price) * pos.lot_size
+
+        risk = abs(pos.entry_price - pos.sl_price)
+        r_mult = pnl / (risk * pos.lot_size) if risk > 0 and pos.lot_size > 0 else 0.0
+
+        closed = ClosedPosition(
+            ticket=ticket,
+            symbol=pos.symbol,
+            direction=pos.direction,
+            entry_price=pos.entry_price,
+            exit_price=exit_price,
+            sl_price=pos.sl_price,
+            tp_price=pos.tp_price,
+            lot_size=pos.lot_size,
+            pnl=round(pnl, 2),
+            r_multiple=round(r_mult, 2),
+            opened_at=pos.opened_at,
+            closed_at=datetime.now(timezone.utc).isoformat(),
+            close_reason=reason,
+            ict_grade=pos.ict_grade,
+            ict_score=pos.ict_score,
+        )
+
+        self.closed_positions.append(closed)
+        self.balance += pnl
+        self.peak_balance = max(self.peak_balance, self.balance)
+
+        # Track win/loss streaks
+        if pnl >= 0:
+            self.wins += 1
+            self.consecutive_losses = 0
+            if pos.ict_grade == "A":
+                self.grade_a_wins += 1
+        else:
+            self.losses += 1
+            self.consecutive_losses += 1
+            if pos.ict_grade == "A":
+                self.grade_a_losses += 1
+
+        self._log_event("CLOSE", {
+            "ticket": ticket,
+            "symbol": pos.symbol,
+            "direction": pos.direction,
+            "entry": pos.entry_price,
+            "exit": exit_price,
+            "pnl": round(pnl, 2),
+            "r_multiple": round(r_mult, 2),
+            "reason": reason,
+            "balance": round(self.balance, 2),
+        })
+
+        return {
+            "ticket": ticket,
+            "symbol": pos.symbol,
+            "pnl": round(pnl, 2),
+            "r_multiple": round(r_mult, 2),
+            "reason": reason,
+            "balance": round(self.balance, 2),
+        }
+
+    # ------------------------------------------------------------------
+    # Account state
+    # ------------------------------------------------------------------
+
+    @property
+    def daily_pnl(self) -> float:
+        """Today's P&L (realized only)."""
+        return round(self.balance - self.initial_balance, 2)
+
+    @property
+    def daily_pnl_pct(self) -> float:
+        return self.daily_pnl / self.initial_balance if self.initial_balance else 0.0
+
+    @property
+    def total_drawdown_pct(self) -> float:
+        if self.peak_balance <= 0:
+            return 0.0
+        return (self.peak_balance - self.balance) / self.peak_balance
+
+    @property
+    def can_trade(self) -> tuple[bool, str]:
+        """Check account limits. Daily loss limit: 2% (self-imposed, prop-firm safe)."""
+        if self.daily_pnl_pct <= -0.02:
+            return False, f"Daily loss {self.daily_pnl_pct:.1%} hit 2% limit"
+        if self.total_drawdown_pct >= 0.08:
+            return False, f"Total DD {self.total_drawdown_pct:.1%} hit 8% soft limit"
+        return True, "OK"
+
+    def get_account_summary(self) -> dict:
+        grade_a_total = self.grade_a_wins + self.grade_a_losses
+        grade_a_wr = f"{self.grade_a_wins/grade_a_total:.0%}" if grade_a_total > 0 else "N/A"
+        return {
+            "balance": round(self.balance, 2),
+            "initial_balance": self.initial_balance,
+            "daily_pnl": self.daily_pnl,
+            "daily_pnl_pct": f"{self.daily_pnl_pct:.2%}",
+            "total_drawdown_pct": f"{self.total_drawdown_pct:.2%}",
+            "open_positions": len(self.open_positions),
+            "closed_today": len(self.closed_positions),
+            "wins": self.wins,
+            "losses": self.losses,
+            "consecutive_losses": self.consecutive_losses,
+            "grade_a_win_rate": grade_a_wr,
+            "can_trade": self.can_trade[0],
+        }
+
+    # ------------------------------------------------------------------
+    # Logging
+    # ------------------------------------------------------------------
+
+    def _log_event(self, event_type: str, data: dict) -> None:
+        """Append event to JSONL trade log."""
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event": event_type,
+            **data,
+        }
+        with open(self.trade_log, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+
+
+# ---------------------------------------------------------------------------
+# CLI test
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    executor = PaperExecutor(initial_balance=10_000)
+
+    # Simulate a BUY
+    decision = TradeDecision(
+        action="BUY",
+        symbol="BTCUSD",
+        entry_price=69000.0,
+        sl_price=68500.0,
+        tp_price=70000.0,
+        confidence=80,
+        risk_pct=0.01,
+        reasoning="Test trade",
+        grade="B",
+        ict_score=76.8,
+    )
+
+    result = executor.open_position(decision)
+    print(f"Open: {result}")
+    print(f"Account: {json.dumps(executor.get_account_summary(), indent=2)}")
+
+    # Simulate price move to TP
+    events = executor.check_positions({"BTCUSD": 70000.0})
+    print(f"Events: {events}")
+    print(f"Account after TP: {json.dumps(executor.get_account_summary(), indent=2)}")

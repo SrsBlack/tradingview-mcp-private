@@ -1,0 +1,173 @@
+{
+  "_description": "Maps trading sessions to valid strategies and time windows. The auto-trading system should only evaluate strategies that are valid for the current session.",
+  "_created": "2026-04-08",
+  "_source": "ChartFanatics strategy time windows + ICT kill zone theory",
+
+  "sessions": {
+    "asian": {
+      "utc_start": "00:00",
+      "utc_end": "08:00",
+      "et_start": "19:00",
+      "et_end": "03:00",
+      "pt_start": "16:00",
+      "pt_end": "00:00",
+      "characteristics": "Low volatility, range building, accumulation phase. Liquidity builds at session high/low.",
+      "valid_strategies": [
+        "ICT_Continuation",
+        "Order_Block_Bounce",
+        "Structure_OTE"
+      ],
+      "avoid_strategies": [
+        "AMD_Model",
+        "Trident_High_RR",
+        "Intraday_Liquidity_Volatility"
+      ],
+      "notes": "Mark Asian High/Low as key liquidity levels for London/NY sweeps. Do not aggressively trade in this session — it's accumulation."
+    },
+
+    "london_open": {
+      "utc_start": "07:00",
+      "utc_end": "10:00",
+      "et_start": "02:00",
+      "et_end": "05:00",
+      "pt_start": "23:00",
+      "pt_end": "02:00",
+      "characteristics": "High volatility. Manipulation phase — sweeps Asian highs/lows. Displacement candles common.",
+      "valid_strategies": [
+        "Trident_High_RR",
+        "Intraday_Liquidity_Volatility",
+        "ICT_Reversal",
+        "Liquidity_Strategy",
+        "PO3_OTE_ADR",
+        "Trendline_Break_Pocket"
+      ],
+      "kill_zone_windows": [
+        {
+          "name": "London Kill Zone (Trident)",
+          "et_start": "03:00",
+          "et_end": "06:30",
+          "strategy": "Trident_High_RR",
+          "pairs": ["USDJPY", "EURUSD", "GBPUSD", "NZDUSD", "USDCAD", "XAUUSD"],
+          "notes": "Look for 3-candle FVG on 30M + doji wicking into FVG 50% + EMA stack aligned"
+        }
+      ],
+      "notes": "Prime time for Forex and Gold. Sweeps of Asian session levels are high-probability setups."
+    },
+
+    "london_ny_overlap": {
+      "utc_start": "12:00",
+      "utc_end": "16:00",
+      "et_start": "07:00",
+      "et_end": "11:00",
+      "pt_start": "04:00",
+      "pt_end": "08:00",
+      "characteristics": "Highest liquidity period globally. Distribution phase. Strongest moves and best fills.",
+      "valid_strategies": [
+        "AMD_Model",
+        "SMT_Divergence_PO3",
+        "Structure_OTE",
+        "Break_Retest",
+        "ICT_Reversal",
+        "ICT_Continuation",
+        "Intraday_Liquidity_Volatility",
+        "Auction_Market_Theory"
+      ],
+      "kill_zone_windows": [
+        {
+          "name": "AMD Prime Window 1",
+          "et_start": "09:50",
+          "et_end": "10:10",
+          "strategy": "AMD_Model",
+          "pairs": ["US30.cash", "US100.cash", "XAUUSD"],
+          "notes": "Manipulation phase typically completes here. Look for displacement + FVG."
+        },
+        {
+          "name": "SMT Manipulation Check",
+          "et_start": "10:00",
+          "et_end": "10:15",
+          "strategy": "SMT_Divergence_PO3",
+          "pairs": ["US30.cash", "US100.cash"],
+          "notes": "Check if NQ/ES diverge at this time — classic SMT divergence window."
+        },
+        {
+          "name": "AMD Prime Window 2",
+          "et_start": "10:50",
+          "et_end": "11:10",
+          "strategy": "AMD_Model",
+          "pairs": ["US30.cash", "US100.cash"],
+          "notes": "Secondary AMD distribution window."
+        }
+      ],
+      "notes": "This is where the money is made. All strategy archetypes valid. Full confluence checking."
+    },
+
+    "ny_afternoon": {
+      "utc_start": "16:00",
+      "utc_end": "21:00",
+      "et_start": "11:00",
+      "et_end": "16:00",
+      "pt_start": "08:00",
+      "pt_end": "13:00",
+      "characteristics": "Declining volatility. Trend continuation or reversal setups. Less manipulation.",
+      "valid_strategies": [
+        "ICT_Continuation",
+        "Structure_OTE",
+        "Break_Retest",
+        "Trendline_Strategy"
+      ],
+      "avoid_strategies": [
+        "AMD_Model",
+        "Trident_High_RR",
+        "SMT_Divergence_PO3"
+      ],
+      "notes": "Reduce position sizes. Avoid new entries after 14:00 ET for day trades. Swing trade entries can be taken."
+    },
+
+    "ny_close": {
+      "utc_start": "20:00",
+      "utc_end": "21:00",
+      "et_start": "15:00",
+      "et_end": "16:00",
+      "pt_start": "12:00",
+      "pt_end": "13:00",
+      "characteristics": "End of day. Position squaring. Mark daily levels for next day.",
+      "valid_strategies": [],
+      "notes": "No new entries. Close intraday positions. Log session summary."
+    }
+  },
+
+  "no_trade_rules": [
+    {
+      "rule": "no_first_15min_ny",
+      "description": "No entries in first 15 minutes of NY session (9:30-9:45 ET)",
+      "reason": "Opening volatility spike creates false signals and wide spreads"
+    },
+    {
+      "rule": "no_major_news_5min",
+      "description": "No entries within 5 minutes before or after FOMC, NFP, CPI, GDP, PPI releases",
+      "reason": "Extreme volatility and slippage. Wait for dust to settle, then analyze."
+    },
+    {
+      "rule": "no_friday_afternoon",
+      "description": "No new entries after 14:00 ET on Fridays",
+      "reason": "Weekend gap risk. Position squaring creates noise."
+    },
+    {
+      "rule": "no_bank_holidays",
+      "description": "No trading on US/UK bank holidays",
+      "reason": "Low liquidity creates unpredictable moves."
+    }
+  ],
+
+  "crypto_override": {
+    "description": "Crypto markets trade 24/7 but still respond to traditional session times",
+    "session_bias": {
+      "asian": "Accumulation — range building, lower conviction signals",
+      "london_open": "Medium — some manipulation of Asian levels",
+      "london_ny_overlap": "Highest — strongest crypto moves align with TradFi sessions",
+      "ny_afternoon": "Medium — continuation or reversal",
+      "weekend": "Low — avoid aggressive entries, wider stops needed"
+    },
+    "notes": "Apply session routing but with relaxed filters. All strategies remain available for crypto but confidence multiplier should be reduced outside London/NY overlap."
+  }
+}
