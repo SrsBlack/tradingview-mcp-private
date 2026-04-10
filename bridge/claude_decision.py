@@ -227,8 +227,8 @@ class ClaudeDecisionMaker:
     - Grade D / INVALID -> auto-SKIP (no API call)
     """
 
-    SONNET = "claude-haiku-4-5-20251001"   # budget mode: Haiku for all grades until $5 is validated
-    HAIKU = "claude-haiku-4-5-20251001"
+    SONNET = "claude-sonnet-4-6"   # Grade A trades — deeper analysis
+    HAIKU = "claude-haiku-4-5-20251001"    # Grade B/C trades — fast, cost-efficient
 
     def __init__(self, min_rr: float = 1.4):
         self.min_rr = min_rr
@@ -277,7 +277,7 @@ class ClaudeDecisionMaker:
                 try:
                     decision = self._call_claude(analysis, model)
                     # Post-gate
-                    rejection = self._post_gate(decision)
+                    rejection = self._post_gate(decision, analysis)
                     if rejection:
                         decision.action = "SKIP"
                         decision.reasoning = f"Post-gate: {rejection}. Original: {decision.reasoning}"
@@ -356,13 +356,16 @@ class ClaudeDecisionMaker:
 
         trade_type = _classify_trade_type(a)
 
+        atr_line = f"\n- ATR(14) on M15: {a.atr_m15:.5f}" if a.atr_m15 > 0 else ""
+        min_sl_dist = a.atr_m15 * 1.5 if a.atr_m15 > 0 else 0
+
         return f"""You are an ICT trading decision engine enhanced with strategy knowledge from 33 ChartFanatics strategies and 375K MT5 backtest passes. Evaluate this signal and respond with ONLY a JSON object.
 
 SIGNAL:
 - Symbol: {a.symbol} @ ${a.current_price:,.2f}
 - Direction: {a.direction} | Grade: {a.grade} ({a.total_score:.0f}/100)
 - Confluence: {', '.join(a.confluence_factors) if a.confluence_factors else 'None'}
-- Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}{ea_line}
+- Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}{ea_line}{atr_line}
 
 SCORE BREAKDOWN:
 - Structure: {a.structure_score:.0f}/30 | Liquidity sweep: REQUIRED GATE (not scored)
@@ -375,12 +378,14 @@ SCORE BREAKDOWN:
 RULES:
 - Minimum R:R 1.5:1 (prefer 2:1+ for Grade B/C)
 - Grade A: full conviction | Grade B: strict risk | Grade C: pullback only
-- SL behind nearest structure level/OB | TP at next liquidity target
+- SL behind nearest structure level/OB, but NEVER closer than 1.5x ATR(14) from entry{f' (minimum {min_sl_dist:.5f} distance)' if min_sl_dist > 0 else ''}
+- IMPORTANT: Tight stops get hunted. Place SL beyond the liquidity sweep zone, not at the edge of it. Give the trade room to breathe.
+- TP at next liquidity target
 - TP1 (tp_price): nearest HTF FVG or Order Block in trade direction (partial close at 50%)
 - TP2 (tp2_price): next liquidity pool / swing high/low (final target, trail remainder)
 - If only one TP level is clear, set tp2_price = tp_price * 1.5 (for BUY) or * 0.667 (for SELL) as fallback
 - Max risk for this symbol/grade: {max_risk:.1%}
-- Trade type: {trade_type.upper()} → SL placement: {'beyond the swept high/low' if trade_type == 'swing' else 'behind the OB/FVG entry zone (tighter)'}
+- Trade type: {trade_type.upper()} → SL placement: {'beyond the swept high/low (give buffer beyond the wick)' if trade_type == 'swing' else 'behind the OB/FVG entry zone (at least 1.5x ATR from entry)'}
 - EA ensemble confirmation adds conviction — treat as extra confluence factor
 - If in a kill zone that matches this symbol's best session: boost confidence
 - If mean reversion warning applies: reduce continuation confidence, prefer reversal setups
@@ -431,16 +436,21 @@ If the setup is not convincing, use "SKIP" for action."""
                     model_used=model,
                 )
 
+        # Guard against null values in Claude's JSON (e.g. "entry_price": null)
+        def _f(key: str, default: float) -> float:
+            v = data.get(key)
+            return float(v) if v is not None else float(default)
+
         return TradeDecision(
-            action=data.get("action", "SKIP").upper(),
+            action=(data.get("action") or "SKIP").upper(),
             symbol=analysis.symbol,
-            entry_price=float(data.get("entry_price", analysis.current_price)),
-            sl_price=float(data.get("sl_price", 0)),
-            tp_price=float(data.get("tp_price", 0)),
-            tp2_price=float(data.get("tp2_price", 0)),
-            confidence=int(data.get("confidence", 0)),
-            risk_pct=float(data.get("risk_pct", 0.005)),
-            reasoning=data.get("reasoning", "No reasoning provided"),
+            entry_price=_f("entry_price", analysis.current_price),
+            sl_price=_f("sl_price", 0),
+            tp_price=_f("tp_price", 0),
+            tp2_price=_f("tp2_price", 0),
+            confidence=int(data.get("confidence") or 0),
+            risk_pct=_f("risk_pct", 0.005),
+            reasoning=data.get("reasoning") or "No reasoning provided",
             grade=analysis.grade,
             ict_score=analysis.total_score,
             model_used=model,
@@ -451,7 +461,7 @@ If the setup is not convincing, use "SKIP" for action."""
     # Post-gate
     # ------------------------------------------------------------------
 
-    def _post_gate(self, decision: TradeDecision) -> str | None:
+    def _post_gate(self, decision: TradeDecision, analysis: SymbolAnalysis | None = None) -> str | None:
         """
         Validate a trade decision after Claude responds.
         Returns rejection reason or None if valid.
@@ -480,6 +490,17 @@ If the setup is not convincing, use "SKIP" for action."""
         if decision.risk_pct > 0.02:
             return f"Risk {decision.risk_pct:.1%} exceeds 2% max"
 
+        # Minimum SL distance: must be at least 1.0x ATR(14) on M15
+        # Prevents premature stopouts from normal volatility
+        if analysis and analysis.atr_m15 > 0:
+            sl_distance = abs(decision.entry_price - decision.sl_price)
+            min_sl = analysis.atr_m15 * 1.0  # 1x ATR minimum (prompt asks for 1.5x)
+            if sl_distance < min_sl:
+                return (
+                    f"SL too tight: {sl_distance:.5f} distance < 1x ATR ({min_sl:.5f}). "
+                    f"ATR(14) M15 = {analysis.atr_m15:.5f}"
+                )
+
         return None
 
     # ------------------------------------------------------------------
@@ -502,10 +523,12 @@ If the setup is not convincing, use "SKIP" for action."""
                 model_used="rule-based-fallback",
             )
 
-        # Simple SL/TP calculation based on ATR-like range
+        # SL/TP calculation: use real ATR if available, else 0.5% fallback
         price = analysis.current_price
-        # Use 0.5% of price as approximate risk distance
-        risk_dist = price * 0.005
+        if analysis.atr_m15 > 0:
+            risk_dist = analysis.atr_m15 * 1.5  # 1.5x ATR for breathing room
+        else:
+            risk_dist = price * 0.005
 
         if analysis.direction == "BULLISH":
             action = "BUY"

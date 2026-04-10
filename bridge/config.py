@@ -67,6 +67,12 @@ SYMBOL_MAP: dict[str, str] = {
     # Dow Jones futures — FTMO calls it US30
     "YM1!":   "US30",
     "YM":     "US30",
+    # S&P 500 E-mini — FTMO calls it US500
+    "ES1!":   "US500",
+    "ES":     "US500",
+    # Nasdaq 100 E-mini — FTMO calls it US100
+    "NQ1!":   "US100",
+    "NQ":     "US100",
     "NAS100": "US100",
     "US100":  "US100",
     "SPX500": "US500",
@@ -84,6 +90,10 @@ REVERSE_SYMBOL_MAP: dict[str, str] = {v: k for k, v in SYMBOL_MAP.items()}
 SMT_PAIRS: dict[str, str] = {
     "US500.cash": "US100.cash",
     "US100.cash": "US500.cash",
+    "ES1!": "NQ1!",
+    "NQ1!": "ES1!",
+    "US500": "US100",
+    "US100": "US500",
     "EURUSD": "GBPUSD",
     "GBPUSD": "EURUSD",
     "XAUUSD": "XAGUSD",
@@ -106,6 +116,39 @@ TF_MAP: dict[str, str] = {
 }
 
 TF_REVERSE: dict[str, str] = {v: k for k, v in TF_MAP.items()}
+
+
+# ---------------------------------------------------------------------------
+# Price range validation — single source of truth for contamination detection
+# ---------------------------------------------------------------------------
+# Keys are base symbol names (no exchange prefix).
+# Range: (floor, ceiling). Upper bound = realistic ATH * ~1.2 headroom.
+# Reject any price outside this range as contamination from another symbol.
+
+PRICE_RANGES: dict[str, tuple[float, float]] = {
+    "BTCUSD":  (10_000, 200_000),  # BTC ATH ~109k; 200k gives headroom
+    "ETHUSD":  (100,    10_000),   # ETH ATH ~4,800; 10k gives headroom, rejects 47k contamination
+    "SOLUSD":  (1,      1_000),    # SOL ATH ~260; 1k gives headroom, rejects 70k contamination
+    "EURUSD":  (0.80,   1.60),     # EUR/USD never outside 0.82–1.60 in modern history
+    "GBPUSD":  (1.00,   2.00),     # GBP/USD realistic range
+    "YM1!":    (10_000, 50_000),   # Dow futures; ATH ~45k
+    "ES1!":    (2_000,  7_000),    # S&P 500 E-mini futures; ATH ~6,100
+    "NQ1!":    (8_000,  25_000),   # Nasdaq 100 E-mini futures; ATH ~22,200
+    "US500":   (2_000,  7_000),    # S&P 500 CFD (same range as ES)
+    "US100":   (8_000,  25_000),   # Nasdaq 100 CFD (same range as NQ)
+    "XAUUSD":  (1_000,  6_000),    # Gold spot confirmed ~4,767 Apr 2026; 6k gives headroom
+    "UKOIL":   (10,     150),      # Brent crude realistic range
+}
+
+
+def price_in_range(symbol: str, price: float) -> bool:
+    """Check if price is within valid range for symbol. Returns True if valid or unknown symbol."""
+    base = symbol.split(":")[-1]
+    rng = PRICE_RANGES.get(base)
+    if rng is None or price <= 0:
+        return True  # unknown symbol — don't block
+    lo, hi = rng
+    return lo <= price <= hi
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +180,11 @@ class BridgeConfig:
     bias_criteria: dict[str, list[str]] = field(default_factory=dict)
     risk_rules: list[str] = field(default_factory=list)
     strategy_ensemble: list[dict] = field(default_factory=list)
+
+    # Grade thresholds (ICT score cutoffs for A/B/C/D)
+    grade_thresholds: dict[str, int] = field(default_factory=lambda: {
+        "A": 80, "B": 65, "C": 50, "D": 35
+    })
 
     # Flags
     has_trading_ai: bool = False
@@ -185,12 +233,14 @@ def get_bridge_config() -> BridgeConfig:
     rules = _load_rules()
     has_tai = ensure_trading_ai_path()
 
+    default_thresholds = {"A": 80, "B": 65, "C": 50, "D": 35}
     return BridgeConfig(
         watchlist=rules.get("watchlist", ["BTCUSD", "ETHUSD", "SOLUSD"]),
         default_timeframe=rules.get("default_timeframe", "240"),
         bias_criteria=rules.get("bias_criteria", {}),
         risk_rules=rules.get("risk_rules", []),
         strategy_ensemble=rules.get("strategy_ensemble", []),
+        grade_thresholds={**default_thresholds, **rules.get("grade_thresholds", {})},
         has_trading_ai=has_tai,
     )
 

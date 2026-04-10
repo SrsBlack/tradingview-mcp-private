@@ -5,6 +5,8 @@
     "COINBASE:SOLUSD",
     "OANDA:EURUSD",
     "CBOT:YM1!",
+    "CAPITALCOM:US500",
+    "CAPITALCOM:US100",
     "OANDA:XAUUSD",
     "TVC:UKOIL"
   ],

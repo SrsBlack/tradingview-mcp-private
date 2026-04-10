@@ -23,7 +23,8 @@ from typing import Any
 
 import pandas as pd
 
-from bridge.config import get_bridge_config, ensure_trading_ai_path, BridgeConfig
+from bridge.config import get_bridge_config, ensure_trading_ai_path, BridgeConfig, price_in_range, PRICE_RANGES
+from bridge.price_verify import PriceVerifier
 from bridge.tv_client import TVClient, TVClientError
 from bridge.tv_data_adapter import bars_to_dataframe, validate_dataframe
 
@@ -100,6 +101,9 @@ class SymbolAnalysis:
     # Risk level suggestion
     risk_level: str = "SKIP"
 
+    # Volatility (ATR-14 on M15)
+    atr_m15: float = 0.0
+
     # Error info
     error: str | None = None
 
@@ -131,6 +135,7 @@ class SymbolAnalysis:
             "has_smt": self.has_smt,
             "sweep_detected": self.sweep_detected,
             "risk_level": self.risk_level,
+            "atr_m15": self.atr_m15,
         }
         if self.error:
             d["error"] = self.error
@@ -152,6 +157,7 @@ class ICTPipeline:
     def __init__(self, config: BridgeConfig | None = None, client: TVClient | None = None):
         self.config = config or get_bridge_config()
         self.client = client or TVClient()
+        self.price_verifier = PriceVerifier()
 
         # Cache for H4 data (changes infrequently)
         self._h4_cache: dict[str, tuple[pd.DataFrame, float]] = {}
@@ -324,7 +330,7 @@ class ICTPipeline:
             else:
                 result.risk_level = "SKIP"
 
-            # LTF analysis summary
+            # LTF analysis summary + ATR
             if df_ltf is not None:
                 ltf_swings = detect_swings(df_ltf, lookback=5)
                 result.ltf_analysis = TimeframeAnalysis(
@@ -337,6 +343,18 @@ class ICTPipeline:
                     ob_count=len(obs),
                     sweep_count=len(sweeps),
                 )
+
+                # Compute ATR(14) on M15 for SL distance guidance
+                if len(df_ltf) >= 15:
+                    highs = df_ltf["high"].astype(float)
+                    lows = df_ltf["low"].astype(float)
+                    closes = df_ltf["close"].astype(float)
+                    tr = pd.concat([
+                        highs - lows,
+                        (highs - closes.shift(1)).abs(),
+                        (lows - closes.shift(1)).abs(),
+                    ], axis=1).max(axis=1)
+                    result.atr_m15 = round(float(tr.iloc[-14:].mean()), 5)
 
         except Exception as e:
             result.error = f"{type(e).__name__}: {e}"
@@ -380,11 +398,20 @@ class ICTPipeline:
     # Data collection helpers
     # ------------------------------------------------------------------
 
+    # Price range validation uses shared config.PRICE_RANGES / config.price_in_range
+    # Single source of truth — no duplicate dicts to go out of sync.
+
+    def _price_in_range(self, symbol: str, price: float) -> bool:
+        """Return False if price is outside the known valid range for this symbol."""
+        return price_in_range(symbol, price)
+
     def _collect_data(self, symbol: str) -> dict[str, pd.DataFrame | None]:
         """
         Collect OHLCV data across H4, H1, M15 timeframes.
 
         Uses H4 cache to avoid unnecessary chart switches.
+        Price-validates every dataframe to catch cross-symbol contamination
+        (TV Desktop streams one chart — symbol switches can race with data reads).
 
         Returns:
             {"H4": df_or_None, "H1": df_or_None, "M15": df_or_None}
@@ -392,53 +419,86 @@ class ICTPipeline:
         dfs: dict[str, pd.DataFrame | None] = {"H4": None, "H1": None, "M15": None}
         cfg = self.config
 
-        # Switch to the correct symbol and poll until the chart confirms it loaded.
-        # TradingView Desktop has one chart — we must wait for the symbol to actually change.
+        # Switch to the correct symbol and poll until BOTH the quote symbol AND
+        # the live price are consistent with the target.
+        # TV Desktop lags: the quote symbol name can update before the price stream
+        # stabilises, so we validate the price against known ranges as a second gate.
         target_sym = symbol.split(":")[-1]
+        # Step 1: Switch symbol and wait for chart_ready (CLI polls up to 10s internally)
         try:
-            self.client.set_symbol(symbol)
-            # Poll quote until chart symbol matches, up to 15s
-            # Compare only the ticker part (strip exchange prefix) since TV may
-            # return a different exchange prefix (e.g. CBOT_MINI_DL vs CBOT)
-            for _ in range(15):
-                time.sleep(1.0)
-                try:
-                    quote = self.client.get_quote()
-                    chart_sym = quote.get("symbol", "").split(":")[-1]
-                    if chart_sym == target_sym:
-                        time.sleep(0.5)
-                        break
-                except Exception:
-                    pass
-            else:
-                print(f"[WARN] Chart did not switch to {symbol} in time — skipping", flush=True)
+            result = self.client.set_symbol(symbol, require_ready=True)
+            if not result.get("chart_ready", False):
+                print(f"[WARN] Chart not ready for {symbol} after set_symbol — skipping", flush=True)
                 return dfs
-        except TVClientError:
-            pass
 
-        # At this point the chart is confirmed on the correct symbol.
-        # All subsequent OHLCV fetches switch timeframe only (switch=False for symbol).
-        # This prevents re-triggering a symbol switch that could race with stale data.
+            # Verify quote confirms the symbol with a live price
+            quote = self.client.get_quote()
+            chart_sym = quote.get("symbol", "").split(":")[-1]
+            if chart_sym != target_sym:
+                print(f"[WARN] Quote symbol mismatch: expected {target_sym}, got {chart_sym} — skipping", flush=True)
+                return dfs
+
+            live_price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+            if live_price <= 0:
+                print(f"[WARN] {symbol} quote returned zero price — skipping", flush=True)
+                return dfs
+
+            # Cross-check against Alpaca live feed (primary defense for crypto)
+            price_ok, alpaca_price = self.price_verifier.verify(symbol, live_price)
+            if not price_ok:
+                print(
+                    f"[REJECT] {symbol}: TV price {live_price:.4f} doesn't match "
+                    f"Alpaca {alpaca_price:.4f} — contaminated data, skipping",
+                    flush=True,
+                )
+                return dfs
+
+            # Safety net: price range check (catches forex/commodities not on Alpaca)
+            if not self._price_in_range(symbol, live_price):
+                print(
+                    f"[WARN] {symbol}: symbol confirmed but price {live_price:.4f} "
+                    f"fails range check — data may be stale, skipping",
+                    flush=True,
+                )
+                return dfs
+
+        except TVClientError as e:
+            print(f"[WARN] Failed to switch to {symbol}: {e}", flush=True)
+            return dfs
+
+        # Chart is confirmed: symbol name matches, price verified against Alpaca, in range.
+        # All subsequent OHLCV fetches switch timeframe only (symbol is locked).
 
         def _fetch_tf(timeframe: str, count: int) -> pd.DataFrame | None:
-            """Switch to timeframe (symbol already correct) and fetch OHLCV."""
+            """Switch timeframe (symbol already confirmed) and fetch verified OHLCV."""
             try:
-                self.client.set_timeframe(timeframe)
-                time.sleep(1.5)  # wait for bars to reload on new timeframe
-                raw = self.client.get_ohlcv(switch=False, count=count)
-                # Verify the returned data isn't from the wrong symbol by checking
-                # that the current quote symbol still matches our target
-                try:
-                    q = self.client.get_quote()
-                    live_sym = q.get("symbol", "").split(":")[-1]
-                    if live_sym and live_sym != target_sym:
-                        print(f"[WARN] Symbol drift on {timeframe}: expected {target_sym}, got {live_sym} — discarding", flush=True)
-                        return None
-                except Exception:
-                    pass
+                tf_result = self.client.set_timeframe(timeframe)
+                if not tf_result.get("chart_ready", True):
+                    # chart_ready=false after TF switch — wait a bit more
+                    time.sleep(2.0)
+
+                # Read OHLCV with post-read symbol verification
+                raw = self.client.get_ohlcv_verified(symbol, count=count)
+                if raw is None:
+                    # Symbol drift detected during OHLCV read
+                    return None
+
                 df = bars_to_dataframe(raw)
                 valid, _ = validate_dataframe(df)
-                return df if valid else None
+                if not valid:
+                    return None
+
+                # Safety net: verify OHLCV close prices are in valid range
+                last_close = float(df["close"].iloc[-1]) if not df.empty else 0
+                if last_close > 0 and not self._price_in_range(symbol, last_close):
+                    print(
+                        f"[WARN] OHLCV contamination on {symbol} {timeframe}: "
+                        f"last close {last_close:.4f} is out of valid range — discarding",
+                        flush=True,
+                    )
+                    return None
+
+                return df
             except TVClientError:
                 return None
 

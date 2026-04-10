@@ -115,9 +115,32 @@ class TVClient:
     # Chart control
     # ------------------------------------------------------------------
 
-    def set_symbol(self, symbol: str) -> dict:
-        """Switch chart to a different symbol."""
-        return self._run(["symbol", symbol])
+    def set_symbol(self, symbol: str, require_ready: bool = False) -> dict:
+        """Switch chart to a different symbol.
+
+        Args:
+            symbol: TradingView symbol (e.g. "BITSTAMP:BTCUSD")
+            require_ready: If True, retry up to 3 times if chart_ready is False.
+
+        Returns:
+            {"success": true, "symbol": "...", "chart_ready": bool}
+        """
+        result = self._run(["symbol", symbol])
+        if require_ready and not result.get("chart_ready", False):
+            # CLI waited 10s and chart still not ready — retry twice more
+            for attempt in range(2):
+                time.sleep(2.0)
+                # Re-read state to check if chart caught up
+                try:
+                    q = self.get_quote()
+                    chart_sym = q.get("symbol", "").split(":")[-1]
+                    target_sym = symbol.split(":")[-1]
+                    if chart_sym == target_sym and float(q.get("last", 0)) > 0:
+                        result["chart_ready"] = True
+                        break
+                except TVClientError:
+                    pass
+        return result
 
     def set_timeframe(self, tf: str) -> dict:
         """Switch chart timeframe. tf is TradingView resolution string (e.g., '240', '15', 'D')."""
@@ -152,6 +175,31 @@ class TVClient:
                 time.sleep(1.0)  # Timeframe switch is faster
 
         return self._run(["ohlcv", "-n", str(min(count, 500))])
+
+    def get_ohlcv_verified(self, expected_symbol: str, count: int = 200) -> dict | None:
+        """Get OHLCV and verify the chart is still on the expected symbol.
+
+        Reads OHLCV, then reads a quote to confirm the symbol hasn't drifted.
+        Returns None if the symbol doesn't match (contamination detected).
+        """
+        bars = self._run(["ohlcv", "-n", str(min(count, 500))])
+
+        # Verify symbol hasn't drifted during OHLCV read
+        try:
+            q = self.get_quote()
+            chart_sym = q.get("symbol", "").split(":")[-1]
+            target_sym = expected_symbol.split(":")[-1]
+            if chart_sym != target_sym:
+                print(
+                    f"  [TV] Symbol drift detected: expected {target_sym}, "
+                    f"chart shows {chart_sym}. Discarding OHLCV data.",
+                    flush=True,
+                )
+                return None
+        except TVClientError:
+            pass  # Can't verify — proceed cautiously
+
+        return bars
 
     def get_quote(self) -> dict:
         """Get real-time quote for the current chart symbol."""
@@ -206,27 +254,37 @@ class TVClient:
                    sl: float, tp1: float, tp2: float, grade: str, ticket: int) -> list[str]:
         """
         Draw entry, SL, TP1, TP2 lines on the chart for a trade.
-        Switches to the symbol first.
+        Ensures chart is on the correct symbol before drawing.
         Returns list of entity_ids so they can be removed on close.
         NEVER calls draw_clear — only adds new shapes.
         """
         entity_ids: list[str] = []
         try:
+            # Ensure chart is on the correct symbol before drawing
+            self.set_symbol(symbol, require_ready=True)
+
+            # Get current timestamp for arrow placement
+            import time as _time
+            now_ts = int(_time.time())
+
             color_entry = "#2196F3"   # blue
             color_sl = "#F44336"      # red
             color_tp = "#4CAF50"      # green
 
-            # Entry arrow — points toward price action (up for BUY, down for SELL)
+            # Entry arrow — placed at current time + entry price
             arrow = "▲" if direction == "BUY" else "▼"
             arrow_color = "#00E676" if direction == "BUY" else "#FF1744"
-            r = self.draw_shape("text", entry,
-                                text=f"{arrow} #{ticket} {grade} {direction}",
-                                overrides={"color": arrow_color, "fontsize": 14, "bold": True})
+            args = ["draw", "shape", "-t", "text", "-p", str(entry),
+                    "--time", str(now_ts),
+                    "--text", f"{arrow} #{ticket} {grade} {direction}",
+                    "--overrides", json.dumps({"color": arrow_color, "fontsize": 14, "bold": True})]
+            r = self._run(args)
             if r.get("entity_id"):
                 entity_ids.append(r["entity_id"])
 
+            # Horizontal lines (these span the full chart, no time needed)
             r = self.draw_shape("horizontal_line", entry,
-                                text=f"#{ticket} {symbol} ENTRY {direction} {grade}",
+                                text=f"#{ticket} {symbol.split(':')[-1]} ENTRY {direction} {grade}",
                                 overrides={"linecolor": color_entry, "linewidth": 2})
             if r.get("entity_id"):
                 entity_ids.append(r["entity_id"])

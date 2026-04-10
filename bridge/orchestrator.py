@@ -24,7 +24,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from bridge.config import get_bridge_config, BridgeConfig
+from bridge.config import get_bridge_config, BridgeConfig, price_in_range, PRICE_RANGES
+from bridge.price_verify import PriceVerifier
 from bridge.tv_client import TVClient, TVClientError
 from bridge.ict_pipeline import ICTPipeline, SymbolAnalysis
 from bridge.claude_decision import ClaudeDecisionMaker
@@ -35,7 +36,7 @@ from bridge.session_store import SessionStore
 from bridge.state_store import StateStore
 from bridge.risk_bridge import RiskBridge
 from bridge.alerts import BridgeAlerts
-from bridge.strategy_engine import StrategyEngine, signal_to_decision
+from bridge.strategy_engine import StrategyEngine
 
 
 # ---------------------------------------------------------------------------
@@ -114,10 +115,20 @@ def _is_m15_boundary(dt: datetime) -> bool:
 
 
 def _ny_hour(dt: datetime) -> int:
-    """Get current hour in New York time (UTC-4 EDT / UTC-5 EST)."""
-    # Simplified: assume EDT (UTC-4) for now
-    ny = dt - timedelta(hours=4)
-    return ny.hour
+    """Get current hour in New York time (handles EDT UTC-4 / EST UTC-5)."""
+    import calendar
+    year = dt.year
+    # EDT starts: 2nd Sunday of March at 02:00 UTC
+    march_weeks = calendar.monthcalendar(year, 3)
+    edt_start_day = [w[6] for w in march_weeks if w[6] != 0][1]
+    edt_start = datetime(year, 3, edt_start_day, 2, 0, tzinfo=timezone.utc)
+    # EST starts: 1st Sunday of November at 02:00 UTC
+    nov_weeks = calendar.monthcalendar(year, 11)
+    est_start_day = [w[6] for w in nov_weeks if w[6] != 0][0]
+    est_start = datetime(year, 11, est_start_day, 2, 0, tzinfo=timezone.utc)
+
+    offset = -4 if edt_start <= dt < est_start else -5
+    return (dt + timedelta(hours=offset)).hour
 
 
 def _is_lunch_pause(dt: datetime) -> bool:
@@ -135,6 +146,9 @@ def _utc_hour(dt: datetime) -> int:
 _SYMBOL_SESSIONS: dict[str, list[tuple[int, int]]] = {
     # Indices — London open + NY session only (futures market hours)
     "CBOT:YM1!":  [(7, 22)],           # London 7 UTC + NY close 22 UTC (futures close 5pm ET = 21:00 UTC EDT)
+    # US indices CFDs — nearly 24/7 (daily maintenance break 5-6pm ET = 21-22 UTC EDT)
+    "CAPITALCOM:US500": [(0, 21), (22, 24)], # S&P 500 CFD — skip 21:00-22:00 UTC maintenance
+    "CAPITALCOM:US100": [(0, 21), (22, 24)], # Nasdaq 100 CFD — skip 21:00-22:00 UTC maintenance
     # Forex — London + NY (7am-5pm UTC)
     "OANDA:EURUSD": [(7, 17)],
     # Crypto — 24/7
@@ -224,6 +238,19 @@ class LiveExecutorAdapter:
         """
         if not decision.is_trade:
             return {"success": False, "ticket": 0, "message": "Not a trade"}
+
+        # Dedup check: same symbol+direction with similar entry price
+        for pos in self.open_positions.values():
+            if pos.symbol == decision.symbol and pos.direction == decision.action:
+                entry_diff = abs(pos.entry_price - decision.entry_price)
+                threshold = pos.entry_price * 0.005  # 0.5% tolerance
+                if entry_diff < threshold:
+                    return {"success": False, "ticket": 0,
+                            "message": f"Duplicate: already {pos.direction} {decision.symbol} "
+                                       f"@ {pos.entry_price:.4f}"}
+            elif pos.symbol == decision.symbol:
+                return {"success": False, "ticket": 0,
+                        "message": f"Already have {pos.direction} position on {decision.symbol}"}
 
         # Use pre-calculated lot size from RiskBridge if provided
         if lot_size is None:
@@ -330,6 +357,9 @@ class LiveExecutorAdapter:
                 pnl = pos.floating_pnl
                 risk = abs(pos.entry_price - pos.sl_price)
                 r_mult = pnl / (risk * pos.lot_size) if risk > 0 and pos.lot_size > 0 else 0.0
+                closed_at = datetime.now(timezone.utc).isoformat()
+                exit_level = pos.sl_price if closed_reason == "SL" else (
+                    pos.tp2_price if pos.tp2_price > 0 else pos.tp_price)
                 to_remove.append(ticket)
                 self.balance += pnl
                 self.peak_balance = max(self.peak_balance, self.balance)
@@ -345,8 +375,16 @@ class LiveExecutorAdapter:
                         self.grade_a_losses += 1
                 events.append({
                     "ticket": ticket, "symbol": pos.symbol,
+                    "direction": pos.direction,
+                    "entry_price": pos.entry_price,
+                    "exit_price": exit_level,
+                    "actual_trigger_price": price,
                     "pnl": round(pnl, 2), "r_multiple": round(r_mult, 2),
                     "reason": closed_reason, "balance": round(self.balance, 2),
+                    "opened_at": pos.opened_at, "closed_at": closed_at,
+                    "sl_price": pos.sl_price, "tp_price": pos.tp_price,
+                    "tp2_price": pos.tp2_price, "lot_size": pos.lot_size,
+                    "ict_grade": pos.ict_grade, "ict_score": pos.ict_score,
                 })
 
         for t in to_remove:
@@ -416,6 +454,7 @@ class Orchestrator:
         self.risk_bridge = RiskBridge()
         self.alerts = BridgeAlerts()
         self.strategy_engine = StrategyEngine()
+        self.price_verifier = PriceVerifier()
 
         # Strategy knowledge (MT5 backtests + ChartFanatics strategies)
         self._knowledge = _load_strategy_knowledge()
@@ -454,6 +493,12 @@ class Orchestrator:
 
         # --- Load today's closed trades from session store for display ---
         today_trades = self._load_todays_trades()
+
+        # --- Reconcile restored positions against live prices ---
+        if restored_positions:
+            await asyncio.get_running_loop().run_in_executor(
+                None, self._reconcile_restored_positions
+            )
 
         # --- Startup banner ---
         knowledge_loaded = bool(self._knowledge.get("symbol_profiles"))
@@ -602,20 +647,22 @@ class Orchestrator:
             except Exception as e:
                 print(f"[CYCLE] {symbol} error: {e}", flush=True)
 
-    # Sanity price ranges per symbol — catches chart cross-contamination
-    _PRICE_RANGES: dict[str, tuple[float, float]] = {
-        "BITSTAMP:BTCUSD":  (10_000, 500_000),
-        "COINBASE:ETHUSD":  (100, 50_000),
-        "COINBASE:SOLUSD":  (1, 5_000),
-        "OANDA:EURUSD":     (0.5, 2.5),
-        "CBOT:YM1!":        (10_000, 100_000),
-        "CBOT_MINI_DL:YM1!":(10_000, 100_000),
-        "OANDA:XAUUSD":     (500, 15_000),
-        "TVC:UKOIL":        (10, 500),
-    }
+    # Price validation uses shared config.PRICE_RANGES / config.price_in_range
+    # Single source of truth — no duplicate dicts to go out of sync.
 
     def _analyze_and_decide(self, symbol: str) -> None:
         """Analyze a single symbol and make a trade decision."""
+        # Kill switch — check BEFORE doing any analysis or API calls
+        if self._kill_switch_triggered:
+            today = _now_utc().strftime("%Y-%m-%d")
+            if self._kill_switch_date == today:
+                print(f"  [{symbol}] Kill switch active — skipping (daily loss limit hit)", flush=True)
+                return
+            else:
+                # New day — reset
+                self._kill_switch_triggered = False
+                self._kill_switch_date = ""
+
         # Run ICT pipeline (synchronous — subprocess calls)
         analysis = self.pipeline.analyze_symbol(symbol)
 
@@ -625,12 +672,10 @@ class Orchestrator:
             return
 
         # Price sanity check — reject if price is outside expected range for this symbol
-        price_range = self._PRICE_RANGES.get(symbol)
-        if price_range and analysis.current_price > 0:
-            lo, hi = price_range
-            if not (lo <= analysis.current_price <= hi):
-                print(f"  [{symbol}] PRICE_ERROR — got {analysis.current_price:.4f}, expected {lo}-{hi}. Chart not switched correctly, skipping.", flush=True)
-                return
+        if analysis.current_price > 0 and not price_in_range(symbol, analysis.current_price):
+            rng = PRICE_RANGES.get(symbol.split(":")[-1], ("?", "?"))
+            print(f"  [{symbol}] PRICE_ERROR — got {analysis.current_price:.4f}, expected {rng[0]}-{rng[1]}. Chart not switched correctly, skipping.", flush=True)
+            return
 
         # Sweep gate: liquidity sweep is required for any trade
         if not analysis.sweep_detected:
@@ -702,7 +747,7 @@ class Orchestrator:
                     f"MT5_undertested({bt_confidence}x, {original_score:.0f}->{analysis.total_score:.0f})"
                 )
             # Re-grade after score adjustment
-            thresholds = self.config.grade_thresholds if hasattr(self.config, 'grade_thresholds') else {"A": 80, "B": 65, "C": 50, "D": 35}
+            thresholds = self.config.grade_thresholds
             if analysis.total_score >= thresholds.get("A", 80):
                 analysis.grade = "A"
             elif analysis.total_score >= thresholds.get("B", 65):
@@ -864,7 +909,9 @@ class Orchestrator:
                                 pass
                         # Send close alert
                         await self.alerts.send_trade_close(
-                            symbol=event["symbol"], direction="",
+                            symbol=event["symbol"],
+                            direction=event.get("direction", ""),
+                            exit_price=event.get("exit_price", 0.0),
                             pnl=event["pnl"], r_multiple=event["r_multiple"],
                             reason=event["reason"], balance=event["balance"],
                             ticket=event["ticket"], mode=self.mode,
@@ -874,27 +921,138 @@ class Orchestrator:
 
             await asyncio.sleep(self.position_interval)
 
+    def _reconcile_restored_positions(self) -> None:
+        """Check restored positions against live prices — close any that hit SL/TP while bridge was down."""
+        if not self.executor.open_positions:
+            return
+
+        print("[RECONCILE] Checking restored positions against live prices...", flush=True)
+        to_close: list[tuple[int, str, float]] = []
+
+        for ticket, pos in list(self.executor.open_positions.items()):
+            try:
+                target_sym = pos.symbol.split(":")[-1]
+                result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
+                if not result.get("chart_ready", False):
+                    print(f"  [RECONCILE] {pos.symbol} chart not ready — will check in position loop", flush=True)
+                    continue
+
+                quote = self.tv_client.get_quote()
+                chart_sym = quote.get("symbol", "").split(":")[-1]
+                if chart_sym != target_sym:
+                    print(f"  [RECONCILE] Symbol mismatch for {pos.symbol} — skipping", flush=True)
+                    continue
+
+                price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                if price <= 0:
+                    continue
+
+                # Alpaca cross-check
+                price_ok, _ = self.price_verifier.verify(pos.symbol, price)
+                if not price_ok:
+                    print(f"  [RECONCILE] {pos.symbol} price verification failed — skipping", flush=True)
+                    continue
+
+                if not price_in_range(pos.symbol, price):
+                    continue
+
+                # Check if SL or TP was already hit
+                if pos.direction == "BUY":
+                    if price <= pos.sl_price:
+                        to_close.append((ticket, "SL (while offline)", pos.sl_price))
+                    elif price >= (pos.tp2_price if pos.tp2_price > 0 else pos.tp_price):
+                        exit_p = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
+                        to_close.append((ticket, "TP (while offline)", exit_p))
+                    else:
+                        pnl = (price - pos.entry_price) * pos.lot_size
+                        print(f"  [RECONCILE] #{ticket} {pos.symbol} STILL OPEN — price {price:.4f} (PnL {pnl:+.2f})", flush=True)
+                else:
+                    if price >= pos.sl_price:
+                        to_close.append((ticket, "SL (while offline)", pos.sl_price))
+                    elif price <= (pos.tp2_price if pos.tp2_price > 0 else pos.tp_price):
+                        exit_p = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
+                        to_close.append((ticket, "TP (while offline)", exit_p))
+                    else:
+                        pnl = (pos.entry_price - price) * pos.lot_size
+                        print(f"  [RECONCILE] #{ticket} {pos.symbol} STILL OPEN — price {price:.4f} (PnL {pnl:+.2f})", flush=True)
+
+            except TVClientError as e:
+                print(f"  [RECONCILE] Error checking {pos.symbol}: {e}", flush=True)
+
+        # Close positions that were hit while offline
+        for ticket, reason, exit_price in to_close:
+            pos = self.executor.open_positions.get(ticket)
+            if not pos:
+                continue
+            if pos.direction == "BUY":
+                pnl = (exit_price - pos.entry_price) * pos.lot_size
+            else:
+                pnl = (pos.entry_price - exit_price) * pos.lot_size
+            print(
+                f"  [RECONCILE] CLOSING #{ticket} {pos.symbol} — {reason} "
+                f"(entry {pos.entry_price:.4f} -> exit {exit_price:.4f}, PnL {pnl:+.2f})",
+                flush=True,
+            )
+            # Use executor's check_positions to handle the close properly
+            prices = {pos.symbol: exit_price}
+            events = self.executor.check_positions(prices)
+            for event in events:
+                event["reason"] = reason  # override with offline context
+                self.session.log_trade({"event": "CLOSE", **event})
+
+        if to_close:
+            self.state_store.save(self.executor, self.mode)
+            print(f"  [RECONCILE] Closed {len(to_close)} position(s) that hit SL/TP while offline", flush=True)
+        elif self.executor.open_positions:
+            print(f"  [RECONCILE] All {len(self.executor.open_positions)} position(s) still valid", flush=True)
+
     def _check_positions_sync(self) -> list[dict]:
         """Get current prices and check positions."""
         prices: dict[str, float] = {}
-        target_sym = None
         for pos in self.executor.open_positions.values():
             try:
                 target_sym = pos.symbol.split(":")[-1]
-                self.tv_client.set_symbol(pos.symbol)
-                # Poll until chart confirms the symbol — up to 5s
-                price = 0.0
-                for _ in range(5):
-                    time.sleep(1.0)
-                    quote = self.tv_client.get_quote()
-                    chart_sym = quote.get("symbol", "").split(":")[-1]
-                    if chart_sym == target_sym:
-                        price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-                        break
-                if price > 0:
-                    prices[pos.symbol] = price
-            except TVClientError:
-                pass
+                # Use chart_ready to confirm symbol is loaded
+                result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
+                if not result.get("chart_ready", False):
+                    print(f"[POSITIONS] Chart not ready for {pos.symbol} — skipping this cycle", flush=True)
+                    continue
+
+                # Read verified quote
+                quote = self.tv_client.get_quote()
+                chart_sym = quote.get("symbol", "").split(":")[-1]
+                if chart_sym != target_sym:
+                    print(f"[POSITIONS] Symbol mismatch: expected {target_sym}, got {chart_sym}", flush=True)
+                    continue
+
+                p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                if p <= 0:
+                    print(f"[POSITIONS] Zero price for {pos.symbol}", flush=True)
+                    continue
+
+                # Cross-check against Alpaca live feed
+                price_ok, alpaca_price = self.price_verifier.verify(pos.symbol, p)
+                if not price_ok:
+                    print(
+                        f"[POSITIONS] {pos.symbol} TV price {p:.4f} doesn't match "
+                        f"Alpaca {alpaca_price:.4f} — skipping",
+                        flush=True,
+                    )
+                    continue
+
+                # Safety net: price range check (for symbols not on Alpaca)
+                if not price_in_range(pos.symbol, p):
+                    print(
+                        f"[POSITIONS] {pos.symbol} price {p:.4f} FAILED range check "
+                        f"— likely stale data, skipping",
+                        flush=True,
+                    )
+                    continue
+
+                prices[pos.symbol] = p
+
+            except TVClientError as e:
+                print(f"[POSITIONS] TVClient error for {pos.symbol}: {e}", flush=True)
 
         if prices:
             return self.executor.check_positions(prices)

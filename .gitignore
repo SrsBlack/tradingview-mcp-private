@@ -4,3 +4,16 @@ scripts/current.pine
 temp_*
 *.log
 discovery-log.json
+
+# Secrets — NEVER commit
+.env
+.env.*
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Local state / logs
+logs/
+.omc/state/
+*.db

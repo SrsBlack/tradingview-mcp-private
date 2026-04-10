@@ -91,11 +91,21 @@ class PaperExecutor:
             return {"success": False, "ticket": 0,
                     "message": f"Max {self.max_positions} positions reached"}
 
-        # Check for duplicate symbol
+        # Check for duplicate: same symbol+direction with similar entry price
         for pos in self.open_positions.values():
-            if pos.symbol == decision.symbol:
+            if pos.symbol == decision.symbol and pos.direction == decision.action:
+                entry_diff = abs(pos.entry_price - decision.entry_price)
+                threshold = pos.entry_price * 0.005  # 0.5% tolerance
+                if entry_diff < threshold:
+                    return {"success": False, "ticket": 0,
+                            "message": f"Duplicate: already {pos.direction} {decision.symbol} "
+                                       f"@ {pos.entry_price:.4f} (new entry {decision.entry_price:.4f} "
+                                       f"within 0.5%)"}
+            # Also block opposite direction on same symbol (already exposed)
+            elif pos.symbol == decision.symbol:
                 return {"success": False, "ticket": 0,
-                        "message": f"Already have open position on {decision.symbol}"}
+                        "message": f"Already have {pos.direction} position on {decision.symbol} "
+                                   f"— close it before reversing"}
 
         ticket = self._next_ticket
         self._next_ticket += 1
@@ -128,7 +138,14 @@ class PaperExecutor:
         )
 
         self.open_positions[ticket] = position
-        self._log_event("OPEN", position.to_dict())
+        self._log_event("OPEN", {
+            **position.to_dict(),
+            "risk_pct": position.risk_pct,
+            "reasoning": position.reasoning,
+            "ict_score": position.ict_score,
+            "trade_type": position.trade_type,
+            "tp2_price": position.tp2_price,
+        })
 
         return {
             "success": True,
@@ -263,6 +280,11 @@ class PaperExecutor:
         if pos is None:
             return None
 
+        # actual_price is the real market price that triggered the close
+        # exit_price is the SL/TP level used for P&L calculation
+        actual_price = pos.current_price  # last known market price
+        closed_at = datetime.now(timezone.utc).isoformat()
+
         if pos.direction == "BUY":
             pnl = (exit_price - pos.entry_price) * pos.lot_size
         else:
@@ -283,7 +305,7 @@ class PaperExecutor:
             pnl=round(pnl, 2),
             r_multiple=round(r_mult, 2),
             opened_at=pos.opened_at,
-            closed_at=datetime.now(timezone.utc).isoformat(),
+            closed_at=closed_at,
             close_reason=reason,
             ict_grade=pos.ict_grade,
             ict_score=pos.ict_score,
@@ -311,19 +333,36 @@ class PaperExecutor:
             "direction": pos.direction,
             "entry": pos.entry_price,
             "exit": exit_price,
+            "actual_trigger_price": actual_price,
+            "sl_price": pos.sl_price,
+            "tp_price": pos.tp_price,
+            "tp2_price": pos.tp2_price,
             "pnl": round(pnl, 2),
             "r_multiple": round(r_mult, 2),
             "reason": reason,
             "balance": round(self.balance, 2),
+            "opened_at": pos.opened_at,
+            "closed_at": closed_at,
+            "lot_size": pos.lot_size,
+            "ict_grade": pos.ict_grade,
+            "ict_score": pos.ict_score,
+            "trailing_sl": pos.trailing_sl,
+            "tp1_hit": pos.tp1_hit,
         })
 
         return {
             "ticket": ticket,
             "symbol": pos.symbol,
+            "direction": pos.direction,
+            "entry_price": pos.entry_price,
+            "exit_price": exit_price,
+            "actual_trigger_price": actual_price,
             "pnl": round(pnl, 2),
             "r_multiple": round(r_mult, 2),
             "reason": reason,
             "balance": round(self.balance, 2),
+            "opened_at": pos.opened_at,
+            "closed_at": closed_at,
         }
 
     # ------------------------------------------------------------------
