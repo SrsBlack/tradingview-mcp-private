@@ -127,8 +127,8 @@ class TVClient:
         """
         result = self._run(["symbol", symbol])
         if require_ready and not result.get("chart_ready", False):
-            # CLI waited 10s and chart still not ready — retry twice more
-            for attempt in range(2):
+            # CLI waited 10s and chart still not ready — retry up to 3 times
+            for attempt in range(3):
                 time.sleep(2.0)
                 # Re-read state to check if chart caught up
                 try:

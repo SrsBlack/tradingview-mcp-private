@@ -76,6 +76,12 @@ _MAX_DEVIATION = 0.02
 # MT5/FTMO is the actual broker — tighter tolerance (1%)
 _MAX_MT5_DEVIATION = 0.01
 
+# Per-symbol MT5 deviation overrides (some instruments have structural price differences)
+# UKOIL: TradingView shows ICE Brent front-month, FTMO uses a CFD with basis spread (~2-3%)
+_MT5_DEVIATION_OVERRIDES: dict[str, float] = {
+    "UKOIL": 0.035,  # 3.5% — Brent CFD vs futures basis
+}
+
 # Finnhub ETF proxies are approximate — allow 5% for the conversion factor drift
 _MAX_FINNHUB_DEVIATION = 0.05
 
@@ -256,13 +262,14 @@ class PriceVerifier:
         # Priority 1: MT5/FTMO — most accurate for forex/indices/commodities
         mt5_price = self.get_mt5_price(symbol)
         if mt5_price is not None:
+            base = symbol.split(":")[-1]
+            max_dev = _MT5_DEVIATION_OVERRIDES.get(base, _MAX_MT5_DEVIATION)
             deviation = abs(tv_price - mt5_price) / mt5_price
-            if deviation > _MAX_MT5_DEVIATION:
-                base = symbol.split(":")[-1]
+            if deviation > max_dev:
                 print(
                     f"[PRICE_VERIFY] MISMATCH on {base}: "
                     f"TV={tv_price:.2f}, MT5/FTMO={mt5_price:.2f}, "
-                    f"deviation={deviation:.1%} (max {_MAX_MT5_DEVIATION:.0%})",
+                    f"deviation={deviation:.1%} (max {max_dev:.1%})",
                     flush=True,
                 )
                 return False, mt5_price

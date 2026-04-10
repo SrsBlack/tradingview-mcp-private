@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from bridge.config import ensure_trading_ai_path
+from bridge.config import ensure_trading_ai_path, tv_to_ftmo_symbol
 from bridge.decision_types import TradeDecision
 
 # Ensure trading-ai-v2 is importable
@@ -128,13 +128,25 @@ class LiveExecutor:
         if not ok:
             return {"success": False, "ticket": 0, "message": reason, "fill_price": 0.0}
 
+        # Map TradingView symbol to FTMO/MT5 broker symbol
+        ftmo_symbol = tv_to_ftmo_symbol(decision.symbol)
+
+        # Normalize volume to broker's step size
+        normalized_lots = self._normalize_volume(ftmo_symbol, lot_size)
+        if normalized_lots <= 0:
+            return {
+                "success": False, "ticket": 0,
+                "message": f"Volume {lot_size:.4f} below minimum for {ftmo_symbol}",
+                "fill_price": 0.0,
+            }
+
         # Build ExecutionEvent
         direction = Direction.BULLISH if decision.action == "BUY" else Direction.BEARISH
 
         event = ExecutionEvent(
-            symbol=decision.symbol,
+            symbol=ftmo_symbol,
             direction=direction,
-            lot_size=lot_size,
+            lot_size=normalized_lots,
             entry_price=decision.entry_price,
             sl_price=decision.sl_price,
             tp_price=decision.tp_price,
@@ -142,7 +154,6 @@ class LiveExecutor:
             signal_id=f"bridge_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
             engine=EngineName.ICT,
             strategy_name=BRIDGE_STRATEGY_NAME,
-            magic=BRIDGE_MAGIC,
         )
 
         # Submit to MT5
@@ -254,6 +265,34 @@ class LiveExecutor:
         if result:
             info["sl_price"] = new_sl
         return result
+
+    # ------------------------------------------------------------------
+    # Volume normalization
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _normalize_volume(symbol: str, lot_size: float) -> float:
+        """Round lot_size to the broker's volume_step and clamp to min/max."""
+        try:
+            import MetaTrader5 as mt5
+            info = mt5.symbol_info(symbol)
+            if info is None:
+                return round(lot_size, 2)
+            vol_min = info.volume_min
+            vol_max = info.volume_max
+            vol_step = info.volume_step
+            if vol_step <= 0:
+                vol_step = 0.01
+            # Round to nearest step
+            steps = round(lot_size / vol_step)
+            normalized = steps * vol_step
+            # Clamp
+            normalized = max(vol_min, min(vol_max, normalized))
+            # Round to avoid floating point artifacts
+            decimals = max(0, len(str(vol_step).rstrip('0').split('.')[-1]))
+            return round(normalized, decimals)
+        except Exception:
+            return round(lot_size, 2)
 
     # ------------------------------------------------------------------
     # State

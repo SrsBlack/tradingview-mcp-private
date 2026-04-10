@@ -135,8 +135,22 @@ class StrategyEngine:
         counts = self.config.bar_counts
         result: dict[str, pd.DataFrame] = {}
 
-        self.tv_client.set_symbol(symbol)
-        time.sleep(0.5)
+        try:
+            switch_result = self.tv_client.set_symbol(symbol, require_ready=True)
+            if not switch_result.get("chart_ready", False):
+                logger.warning(f"[ENGINE] Chart not ready for {symbol} — skipping")
+                return result
+
+            # Verify quote confirms the symbol
+            quote = self.tv_client.get_quote()
+            target_sym = symbol.split(":")[-1]
+            chart_sym = quote.get("symbol", "").split(":")[-1]
+            if chart_sym != target_sym:
+                logger.warning(f"[ENGINE] Quote mismatch: expected {target_sym}, got {chart_sym} — skipping")
+                return result
+        except TVClientError as e:
+            logger.warning(f"[ENGINE] Failed to switch to {symbol}: {e}")
+            return result
 
         for tf in timeframes:
             try:

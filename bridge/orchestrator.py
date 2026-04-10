@@ -443,13 +443,20 @@ class Orchestrator:
         # Components
         self.pipeline = ICTPipeline()
         self.decision_maker = ClaudeDecisionMaker()
+        # Shadow paper executor — tracks ALL decisions for auditing, regardless of mode
+        self.paper_shadow = PaperExecutor(initial_balance=initial_balance)
         if mode == "live":
             self.executor = LiveExecutorAdapter(initial_balance=initial_balance)
             print("[ORCH] Mode: LIVE — trades will be sent to MT5", flush=True)
+            print("[ORCH] Shadow paper executor running in parallel for audit", flush=True)
         else:
             self.executor = PaperExecutor(initial_balance=initial_balance)
         self.session = SessionStore()
         self.state_store = StateStore()
+        # Separate state file for paper shadow — survives restarts
+        self.paper_state_store = StateStore(
+            path=Path.home() / ".tradingview-mcp" / "paper_shadow_state.json"
+        )
         self.tv_client = TVClient()
         self.risk_bridge = RiskBridge()
         self.alerts = BridgeAlerts()
@@ -477,8 +484,13 @@ class Orchestrator:
         self._cycle_count = 0
         self._kill_switch_triggered = False
         self._kill_switch_date: str = ""  # date when triggered (YYYY-MM-DD UTC)
-        self._trade_drawings: dict[int, list[str]] = {}  # ticket -> [entity_id, ...]
+        self._trade_drawings: dict[int | str, list[str]] = {}  # ticket/paper_N -> [entity_id, ...]
         self._last_eod_date: str = ""  # date of last end-of-day summary (YYYY-MM-DD ET)
+
+        # Decision cooldown: don't call Claude for the same symbol if we recently got a
+        # BUY/SELL or high-confidence SKIP. Saves API costs on repeated setups.
+        self._decision_cooldown: dict[str, float] = {}  # symbol -> UTC timestamp of last decision
+        self._cooldown_seconds = 1800  # 30 min cooldown after BUY/SELL decision
 
     # ------------------------------------------------------------------
     # Main entry
@@ -490,6 +502,12 @@ class Orchestrator:
 
         # --- Restore state from previous session (if same day, same mode) ---
         restored_positions = self.state_store.restore_into(self.executor, self.mode)
+
+        # --- Restore paper shadow state (always, regardless of mode) ---
+        if self.paper_shadow is not self.executor:
+            paper_restored = self.paper_state_store.restore_into(self.paper_shadow, "paper_shadow")
+            if paper_restored:
+                print(f"[PAPER] Restored {len(paper_restored)} shadow position(s) from state", flush=True)
 
         # --- Load today's closed trades from session store for display ---
         today_trades = self._load_todays_trades()
@@ -561,6 +579,17 @@ class Orchestrator:
                     )
         else:
             print(f"\n  No trades today yet.", flush=True)
+
+        # Paper shadow positions
+        if self.paper_shadow is not self.executor and self.paper_shadow.open_positions:
+            print(f"\n  PAPER SHADOW ({len(self.paper_shadow.open_positions)} open):", flush=True)
+            for pos in self.paper_shadow.open_positions.values():
+                print(
+                    f"    P-#{pos.ticket} {pos.direction} {pos.symbol}  "
+                    f"Entry={pos.entry_price:,.4f}  SL={pos.sl_price:,.4f}  "
+                    f"Grade={pos.ict_grade}  W/L={self.paper_shadow.wins}/{self.paper_shadow.losses}",
+                    flush=True,
+                )
 
         print(f"{'='*W}\n", flush=True)
 
@@ -649,6 +678,16 @@ class Orchestrator:
 
     # Price validation uses shared config.PRICE_RANGES / config.price_in_range
     # Single source of truth — no duplicate dicts to go out of sync.
+
+    def _fallback_paper_lots(self, decision: "TradeDecision") -> float:
+        """Calculate a reasonable paper lot size when risk gate doesn't provide one."""
+        if decision.entry_price <= 0 or decision.sl_price <= 0:
+            return 1.0
+        risk_usd = self.paper_shadow.balance * (decision.risk_pct or 0.0075)
+        sl_distance = abs(decision.entry_price - decision.sl_price)
+        if sl_distance <= 0:
+            return 1.0
+        return round(risk_usd / sl_distance, 4)
 
     def _analyze_and_decide(self, symbol: str) -> None:
         """Analyze a single symbol and make a trade decision."""
@@ -759,8 +798,20 @@ class Orchestrator:
             else:
                 analysis.grade = "INVALID"
 
+        # Cooldown check: skip Claude API call if we recently got a BUY/SELL for this symbol
+        import time as _time
+        last_decision_time = self._decision_cooldown.get(symbol, 0)
+        if _time.time() - last_decision_time < self._cooldown_seconds:
+            mins_left = int((self._cooldown_seconds - (_time.time() - last_decision_time)) / 60)
+            print(f"  [{symbol}] Cooldown active ({mins_left}m remaining) — skipping Claude call", flush=True)
+            return
+
         # Claude decision (ICT analysis + EA context + strategy knowledge in prompt)
         decision = self.decision_maker.evaluate(analysis)
+
+        # Set cooldown if Claude decided to trade (avoid repeated BUY calls)
+        if decision.is_trade:
+            self._decision_cooldown[symbol] = _time.time()
 
         # Log decision
         self.session.log_decision(decision.to_dict())
@@ -810,6 +861,60 @@ class Orchestrator:
                 daily_pnl=self.executor.daily_pnl,
                 peak_balance=self.executor.peak_balance,
             )
+
+            # ── Paper shadow: ALWAYS record trade decisions for audit ──
+            # Records even if risk rejects or live executor fails.
+            # In paper mode, main executor IS the paper executor — skip shadow to avoid dupes.
+            if self.paper_shadow is not self.executor:
+                paper_lot = lot_size if lot_size and lot_size > 0 else self._fallback_paper_lots(decision)
+                try:
+                    shadow_result = self.paper_shadow.open_position(decision, lot_size=paper_lot)
+                    if shadow_result["success"]:
+                        paper_ticket = shadow_result["ticket"]
+                        blocked_by = ""
+                        if not approved:
+                            blocked_by = f" (LIVE BLOCKED: {risk_msg})"
+                        print(f"  [{symbol}] Paper #{paper_ticket}: {decision.action} @ {decision.entry_price:.2f}{blocked_by}", flush=True)
+                        # Log paper trade to session
+                        self.session.log_trade({
+                            "event": "PAPER_OPEN",
+                            "ticket": paper_ticket,
+                            "symbol": decision.symbol,
+                            "direction": decision.action,
+                            "entry_price": decision.entry_price,
+                            "sl_price": decision.sl_price,
+                            "tp_price": decision.tp_price,
+                            "tp2_price": decision.tp2_price,
+                            "lot_size": paper_lot,
+                            "risk_pct": decision.risk_pct,
+                            "ict_grade": decision.grade,
+                            "ict_score": decision.ict_score,
+                            "confidence": decision.confidence,
+                            "reasoning": decision.reasoning,
+                            "live_approved": approved,
+                            "live_risk_msg": risk_msg if not approved else "",
+                            "mode": "paper_shadow",
+                        })
+                        # Draw paper trade on TradingView (P- prefix distinguishes from live)
+                        try:
+                            entity_ids = self.tv_client.draw_trade(
+                                symbol=decision.symbol,
+                                direction=decision.action,
+                                entry=decision.entry_price,
+                                sl=decision.sl_price,
+                                tp1=decision.tp_price,
+                                tp2=decision.tp2_price,
+                                grade=f"P-{decision.grade}",
+                                ticket=paper_ticket,
+                            )
+                            if entity_ids:
+                                self._trade_drawings[f"paper_{paper_ticket}"] = entity_ids
+                        except Exception:
+                            pass
+                        # Persist paper shadow state
+                        self.paper_state_store.save(self.paper_shadow, "paper_shadow")
+                except Exception as e:
+                    print(f"  [{symbol}] Paper shadow error: {e}", flush=True)
 
             if not approved:
                 print(f"  [{symbol}] Risk rejected: {risk_msg}", flush=True)
@@ -918,6 +1023,55 @@ class Orchestrator:
                         )
                 except Exception as e:
                     print(f"[POSITIONS] Error: {e}", flush=True)
+
+            # Shadow paper executor — check positions using TV quotes (skip if shadow IS the main executor)
+            if self.paper_shadow is not self.executor and self.paper_shadow.open_positions:
+                try:
+                    # Build price dict from TV quotes
+                    shadow_prices: dict[str, float] = {}
+                    for pos in self.paper_shadow.open_positions.values():
+                        try:
+                            sym_base = pos.symbol.split(":")[-1]
+                            result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
+                            if not result.get("chart_ready", False):
+                                continue
+                            quote = self.tv_client.get_quote()
+                            chart_sym = quote.get("symbol", "").split(":")[-1]
+                            if chart_sym != sym_base:
+                                continue
+                            p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                            if p > 0:
+                                shadow_prices[pos.symbol] = p
+                        except Exception:
+                            pass
+                    if shadow_prices:
+                        shadow_events = self.paper_shadow.check_positions(shadow_prices)
+                        for event in shadow_events:
+                            pnl_str = f"+${event['pnl']:.2f}" if event['pnl'] >= 0 else f"-${abs(event['pnl']):.2f}"
+                            print(
+                                f"  [PAPER] {event['symbol']} {event['reason']} "
+                                f"PnL={pnl_str} ({event['r_multiple']:.1f}R) "
+                                f"Paper balance=${event['balance']:,.2f}",
+                                flush=True,
+                            )
+                            # Log paper close to session
+                            self.session.log_trade({
+                                "event": "PAPER_CLOSE",
+                                **event,
+                                "mode": "paper_shadow",
+                            })
+                            # Remove paper trade chart drawings
+                            paper_key = f"paper_{event.get('ticket')}"
+                            if paper_key in self._trade_drawings:
+                                try:
+                                    self.tv_client.draw_remove_trade(self._trade_drawings.pop(paper_key))
+                                except Exception:
+                                    pass
+                        # Persist paper shadow state after closes
+                        if shadow_events:
+                            self.paper_state_store.save(self.paper_shadow, "paper_shadow")
+                except Exception as e:
+                    print(f"[PAPER] Shadow position check error: {e}", flush=True)
 
             await asyncio.sleep(self.position_interval)
 
@@ -1079,6 +1233,16 @@ class Orchestrator:
                 for pos in self.executor.open_positions.values():
                     positions_info += f" | {pos.symbol} {pos.direction} {pos.floating_pnl:+.2f}"
 
+            # Paper shadow stats
+            paper_info = ""
+            if self.paper_shadow is not self.executor:
+                ps = self.paper_shadow
+                paper_info = (
+                    f" | Paper: ${ps.balance:,.2f} "
+                    f"Open={len(ps.open_positions)} "
+                    f"W/L={ps.wins}/{ps.losses}"
+                )
+
             print(
                 f"[HEALTH {now.strftime('%H:%M')}] "
                 f"Balance=${summary['balance']:,.2f} "
@@ -1086,7 +1250,7 @@ class Orchestrator:
                 f"DD={summary['total_drawdown_pct']} "
                 f"Open={open_pos} "
                 f"W/L={summary['wins']}/{summary['losses']}"
-                f"{positions_info}",
+                f"{positions_info}{paper_info}",
                 flush=True,
             )
 

@@ -53,24 +53,23 @@ def ensure_trading_ai_path() -> bool:
 # Symbol mapping
 # ---------------------------------------------------------------------------
 
-# TradingView name → MT5 symbol name (FTMO naming)
-# TV uses exchange-prefixed names like "BITSTAMP:BTCUSD" — strip prefix first,
-# then look up the MT5 equivalent.
+# TradingView name → internal name (for scoring, routing)
+# TV uses exchange-prefixed names like "BITSTAMP:BTCUSD" — strip prefix first.
 SYMBOL_MAP: dict[str, str] = {
     # Forex
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
-    # Gold / commodities — FTMO uses XAUUSD and UKOIL
+    # Gold / commodities
     "XAUUSD": "XAUUSD",
     "XAGUSD": "XAGUSD",
     "UKOIL":  "UKOIL",
-    # Dow Jones futures — FTMO calls it US30
+    # Dow Jones futures
     "YM1!":   "US30",
     "YM":     "US30",
-    # S&P 500 E-mini — FTMO calls it US500
+    # S&P 500 E-mini
     "ES1!":   "US500",
     "ES":     "US500",
-    # Nasdaq 100 E-mini — FTMO calls it US100
+    # Nasdaq 100 E-mini
     "NQ1!":   "US100",
     "NQ":     "US100",
     "NAS100": "US100",
@@ -82,6 +81,29 @@ SYMBOL_MAP: dict[str, str] = {
     "ETHUSD":  "ETHUSD",
     "SOLUSD":  "SOLUSD",
 }
+
+# TradingView base name → FTMO/MT5 broker symbol name
+# FTMO uses .cash suffix for CFD indices and commodities
+TV_TO_FTMO: dict[str, str] = {
+    "EURUSD": "EURUSD",
+    "GBPUSD": "GBPUSD",
+    "XAUUSD": "XAUUSD",
+    "XAGUSD": "XAGUSD",
+    "UKOIL":  "UKOIL.cash",
+    "YM1!":   "US30.cash",
+    "US30":   "US30.cash",
+    "US500":  "US500.cash",
+    "US100":  "US100.cash",
+    "BTCUSD": "BTCUSD",
+    "ETHUSD": "ETHUSD",
+    "SOLUSD": "SOLUSD",
+}
+
+
+def tv_to_ftmo_symbol(tv_symbol: str) -> str:
+    """Convert a TradingView symbol to the FTMO/MT5 broker symbol name."""
+    base = tv_symbol.split(":")[-1]
+    return TV_TO_FTMO.get(base, base)
 
 # Reverse: trading-ai-v2 name → TradingView name (for chart switching)
 REVERSE_SYMBOL_MAP: dict[str, str] = {v: k for k, v in SYMBOL_MAP.items()}
@@ -133,9 +155,9 @@ PRICE_RANGES: dict[str, tuple[float, float]] = {
     "GBPUSD":  (1.00,   2.00),     # GBP/USD realistic range
     "YM1!":    (10_000, 50_000),   # Dow futures; ATH ~45k
     "ES1!":    (2_000,  7_000),    # S&P 500 E-mini futures; ATH ~6,100
-    "NQ1!":    (8_000,  25_000),   # Nasdaq 100 E-mini futures; ATH ~22,200
-    "US500":   (2_000,  7_000),    # S&P 500 CFD (same range as ES)
-    "US100":   (8_000,  25_000),   # Nasdaq 100 CFD (same range as NQ)
+    "NQ1!":    (8_000,  30_000),   # Nasdaq 100 E-mini futures; ~25,100 Apr 2026
+    "US500":   (2_000,  8_000),    # S&P 500 CFD; ~6,800 Apr 2026
+    "US100":   (8_000,  30_000),   # Nasdaq 100 CFD; ~25,100 Apr 2026
     "XAUUSD":  (1_000,  6_000),    # Gold spot confirmed ~4,767 Apr 2026; 6k gives headroom
     "UKOIL":   (10,     150),      # Brent crude realistic range
 }
