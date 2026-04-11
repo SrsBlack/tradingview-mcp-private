@@ -1,0 +1,40 @@
+{
+  "id": "session_levels",
+  "layer": 1,
+  "definition": "Key price levels from previous sessions that act as primary liquidity references and draw-on-liquidity targets.",
+  "depends_on": [
+    "dealing_range (previous session ranges define these levels)"
+  ],
+  "feeds_into": [
+    "liquidity (session levels ARE the primary external liquidity)",
+    "draw_on_liquidity (nearest unswept session level = TP target)",
+    "liquidity_sweep (sweeps TARGET session levels)"
+  ],
+  "related_to": [
+    "CRT (previous day candle high/low = PDH/PDL = session levels)",
+    "PO3_AMD (manipulation phase sweeps these levels)",
+    "order_pairing (PDH and PDL are a PAIRED set — sweep one, target the other)"
+  ],
+  "levels": {
+    "PDH_PDL": {
+      "definition": "Previous Day High / Previous Day Low",
+      "significance": "Primary intraday liquidity targets. Most common sweep targets during London/NY.",
+      "order_pairing": "PDH and PDL are a PAIR — when price sweeps PDL, PDH becomes the draw on liquidity target (and vice versa)"
+    },
+    "PWH_PWL": {
+      "definition": "Previous Week High / Previous Week Low",
+      "significance": "Swing trade targets. Weekly PO3: manipulation (Wed) often sweeps one, then distribution targets the other.",
+      "order_pairing": "PWH ↔ PWL are paired. Wednesday manipulation sweeps one; Thursday-Friday distribution targets the other."
+    },
+    "PMH_PML": {
+      "definition": "Previous Month High / Previous Month Low",
+      "significance": "Macro targets for position trades. When monthly level is swept, expect multi-day directional move toward the opposite.",
+      "connection": "PMH/PML interact with IPDA 20/40/60 day ranges. A PMH/PML near an IPDA range extreme = very high significance."
+    },
+    "asian_range": {
+      "definition": "Asian session high and low (8 PM - 12 AM ET)",
+      "significance": "London open's primary manipulation targets. Asian range IS the accumulation phase of PO3.",
+      "connection": "Asian range → London sweeps it (manipulation) → NY distributes from the sweep. This IS PO3 applied to sessions."
+    }
+  }
+}

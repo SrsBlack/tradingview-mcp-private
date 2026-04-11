@@ -1,0 +1,26 @@
+{
+  "id": "volume_profile",
+  "layer": 5,
+  "definition": "Distribution of traded volume at each price level over a period. Reveals where institutional orders concentrated (high volume) vs. where price moved freely (low volume).",
+  "depends_on": [
+    "dealing_range (volume profile applied within dealing range context)",
+    "liquidity (volume profile reveals WHERE liquidity actually exists vs. theoretical)"
+  ],
+  "feeds_into": [
+    "trade entry (POC/VAH/VAL act as support/resistance)",
+    "draw_on_liquidity (low volume nodes are magnets — price accelerates through them)"
+  ],
+  "related_to": [
+    "liquidity_void (low volume areas in profile ARE liquidity voids)",
+    "order_blocks (high volume at OB zones CONFIRMS institutional activity)",
+    "fair_value_gaps (FVGs at low volume zones have highest fill probability)"
+  ],
+  "key_levels": {
+    "POC": "Point of Control — the single price level with highest traded volume. Acts as strongest magnet. Price tends to return to POC.",
+    "VAH": "Value Area High — upper boundary of the 70% volume zone. Acts as resistance.",
+    "VAL": "Value Area Low — lower boundary of the 70% volume zone. Acts as support.",
+    "HVN": "High Volume Node — price level with concentrated volume. Acts as support/resistance (institutions defended this level).",
+    "LVN": "Low Volume Node — price level with minimal volume. Price accelerates THROUGH these zones (no one defending). LVN zones between entry and TP = price will move fast through them."
+  },
+  "cross_validation": "Volume profile VALIDATES other concepts: An OB at an HVN = confirmed institutional defense. An FVG at an LVN = high probability fill. An OB at an LVN = suspicious (no volume = no institutional activity)."
+}

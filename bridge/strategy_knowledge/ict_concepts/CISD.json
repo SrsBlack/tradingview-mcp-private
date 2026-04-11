@@ -1,0 +1,21 @@
+{
+  "id": "CISD",
+  "layer": 3,
+  "definition": "Change In State of Delivery — a pre-CHoCH signal where price shifts from consistently delivering bearish candles to bullish ones (or vice versa). The LAST candle of the old delivery state becomes the entry zone.",
+  "depends_on": [
+    "market_structure (CISD is a refinement of CHoCH detection)",
+    "displacement (CISD is confirmed when displacement follows the state change)"
+  ],
+  "feeds_into": [
+    "order_blocks (the CISD candle IS an order block)",
+    "trade entry (CISD provides earlier entry than waiting for full CHoCH)"
+  ],
+  "related_to": [
+    "market_structure.CHoCH (CISD precedes and anticipates CHoCH)",
+    "order_blocks (CISD candle = OB)",
+    "PO3_AMD (CISD marks the transition from manipulation to distribution)"
+  ],
+  "vs_CHoCH": "CHoCH requires a swing point to be broken. CISD fires BEFORE that — it detects the shift in candle delivery. CISD is the early warning; CHoCH is the confirmation.",
+  "how_to_trade": "When candle delivery shifts (3+ bearish candles followed by 1 bullish candle with body close above prior candle high), the bullish candle's low is the entry zone. Enter on retest. SL below the manipulation extreme.",
+  "PO3_connection": "CISD typically occurs at the exact moment PO3 transitions from manipulation to distribution. It IS the phase transition signal."
+}

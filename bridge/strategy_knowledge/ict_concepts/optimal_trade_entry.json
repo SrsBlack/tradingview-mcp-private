@@ -1,0 +1,26 @@
+{
+  "id": "optimal_trade_entry",
+  "layer": 5,
+  "definition": "The 61.8%-78.6% Fibonacci retracement of a displacement move — where institutions reload during pullbacks.",
+  "depends_on": [
+    "displacement (Fibonacci is drawn on the displacement move)",
+    "fair_value_gaps (OTE zone should overlap with FVG)",
+    "order_blocks (OTE zone should overlap with OB)"
+  ],
+  "feeds_into": [
+    "trade entry (OTE defines the precise entry price within the FVG/OB zone)"
+  ],
+  "related_to": [
+    "premium_discount (OTE zone should be in correct premium/discount area)",
+    "PD_arrays (OTE is applied WITHIN PD arrays, not independently)"
+  ],
+  "fibonacci_levels": {
+    "0.5": "Equilibrium — bare minimum retracement. Connects to dealing_range equilibrium concept.",
+    "0.618": "Start of OTE zone. Good entries.",
+    "0.705": "ICT's preferred level. Best confirmation-to-R:R balance.",
+    "0.786": "Deep retracement. Best R:R but lowest probability.",
+    "above_0.786": "Danger — pullback may be reversal. Connects to market_structure — if this level breaks, the displacement may have been a fake."
+  },
+  "application_chain": "displacement (layer 3) → creates FVG + OB (layer 4) → draw Fibonacci on the displacement → OTE zone (0.618-0.786) within the FVG/OB = entry. This IS the layer 3→4→5 chain.",
+  "common_mistake": "Entering at 0.5 without waiting for OTE. The 0.5 is equilibrium, not optimal. Patient wait for 0.618-0.705 dramatically improves win rate."
+}

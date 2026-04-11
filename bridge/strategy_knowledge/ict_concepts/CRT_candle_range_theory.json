@@ -1,0 +1,22 @@
+{
+  "id": "CRT",
+  "layer": 3,
+  "definition": "Every candle IS a micro dealing range with its own BSL (high), SSL (low), and equilibrium (50%).",
+  "depends_on": [
+    "dealing_range (CRT applies dealing_range theory to individual candles)",
+    "liquidity (candle high/low are micro liquidity levels)"
+  ],
+  "feeds_into": [
+    "intraday analysis — previous candle's range defines next candle's liquidity targets"
+  ],
+  "related_to": [
+    "PO3_AMD (daily candle PO3: open=accumulation, wick=manipulation, close=distribution)",
+    "dealing_range (CRT IS dealing_range at candle level)"
+  ],
+  "application": {
+    "daily_candle": "PDH = BSL target, PDL = SSL target, 50% = equilibrium for today's activity.",
+    "4h_candle": "Previous 4H high/low define next 4H's targets.",
+    "weekly_candle": "Mon-Tue establish range. Wed typically sweeps one extreme (manipulation)."
+  },
+  "connection": "CRT is dealing_range + liquidity + PO3 applied fractally to every single candle. It unifies these three concepts at the smallest scale."
+}

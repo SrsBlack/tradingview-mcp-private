@@ -1,0 +1,19 @@
+{
+  "id": "liquidity_void",
+  "layer": 4,
+  "definition": "An area in the price chart where there was NO trading volume — price jumped through this zone without any order interaction. Unlike FVGs (which are price gaps), liquidity voids are VOLUME gaps.",
+  "depends_on": [
+    "displacement (extreme displacement creates liquidity voids)",
+    "volume_profile (volume data reveals where voids exist)"
+  ],
+  "feeds_into": [
+    "trade entry (voids act as magnets — price tends to return to fill them)",
+    "draw_on_liquidity (unfilled voids ARE draw targets)"
+  ],
+  "related_to": [
+    "fair_value_gaps (FVG = price gap, liquidity_void = volume gap — related but different)",
+    "balanced_price_range (BPR fills voids)"
+  ],
+  "vs_FVG": "FVG: gap between candle 1 high and candle 3 low (pure price pattern). Liquidity void: area where volume profile shows zero or near-zero traded volume. An FVG CAN be a liquidity void, but not all FVGs are voids, and voids can exist without FVG pattern.",
+  "how_to_use": "Price fills liquidity voids before continuing. If a void exists between entry and TP, expect price to pause there. If a void exists behind price, expect price to retrace to fill it."
+}

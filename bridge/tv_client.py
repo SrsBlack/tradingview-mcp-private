@@ -201,6 +201,14 @@ class TVClient:
 
         return bars
 
+    def health_check(self) -> bool:
+        """Quick connectivity check — returns True if TradingView is responsive."""
+        try:
+            result = self._run(["quote"], timeout=10)
+            return isinstance(result, dict) and float(result.get("last", 0)) > 0
+        except Exception:
+            return False
+
     def get_quote(self) -> dict:
         """Get real-time quote for the current chart symbol."""
         return self._run(["quote"])
@@ -244,6 +252,14 @@ class TVClient:
             import json as _json
             args += ["--overrides", _json.dumps(overrides)]
         return self._run(args)
+
+    def draw_list(self) -> dict:
+        """List all drawings on the chart. Returns {shapes: [{id, name}, ...]}."""
+        return self._run(["draw", "list"])
+
+    def draw_get_properties(self, entity_id: str) -> dict:
+        """Get properties of a drawing by entity_id. Returns text, points, etc."""
+        return self._run(["draw", "get", entity_id])
 
     def draw_remove(self, entity_id: str) -> dict:
         """Remove a single drawing by its entity_id. Never touches other drawings."""
@@ -320,6 +336,50 @@ class TVClient:
                 self.draw_remove(eid)
             except Exception:
                 pass
+
+    def draw_remove_stale_trades(self, active_tickets: set[str] | None = None) -> int:
+        """Remove trade drawings that no longer have an open position.
+
+        Identifies trade drawings by checking if their text/title contains '#<number>'
+        (our trade drawing convention: '#123 ENTRY', '#123 SL', '#123 TP1', etc.).
+        Only removes drawings whose ticket is NOT in active_tickets.
+
+        Uses the enhanced draw_list which returns text/title inline (no N+1 queries).
+
+        Args:
+            active_tickets: Set of ticket strings (e.g. {"123", "P-5"}) to keep.
+                            If None, removes ALL trade drawings.
+
+        Returns:
+            Number of drawings removed.
+        """
+        import re
+        active = active_tickets or set()
+        removed = 0
+        try:
+            result = self.draw_list()
+            shapes = result.get("shapes", [])
+            for shape in shapes:
+                eid = shape.get("id", "")
+                if not eid:
+                    continue
+                # draw_list now returns title/text inline
+                text = str(shape.get("title", "") or shape.get("text", "") or "")
+                # Match our trade drawing pattern: #<number>
+                match = re.search(r"#(\d+)", text)
+                if match:
+                    ticket_str = match.group(1)
+                    # Keep if ticket is in active set
+                    if ticket_str in active:
+                        continue
+                    # Also check paper prefix
+                    if f"P-{ticket_str}" in active:
+                        continue
+                    self.draw_remove(eid)
+                    removed += 1
+        except Exception as e:
+            print(f"  [DRAW] Warning: could not list drawings for cleanup: {e}", flush=True)
+        return removed
 
     def run_brief(self) -> dict:
         """Run the morning brief scan across the watchlist."""

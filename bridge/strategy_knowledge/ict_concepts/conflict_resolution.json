@@ -1,0 +1,117 @@
+{
+  "_purpose": "When concepts give contradictory signals, use these rules to resolve. Higher-layer concepts OVERRIDE lower-layer ones.",
+  "rules": [
+    {
+      "conflict": "LTF structure says SELL but HTF structure says BUY",
+      "resolution": "HTF WINS. The LTF SELL signal is a pullback within the HTF trend, not a reversal. Look for LTF BUY entries inside the pullback.",
+      "concepts_involved": [
+        "market_structure (multi-timeframe)"
+      ]
+    },
+    {
+      "conflict": "FVG says enter but price is in wrong premium/discount zone",
+      "resolution": "premium_discount WINS. The FVG may be valid technically but entering in the wrong zone means poor R:R. Reduce grade by 1 or skip.",
+      "concepts_involved": [
+        "fair_value_gaps",
+        "premium_discount"
+      ]
+    },
+    {
+      "conflict": "OB is present but no displacement created it",
+      "resolution": "displacement requirement WINS. An OB without displacement is just a candle — no institutional proof. Skip the OB.",
+      "concepts_involved": [
+        "order_blocks",
+        "displacement"
+      ]
+    },
+    {
+      "conflict": "Kill zone is active but no liquidity sweep occurred yet",
+      "resolution": "Wait. Kill zone provides the WINDOW but liquidity_sweep provides the TRIGGER. Being in a kill zone without a sweep = no entry yet.",
+      "concepts_involved": [
+        "sessions_kill_zones",
+        "liquidity_sweep"
+      ]
+    },
+    {
+      "conflict": "SMT says reversal but structure hasn't changed (no CHoCH)",
+      "resolution": "Wait for structure confirmation. SMT is a LEADING indicator, structure is CONFIRMING. SMT without CHoCH = early warning, not entry signal.",
+      "concepts_involved": [
+        "SMT_divergence",
+        "market_structure"
+      ]
+    },
+    {
+      "conflict": "OTE zone doesn't overlap with FVG/OB",
+      "resolution": "Prefer FVG/OB as entry over pure Fibonacci level. OTE is precision refinement WITHIN entry zones, not a standalone entry method.",
+      "concepts_involved": [
+        "optimal_trade_entry",
+        "fair_value_gaps",
+        "order_blocks"
+      ]
+    },
+    {
+      "conflict": "PO3 says accumulation (don't trade) but HTF structure is very clear",
+      "resolution": "PO3 timing WINS for intraday. Clear HTF structure is for swing trades with wider stops. For intraday, wait for manipulation + distribution phases.",
+      "concepts_involved": [
+        "PO3_AMD",
+        "market_structure"
+      ]
+    },
+    {
+      "conflict": "CISD fires but no CHoCH confirmed yet",
+      "resolution": "CISD is early warning — enter with reduced size. Full size only after CHoCH confirms. CISD anticipates CHoCH but doesn't guarantee it.",
+      "concepts_involved": [
+        "CISD",
+        "market_structure.CHoCH"
+      ]
+    },
+    {
+      "conflict": "Volume profile shows HVN at entry but FVG says enter",
+      "resolution": "Volume profile VALIDATES the FVG. An FVG at an HVN is stronger — institutional defense confirmed. Enter with higher conviction.",
+      "concepts_involved": [
+        "volume_profile",
+        "fair_value_gaps"
+      ]
+    },
+    {
+      "conflict": "OB at LVN (low volume node) — institutional zone but no volume",
+      "resolution": "Reduce conviction. OB at LVN means the zone was NOT heavily defended. Price may accelerate through without reacting.",
+      "concepts_involved": [
+        "order_blocks",
+        "volume_profile"
+      ]
+    },
+    {
+      "conflict": "Order pairing says TP at BSL but fibonacci extension says TP at 1.618",
+      "resolution": "Order pairing (liquidity-based TP) takes priority over Fibonacci (mathematical TP). If BSL is before 1.618 extension → TP at BSL. If BSL is beyond 1.618 → use 1.618 as TP1, BSL as TP2.",
+      "concepts_involved": [
+        "order_pairing",
+        "fibonacci_extensions"
+      ]
+    },
+    {
+      "conflict": "Intraday profile says London Delayed but kill zone is active",
+      "resolution": "Wait. London Delayed means manipulation is pushed to NY. Don't force entries during London just because the kill zone window is open.",
+      "concepts_involved": [
+        "intraday_profile",
+        "sessions_kill_zones"
+      ]
+    },
+    {
+      "conflict": "Quarterly shift conflicts with daily bias",
+      "resolution": "Quarterly shift WINS for swing trades. Daily bias WINS for intraday. A new quarterly shift takes days to fully express — intraday can still move counter to it.",
+      "concepts_involved": [
+        "quarterly_shifts",
+        "daily_bias"
+      ]
+    },
+    {
+      "conflict": "Balanced price range blocks the path to TP",
+      "resolution": "BPR = strong obstacle. If a BPR sits between entry and TP, price may stall. Either set TP at the BPR (closer target) or wait for BPR to be broken before entering.",
+      "concepts_involved": [
+        "balanced_price_range",
+        "draw_on_liquidity"
+      ]
+    }
+  ]
+}

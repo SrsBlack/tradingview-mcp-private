@@ -1,0 +1,21 @@
+{
+  "id": "rejection_blocks",
+  "layer": 4,
+  "definition": "Candles with disproportionately long wicks at key levels — the wick zone represents where institutional orders absorbed aggressive selling/buying and rejected the price.",
+  "depends_on": [
+    "liquidity (rejection occurs at liquidity levels)",
+    "market_structure (rejection at key swings = significant)"
+  ],
+  "feeds_into": [
+    "trade entry (rejection block wick zone = entry area on retest)"
+  ],
+  "related_to": [
+    "order_blocks (rejection blocks are a TYPE of block, but identified by wick behavior, not body)",
+    "swing_failure_pattern (SFP candles often ARE rejection blocks)",
+    "fair_value_gaps (a rejection block's wick can create a gap that acts like an FVG)"
+  ],
+  "definition_detail": "A candle where the wick is >60% of the total range. The wick zone (from wick tip to body edge) is the rejection block.",
+  "bullish_rejection": "Long lower wick at support. The wick zone below the body = demand zone. Enter on retest of this zone.",
+  "bearish_rejection": "Long upper wick at resistance. The wick zone above the body = supply zone. Enter on retest.",
+  "quality": "Rejection blocks at PDH/PDL, OB zones, or FVG boundaries are highest quality. Random rejection blocks are less significant."
+}

@@ -1,0 +1,23 @@
+{
+  "id": "venom_model",
+  "layer": "composite",
+  "definition": "A specific pre-market trading model for US equity index futures. Uses the 90-minute pre-market range (8:00-9:30 AM NY) as the accumulation phase, then trades the sweep + reversal at market open.",
+  "composes": [
+    "PO3_AMD (pre-market = accumulation, 9:30 open = manipulation, 9:45+ = distribution)",
+    "liquidity_sweep (pre-market high/low get swept at open)",
+    "displacement (post-sweep displacement confirms direction)"
+  ],
+  "setup": {
+    "step_1": "Mark 90-min pre-market range high/low (8:00-9:30 AM NY)",
+    "step_2": "At 9:30 open, watch for sweep of pre-market high OR low",
+    "step_3": "After sweep, wait for displacement + FVG in opposite direction",
+    "step_4": "Enter retracement into FVG. SL beyond pre-market sweep extreme."
+  },
+  "applicable_to": [
+    "US30",
+    "US100",
+    "US500"
+  ],
+  "time_filter": "9:30-10:30 AM NY only",
+  "connection_to_PO3": "Venom IS PO3 applied to the specific 8:00-10:30 AM window with pre-market as the accumulation range."
+}

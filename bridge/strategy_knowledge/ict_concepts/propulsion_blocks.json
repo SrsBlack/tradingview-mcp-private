@@ -1,0 +1,18 @@
+{
+  "id": "propulsion_blocks",
+  "layer": 4,
+  "definition": "Order blocks created by extreme displacement candles — the displacement is so strong that the OB becomes a 'propulsion zone' with exceptionally high institutional interest.",
+  "depends_on": [
+    "order_blocks (propulsion blocks ARE OBs with extreme displacement)",
+    "displacement (propulsion requires extreme, not just normal displacement)"
+  ],
+  "feeds_into": [
+    "trade entry (propulsion blocks are highest-confidence OB entries)"
+  ],
+  "related_to": [
+    "order_blocks (propulsion is the STRONGEST grade of OB)",
+    "fair_value_gaps (propulsion blocks always leave large FVGs)"
+  ],
+  "criteria": "The displacement candle must be >2x the average candle range, with body >80% of range (almost no wick). These are institutional aggression candles.",
+  "significance": "Propulsion blocks are the strongest OBs. First touch has near-90% reaction probability. If a propulsion block is mitigated without reaction, the trend thesis is WRONG."
+}

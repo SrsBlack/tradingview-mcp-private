@@ -14,6 +14,8 @@ This is separate from SessionStore (daily log) — StateStore is the
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -83,7 +85,12 @@ class StateStore:
             "grade_a_losses": getattr(executor, "grade_a_losses", 0),
             "open_positions": positions,
         }
-        self._path.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+        tmp_path = self._path.with_suffix(".tmp")
+        backup_path = self._path.with_suffix(".backup.json")
+        tmp_path.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+        if self._path.exists():
+            shutil.copy2(self._path, backup_path)
+        os.replace(tmp_path, self._path)
 
     def load(self) -> dict | None:
         """Load saved state. Returns None if no state file exists."""
@@ -92,6 +99,13 @@ class StateStore:
         try:
             return json.loads(self._path.read_text(encoding="utf-8"))
         except Exception:
+            backup_path = self._path.with_suffix(".backup.json")
+            if backup_path.exists():
+                try:
+                    print(f"[StateStore] WARNING: primary state file corrupt, falling back to backup: {backup_path}")
+                    return json.loads(backup_path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
             return None
 
     def clear(self) -> None:
@@ -114,20 +128,22 @@ class StateStore:
         if state.get("mode") != mode:
             return []
 
-        # Only restore if saved today (UTC) — don't carry stale positions across days
-        saved_date = state.get("saved_at", "")[:10]
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if saved_date != today:
-            return []
-
-        # Restore balance accumulators
+        # Always restore balance and stats (persists across days)
         executor.balance = state.get("balance", executor.balance)
+        executor.initial_balance = state.get("initial_balance", executor.initial_balance)
         executor.peak_balance = state.get("peak_balance", executor.peak_balance)
         executor.wins = state.get("wins", 0)
         executor.losses = state.get("losses", 0)
         if hasattr(executor, "grade_a_wins"):
             executor.grade_a_wins = state.get("grade_a_wins", 0)
             executor.grade_a_losses = state.get("grade_a_losses", 0)
+
+        # Only restore positions from today — stale positions may have been closed
+        saved_date = state.get("saved_at", "")[:10]
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if saved_date != today:
+            print(f"  [STATE] Balance restored from {saved_date}: ${executor.balance:,.2f} (positions cleared — new day)", flush=True)
+            return []
 
         # Restore open positions
         from bridge.decision_types import PaperPosition

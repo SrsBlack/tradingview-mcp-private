@@ -1,0 +1,50 @@
+{
+  "mistake_1_chasing": {
+    "what": "Entering during manipulation instead of waiting for distribution retracement",
+    "concepts_violated": [
+      "PO3_AMD",
+      "displacement"
+    ],
+    "fix": "Wait for displacement AFTER sweep. Enter the retracement."
+  },
+  "mistake_2_wrong_zone": {
+    "what": "Buying in premium or selling in discount",
+    "concepts_violated": [
+      "premium_discount",
+      "dealing_range"
+    ],
+    "fix": "Always classify zone before entry."
+  },
+  "mistake_3_ignoring_htf": {
+    "what": "Trading LTF against HTF structure",
+    "concepts_violated": [
+      "market_structure (multi-timeframe rule)"
+    ],
+    "fix": "HTF = direction. LTF = timing. Never trade LTF against HTF."
+  },
+  "mistake_4_tight_stops": {
+    "what": "SL at exact OB/FVG edge",
+    "concepts_violated": [
+      "liquidity (your SL IS liquidity that will be swept)",
+      "risk_management"
+    ],
+    "fix": "Buffer beyond manipulation zone. Minimum 1.5x ATR."
+  },
+  "mistake_5_no_DOL": {
+    "what": "No draw on liquidity identified",
+    "concepts_violated": [
+      "draw_on_liquidity",
+      "liquidity"
+    ],
+    "fix": "No DOL = no clear TP = skip."
+  },
+  "mistake_6_no_displacement": {
+    "what": "Entering at OB/FVG that was NOT preceded by displacement",
+    "concepts_violated": [
+      "displacement",
+      "order_blocks",
+      "fair_value_gaps"
+    ],
+    "fix": "OB/FVG without displacement = unproven zone. Wait for displacement to validate."
+  }
+}

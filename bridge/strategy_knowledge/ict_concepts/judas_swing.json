@@ -1,0 +1,24 @@
+{
+  "id": "judas_swing",
+  "layer": 3,
+  "definition": "The fake move at session open that goes OPPOSITE to the real direction. It IS a liquidity sweep timed to the session open.",
+  "depends_on": [
+    "sessions_kill_zones (occurs at session opens)",
+    "liquidity (sweeps session liquidity — Asian high/low, PDH/PDL)"
+  ],
+  "feeds_into": [
+    "liquidity_sweep (a judas swing IS a liquidity sweep)",
+    "displacement (after judas reversal, displacement confirms real direction)"
+  ],
+  "related_to": [
+    "PO3_AMD (judas swing IS the manipulation phase of PO3)",
+    "turtle_soup (turtle soup can be the judas swing's reversal pattern)"
+  ],
+  "pattern": "First 30-60 minutes of London or NY: price makes convincing move in one direction, sweeps key level, then reverses.",
+  "how_to_distinguish": [
+    "Moderate volume (institutions trapping, not pushing)",
+    "Takes out a key level (Asian high/low, PDH/PDL)",
+    "After the sweep, displacement candles form in OPPOSITE direction"
+  ],
+  "trading_rule": "NEVER chase the first move of a session. Wait 30-60 min, identify if judas swing occurred, then trade the reversal."
+}

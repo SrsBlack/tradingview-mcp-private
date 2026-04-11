@@ -47,6 +47,9 @@ _TV_TO_ALPACA: dict[str, str] = {
     "BTCUSD":  "BTC/USD",
     "ETHUSD":  "ETH/USD",
     "SOLUSD":  "SOL/USD",
+    "AVAXUSD": "AVAX/USD",
+    "LINKUSD": "LINK/USD",
+    "DOGEUSD": "DOGE/USD",
 }
 
 # Map TradingView base symbols to Finnhub ETF proxies + conversion factor

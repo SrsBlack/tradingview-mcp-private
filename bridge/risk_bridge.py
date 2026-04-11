@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from bridge.config import ensure_trading_ai_path, get_bridge_config
+from bridge.config import ensure_trading_ai_path, get_bridge_config, SMT_PAIRS, tv_to_ftmo_symbol
 
 # Ensure trading-ai-v2 is importable
 ensure_trading_ai_path()
@@ -31,20 +31,21 @@ from core.types import Direction
 # ---------------------------------------------------------------------------
 
 PAPER_SYMBOL_SPECS: dict[str, SymbolSpec] = {
-    # Crypto (typical broker specs)
-    "BTCUSD": SymbolSpec(name="BTCUSD", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=100.0, volume_step=0.01),
-    "ETHUSD": SymbolSpec(name="ETHUSD", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=500.0, volume_step=0.01),
-    "SOLUSD": SymbolSpec(name="SOLUSD", tick_size=0.001, tick_value=0.001, volume_min=0.1, volume_max=5000.0, volume_step=0.1),
-    # Forex
-    "EURUSD": SymbolSpec(name="EURUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=500.0, volume_step=0.01),
-    "GBPUSD": SymbolSpec(name="GBPUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=500.0, volume_step=0.01),
+    # Crypto — FTMO actual specs
+    "BTCUSD": SymbolSpec(name="BTCUSD", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=5.0, volume_step=0.01),
+    "ETHUSD": SymbolSpec(name="ETHUSD", tick_size=0.01, tick_value=0.1, volume_min=0.01, volume_max=5.0, volume_step=0.01),
+    "SOLUSD": SymbolSpec(name="SOLUSD", tick_size=0.01, tick_value=1.0, volume_min=0.01, volume_max=5.0, volume_step=0.01),
+    "DOGEUSD": SymbolSpec(name="DOGEUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=1.0, volume_step=0.01),
+    # Forex — correct
+    "EURUSD": SymbolSpec(name="EURUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=50.0, volume_step=0.01),
+    "GBPUSD": SymbolSpec(name="GBPUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=50.0, volume_step=0.01),
     # Gold / Oil
-    "XAUUSD": SymbolSpec(name="XAUUSD", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=100.0, volume_step=0.01),
+    "XAUUSD": SymbolSpec(name="XAUUSD", tick_size=0.01, tick_value=1.0, volume_min=0.01, volume_max=100.0, volume_step=0.01),
     "UKOIL":  SymbolSpec(name="UKOIL",  tick_size=0.01, tick_value=0.01, volume_min=0.1,  volume_max=500.0, volume_step=0.1),
     # Indices — FTMO naming
     "US30":   SymbolSpec(name="US30",   tick_size=1.0,  tick_value=1.0,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
-    "US100":  SymbolSpec(name="US100",  tick_size=0.1,  tick_value=0.1,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
-    "US500":  SymbolSpec(name="US500",  tick_size=0.1,  tick_value=0.1,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
+    "US100":  SymbolSpec(name="US100",  tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=1000.0, volume_step=0.01),
+    "US500":  SymbolSpec(name="US500",  tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=1000.0, volume_step=0.01),
 }
 
 
@@ -134,6 +135,45 @@ class RiskBridge:
             spec=spec,
         )
 
+    def get_lot_size_live(
+        self,
+        symbol: str,
+        balance: float,
+        risk_pct: float,
+        entry_price: float,
+        sl_price: float,
+        direction: str,
+    ) -> float:
+        """Calculate lot size using LIVE MT5 symbol specs (most accurate)."""
+        try:
+            import MetaTrader5 as mt5
+            ftmo_sym = tv_to_ftmo_symbol(symbol)
+            info = mt5.symbol_info(ftmo_sym)
+            if info and info.trade_tick_value > 0:
+                spec = SymbolSpec(
+                    name=ftmo_sym,
+                    tick_size=info.trade_tick_size,
+                    tick_value=info.trade_tick_value,
+                    volume_min=info.volume_min,
+                    volume_max=info.volume_max,
+                    volume_step=info.volume_step,
+                )
+                dir_enum = Direction.BULLISH if direction == "BUY" else Direction.BEARISH
+                return calculate_lots(
+                    account_balance=balance,
+                    risk_pct=risk_pct,
+                    entry_price=entry_price,
+                    sl_price=sl_price,
+                    direction=dir_enum,
+                    spec=spec,
+                )
+        except ImportError:
+            pass
+        except Exception:
+            pass
+        # Fallback to paper specs
+        return self.get_lot_size(symbol, balance, risk_pct, entry_price, sl_price, direction)
+
     def get_proximity_multiplier(
         self,
         balance: float,
@@ -195,12 +235,72 @@ class RiskBridge:
 
         # Calculate lot size
         adjusted_risk = risk_pct * multiplier
-        lot_size = self.get_lot_size(symbol, balance, adjusted_risk, entry_price, sl_price, direction)
+        lot_size = self.get_lot_size_live(symbol, balance, adjusted_risk, entry_price, sl_price, direction)
 
         if lot_size <= 0:
             return False, 0.0, "Invalid lot size (check SL distance)"
 
         return True, lot_size, f"Approved: {lot_size:.4f} lots (risk={adjusted_risk:.3%}, proximity={multiplier:.2f})"
+
+    def check_correlation(
+        self,
+        new_symbol: str,
+        new_direction: str,
+        open_positions: dict,
+    ) -> tuple[bool, str]:
+        """
+        Check if a new trade is too correlated with existing open positions.
+
+        Uses SMT_PAIRS to identify correlated instruments. Blocks if:
+        - Same symbol already open in same direction
+        - Correlated pair (e.g., US500 + US100) both open in same direction
+
+        Returns:
+            (ok, reason) — ok=True if trade is allowed, False if blocked.
+        """
+        if not open_positions:
+            return True, ""
+
+        new_base = new_symbol.split(":")[-1]
+
+        for pos in open_positions.values():
+            pos_base = pos.symbol.split(":")[-1]
+
+            # Same symbol, same direction — already exposed
+            if pos_base == new_base and pos.direction == new_direction:
+                return False, f"Already have {pos.direction} on {pos_base} (#{pos.ticket})"
+
+            # Check SMT correlation — same direction on correlated pair
+            smt_pair = SMT_PAIRS.get(new_base)
+            if smt_pair and smt_pair == pos_base and pos.direction == new_direction:
+                return False, (
+                    f"Correlated: {new_base} + {pos_base} both {new_direction} "
+                    f"(SMT pair — concentrated risk)"
+                )
+
+            # Time-based correlation: block same-direction crypto trades within 60 min
+            crypto_symbols = {"BTCUSD", "ETHUSD", "SOLUSD", "DOGEUSD"}
+            if new_base in crypto_symbols and pos_base in crypto_symbols:
+                if pos.direction == new_direction:
+                    # Check if existing position was opened recently (within 60 min)
+                    opened_at = getattr(pos, "opened_at", None)
+                    if opened_at:
+                        from datetime import datetime, timezone, timedelta
+                        try:
+                            if isinstance(opened_at, str):
+                                opened_dt = datetime.fromisoformat(opened_at)
+                            else:
+                                opened_dt = opened_at
+                            age = datetime.now(timezone.utc) - opened_dt
+                            if age < timedelta(minutes=60):
+                                return False, (
+                                    f"Crypto correlation: {new_base} + {pos_base} both {new_direction} "
+                                    f"within 60min (opened {age.total_seconds()/60:.0f}m ago)"
+                                )
+                        except (ValueError, TypeError):
+                            pass
+
+        return True, ""
 
 
 # ---------------------------------------------------------------------------

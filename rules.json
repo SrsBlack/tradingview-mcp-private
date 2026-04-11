@@ -8,10 +8,10 @@
     "CAPITALCOM:US500",
     "CAPITALCOM:US100",
     "OANDA:XAUUSD",
-    "TVC:UKOIL"
+    "TVC:UKOIL",
+    "COINBASE:DOGEUSD"
   ],
   "default_timeframe": "240",
-
   "bias_criteria": {
     "bullish": [
       "Price trading above HTF order block",
@@ -24,7 +24,6 @@
       "Liquidity sweep above recent highs"
     ]
   },
-
   "risk_rules": [
     "Grade A: 1% risk per trade",
     "Grade B: 0.5% risk per trade",
@@ -33,12 +32,9 @@
     "Daily loss limit: 2%",
     "Maximum drawdown: 4%"
   ],
-
   "strategy_ensemble": [],
-
   "liquidity_sweep_required": true,
   "daily_loss_limit_pct": 2.0,
-
   "score_weights": {
     "structure": 30,
     "liquidity": 0,

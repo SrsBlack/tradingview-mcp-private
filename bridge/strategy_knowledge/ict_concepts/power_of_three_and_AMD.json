@@ -1,0 +1,48 @@
+{
+  "id": "PO3_AMD",
+  "layer": 2,
+  "definition": "Every session/day/week follows: Accumulation → Manipulation → Distribution. This is the Market Maker's algorithm.",
+  "depends_on": [
+    "liquidity (accumulation BUILDS liquidity, manipulation SWEEPS it)",
+    "sessions_kill_zones (sessions determine WHEN each phase occurs)"
+  ],
+  "feeds_into": [
+    "liquidity_sweep (manipulation phase IS a liquidity sweep)",
+    "displacement (distribution phase starts WITH displacement)",
+    "judas_swing (the manipulation move IS often a judas swing)"
+  ],
+  "related_to": [
+    "market_maker_model (MMM is PO3 applied with premium/discount + structure)",
+    "dealing_range (daily PO3 creates the daily dealing range)"
+  ],
+  "phases": {
+    "accumulation": {
+      "what": "Smart money builds positions. Sideways, choppy. Retail places breakout orders above/below.",
+      "creates": "liquidity — the breakout orders and stops that accumulate ARE the liquidity for step 3 of the sweep",
+      "when": "Asian session (7 PM - 2 AM ET) or pre-London",
+      "trading_rule": "DO NOT TRADE. This is NOT a signal, it's preparation."
+    },
+    "manipulation": {
+      "what": "Sharp fake move sweeping accumulated liquidity. Price breaks the range to trigger stops.",
+      "IS": "A liquidity_sweep in disguise. The manipulation IS the sweep of the liquidity built in accumulation.",
+      "creates": "The sweep extreme (which becomes your SL reference) + trapped traders who provide fuel for distribution",
+      "when": "London open (2-5 AM ET) or 10:00 AM ET",
+      "trading_rule": "DO NOT CHASE. This move is designed to look like a breakout. It is the TRAP.",
+      "confirmation_via": "SMT_divergence — if correlated instrument does NOT confirm the 'breakout', it's manipulation"
+    },
+    "distribution": {
+      "what": "The real move. After manipulation takes liquidity, price moves to the true target.",
+      "IS": "displacement in the real direction. Distribution starts WITH displacement candles creating FVGs and OBs.",
+      "creates": "FVGs (entry zones) + OBs (entry zones) + BOS/CHoCH (structure confirmation)",
+      "when": "After manipulation completes. NY session 10:30 AM - 2:00 PM ET typically.",
+      "trading_rule": "THIS is when you trade — but enter the RETRACEMENT into the FVG/OB, not the displacement itself."
+    }
+  },
+  "daily_candle_PO3": "Daily open = accumulation reference. Daily low (bullish) or high (bearish) = manipulation. Daily close = distribution result.",
+  "weekly_PO3": "Mon-Tue = accumulation. Wed = manipulation (weekly high/low often forms). Thu-Fri = distribution.",
+  "intraday_AMD_times": {
+    "09_50_10_10": "Primary AMD manipulation window",
+    "10_50_11_10": "Secondary AMD window",
+    "14_00_15_00": "Late distribution / position squaring"
+  }
+}

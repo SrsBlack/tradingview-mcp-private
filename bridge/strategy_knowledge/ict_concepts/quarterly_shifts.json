@@ -1,0 +1,19 @@
+{
+  "id": "quarterly_shifts",
+  "layer": 0,
+  "definition": "2-4 month directional changes in market delivery. Detected via weekly return analysis — when the trend of weekly closes reverses, a quarterly shift has occurred.",
+  "depends_on": [
+    "IPDA (quarterly shifts occur when IPDA 60-day range is exhausted)"
+  ],
+  "feeds_into": [
+    "market_structure (quarterly shift changes the HTF bias)",
+    "daily_bias (new quarterly direction overrides old)"
+  ],
+  "related_to": [
+    "seasonal_tendencies (quarterly shifts align with seasonal patterns)",
+    "dealing_range (new quarterly range establishes new dealing range)"
+  ],
+  "detection": "Analyze 8-12 weekly closes. When 3+ consecutive weekly closes reverse the prior quarterly direction, a shift is underway.",
+  "trading_implication": "A quarterly shift changes the macro bias. Trades aligned with the new quarterly direction have significantly higher probability. Counter-quarterly trades should be avoided or sized down.",
+  "typical_timing": "Shifts often align with fiscal quarters: Jan, Apr, Jul, Oct. But can occur at any time when IPDA 60-day range extremes are tested."
+}

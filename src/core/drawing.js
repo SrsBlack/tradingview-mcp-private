@@ -40,7 +40,20 @@ export async function listDrawings() {
     (function() {
       var api = ${apiPath};
       var all = api.getAllShapes();
-      return all.map(function(s) { return { id: s.id, name: s.name }; });
+      return all.map(function(s) {
+        var info = { id: s.id, name: s.name };
+        try {
+          var shape = api.getShapeById(s.id);
+          if (shape) {
+            var p = shape.getProperties();
+            if (p) {
+              if (p.title) info.title = p.title;
+              if (p.text) info.text = p.text;
+            }
+          }
+        } catch(e) {}
+        return info;
+      });
     })()
   `);
   return { success: true, count: shapes?.length || 0, shapes: shapes || [] };

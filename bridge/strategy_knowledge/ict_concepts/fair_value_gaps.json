@@ -1,0 +1,31 @@
+{
+  "id": "fair_value_gaps",
+  "layer": 4,
+  "definition": "Three-candle pattern creating a gap (imbalance) where price moved too fast for balanced order flow.",
+  "depends_on": [
+    "displacement (FVGs are CREATED BY displacement — no displacement, no meaningful FVG)"
+  ],
+  "feeds_into": [
+    "trade entry (FVG is an entry zone)",
+    "optimal_trade_entry (OTE applied within FVG zone)",
+    "unicorn_model (FVG + breaker overlap = unicorn)",
+    "PD_arrays (FVGs are premium/discount arrays)",
+    "silver_bullet (silver bullet = FVG formed in specific time window)"
+  ],
+  "related_to": [
+    "order_blocks (OB + FVG = strongest entry)",
+    "displacement (FVG is the EVIDENCE of displacement)",
+    "premium_discount (FVG in wrong zone is less reliable)"
+  ],
+  "bullish_FVG": "Gap between candle 1 high and candle 3 low. Below current price.",
+  "bearish_FVG": "Gap between candle 1 low and candle 3 high. Above current price.",
+  "consequent_encroachment": {
+    "definition": "The 50% midpoint of the FVG (CE) — the most precise entry point.",
+    "connection": "CE is the FVG's version of equilibrium (like dealing_range equilibrium). Price reaching CE and holding = FVG respected. Price closing through CE = FVG invalid."
+  },
+  "timeframe_hierarchy": "HTF FVGs (H4/D1) > LTF FVGs (M15/M5). A LTF FVG INSIDE a HTF FVG = highest probability. This nesting mirrors dealing_range nesting.",
+  "inversion_FVG": {
+    "definition": "FVG that was fully filled and traded through — now acts as opposite S/R.",
+    "connection": "Inverted FVGs become OBSTACLES. If your trade path crosses an inverted FVG, reduce conviction."
+  }
+}

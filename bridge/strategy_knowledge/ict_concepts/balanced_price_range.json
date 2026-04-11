@@ -1,0 +1,17 @@
+{
+  "id": "balanced_price_range",
+  "layer": 4,
+  "definition": "When two opposing FVGs overlap — a bullish FVG and bearish FVG at the same price level. This creates a 'balanced' zone where both buyers and sellers have filled gaps.",
+  "depends_on": [
+    "fair_value_gaps (BPR IS two overlapping FVGs)"
+  ],
+  "feeds_into": [
+    "trade entry (BPR = equilibrium zone, expect price to use it as support/resistance)"
+  ],
+  "related_to": [
+    "dealing_range.equilibrium (BPR represents localized equilibrium)",
+    "premium_discount (BPR often forms near the 50% level of a dealing range)"
+  ],
+  "significance": "BPRs are strong support/resistance zones because both sides have expressed interest. Price that breaks through a BPR is likely in genuine breakout, not manipulation.",
+  "how_to_trade": "Look for entries at BPR zones when price retests them. If price respects BPR → continuation trade. If price smashes through BPR → the breakout is likely real (not a sweep)."
+}

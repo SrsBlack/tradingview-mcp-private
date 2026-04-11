@@ -115,26 +115,57 @@ def _is_m15_boundary(dt: datetime) -> bool:
 
 
 def _ny_hour(dt: datetime) -> int:
-    """Get current hour in New York time (handles EDT UTC-4 / EST UTC-5)."""
-    import calendar
-    year = dt.year
-    # EDT starts: 2nd Sunday of March at 02:00 UTC
-    march_weeks = calendar.monthcalendar(year, 3)
-    edt_start_day = [w[6] for w in march_weeks if w[6] != 0][1]
-    edt_start = datetime(year, 3, edt_start_day, 2, 0, tzinfo=timezone.utc)
-    # EST starts: 1st Sunday of November at 02:00 UTC
-    nov_weeks = calendar.monthcalendar(year, 11)
-    est_start_day = [w[6] for w in nov_weeks if w[6] != 0][0]
-    est_start = datetime(year, 11, est_start_day, 2, 0, tzinfo=timezone.utc)
-
-    offset = -4 if edt_start <= dt < est_start else -5
-    return (dt + timedelta(hours=offset)).hour
+    """Get current hour in New York time (handles DST automatically)."""
+    from zoneinfo import ZoneInfo
+    ny = dt.astimezone(ZoneInfo("America/New_York"))
+    return ny.hour
 
 
 def _is_lunch_pause(dt: datetime) -> bool:
     """12:00-13:00 NY = low-volume lunch hour."""
     h = _ny_hour(dt)
     return h == 12
+
+
+def _is_high_impact_news_window(dt: datetime) -> tuple[bool, str]:
+    """
+    Check if we're within 15 minutes of a known high-impact news event.
+
+    Returns (is_near_news, event_name).
+    Uses static schedule for recurring monthly events (FOMC, NFP, CPI).
+    """
+    from zoneinfo import ZoneInfo
+    ny = dt.astimezone(ZoneInfo("America/New_York"))
+    day = ny.day
+    weekday = ny.weekday()  # 0=Mon
+    hour, minute = ny.hour, ny.minute
+    current_min = hour * 60 + minute
+
+    # NFP: First Friday of month at 8:30 AM ET
+    if weekday == 4 and day <= 7:
+        nfp_min = 8 * 60 + 30
+        if abs(current_min - nfp_min) <= 15:
+            return True, "NFP (Non-Farm Payrolls)"
+
+    # CPI: Usually 2nd Tuesday-Thursday of month at 8:30 AM ET
+    # Approximate: days 10-14
+    if 10 <= day <= 14 and weekday in (1, 2, 3):
+        cpi_min = 8 * 60 + 30
+        if abs(current_min - cpi_min) <= 15:
+            return True, "CPI (Consumer Price Index)"
+
+    # FOMC: Usually Wed at 2:00 PM ET, roughly every 6 weeks
+    # Known 2026 FOMC dates (announcement at 14:00 ET):
+    # Jan 28-29, Mar 18-19, May 6-7, Jun 17-18, Jul 29-30, Sep 16-17, Nov 4-5, Dec 16-17
+    fomc_dates = {
+        (1, 29), (3, 19), (5, 7), (6, 18), (7, 30), (9, 17), (11, 5), (12, 17)
+    }
+    if (ny.month, day) in fomc_dates:
+        fomc_min = 14 * 60  # 2:00 PM ET
+        if abs(current_min - fomc_min) <= 15:
+            return True, "FOMC Rate Decision"
+
+    return False, ""
 
 
 def _utc_hour(dt: datetime) -> int:
@@ -162,7 +193,10 @@ _SYMBOL_SESSIONS: dict[str, list[tuple[int, int]]] = {
 }
 
 # Symbols that trade 24/7 (no gate needed)
-_ALWAYS_ON = {"BITSTAMP:BTCUSD", "COINBASE:ETHUSD", "COINBASE:SOLUSD"}
+_ALWAYS_ON = {
+    "BITSTAMP:BTCUSD", "COINBASE:ETHUSD", "COINBASE:SOLUSD",
+    "COINBASE:AVAXUSD", "COINBASE:LINKUSD", "COINBASE:DOGEUSD",
+}
 
 
 def _symbol_is_active(symbol: str, dt: datetime) -> bool:
@@ -485,12 +519,92 @@ class Orchestrator:
         self._kill_switch_triggered = False
         self._kill_switch_date: str = ""  # date when triggered (YYYY-MM-DD UTC)
         self._trade_drawings: dict[int | str, list[str]] = {}  # ticket/paper_N -> [entity_id, ...]
+        self._drawings_path = Path.home() / ".tradingview-mcp" / "trade_drawings.json"
+        self._restore_trade_drawings()
         self._last_eod_date: str = ""  # date of last end-of-day summary (YYYY-MM-DD ET)
 
         # Decision cooldown: don't call Claude for the same symbol if we recently got a
         # BUY/SELL or high-confidence SKIP. Saves API costs on repeated setups.
         self._decision_cooldown: dict[str, float] = {}  # symbol -> UTC timestamp of last decision
         self._cooldown_seconds = 1800  # 30 min cooldown after BUY/SELL decision
+
+        # Score decay: track first signal price per (symbol, direction) to detect
+        # when price moves against the thesis — penalizes stale signals.
+        self._signal_anchor: dict[str, tuple[str, float]] = {}  # symbol -> (direction, anchor_price)
+
+        # TradingView connectivity tracking
+        self._tv_consecutive_failures = 0
+        self._tv_healthy = True
+
+    # ------------------------------------------------------------------
+    # Trade drawing persistence
+    # ------------------------------------------------------------------
+
+    def _save_trade_drawings(self) -> None:
+        """Persist trade drawing entity IDs to disk so they survive restarts."""
+        try:
+            # Convert keys to strings for JSON serialization
+            data = {str(k): v for k, v in self._trade_drawings.items()}
+            self._drawings_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _restore_trade_drawings(self) -> None:
+        """Load saved trade drawing entity IDs from disk."""
+        if not self._drawings_path.exists():
+            return
+        try:
+            data = json.loads(self._drawings_path.read_text(encoding="utf-8"))
+            for k, v in data.items():
+                # Restore int keys for numeric tickets, string keys for paper_N
+                try:
+                    self._trade_drawings[int(k)] = v
+                except ValueError:
+                    self._trade_drawings[k] = v
+        except Exception:
+            pass
+
+    def _cleanup_stale_drawings(self) -> None:
+        """Remove chart drawings for positions that are no longer open.
+
+        Uses saved entity IDs first (fast, precise). Then falls back to
+        scanning chart drawings by text pattern for any orphaned lines
+        from sessions where entity IDs weren't persisted.
+        """
+        # Collect active tickets (live + paper)
+        active_tickets: set[str] = set()
+        for ticket in self.executor.open_positions:
+            active_tickets.add(str(ticket))
+        if self.paper_shadow is not self.executor:
+            for ticket in self.paper_shadow.open_positions:
+                active_tickets.add(str(ticket))
+
+        # Step 1: Remove drawings for closed positions via saved entity IDs
+        stale_keys = []
+        for key, entity_ids in self._trade_drawings.items():
+            key_str = str(key)
+            # paper_123 → ticket "123"
+            ticket_str = key_str.replace("paper_", "")
+            if ticket_str not in active_tickets:
+                stale_keys.append(key)
+
+        removed_tracked = 0
+        for key in stale_keys:
+            entity_ids = self._trade_drawings.pop(key, [])
+            try:
+                self.tv_client.draw_remove_trade(entity_ids)
+                removed_tracked += len(entity_ids)
+            except Exception:
+                pass
+
+        # Step 2: Scan chart for any orphaned trade drawings (from pre-persistence sessions)
+        removed_orphan = self.tv_client.draw_remove_stale_trades(active_tickets)
+
+        total = removed_tracked + removed_orphan
+        if total > 0:
+            print(f"  [DRAW] Cleaned up {total} stale trade drawing(s) "
+                  f"({removed_tracked} tracked, {removed_orphan} orphaned)", flush=True)
+            self._save_trade_drawings()
 
     # ------------------------------------------------------------------
     # Main entry
@@ -517,6 +631,14 @@ class Orchestrator:
             await asyncio.get_running_loop().run_in_executor(
                 None, self._reconcile_restored_positions
             )
+
+        # --- Clean up stale trade drawings from closed/expired positions ---
+        try:
+            await asyncio.get_running_loop().run_in_executor(
+                None, self._cleanup_stale_drawings
+            )
+        except Exception as e:
+            print(f"  [DRAW] Startup cleanup error (non-fatal): {e}", flush=True)
 
         # --- Startup banner ---
         knowledge_loaded = bool(self._knowledge.get("symbol_profiles"))
@@ -550,28 +672,46 @@ class Orchestrator:
         else:
             print(f"\n  No open positions restored.", flush=True)
 
-        # Today's closed trades
-        closed = [t for t in today_trades if t.get("event") == "CLOSE"]
-        opens  = [t for t in today_trades if t.get("event") == "OPEN"]
+        # Today's trades — cross-reference OPENs with CLOSEs to avoid showing
+        # stale "OPEN" entries for positions that were closed but CLOSE wasn't logged.
+        closed = [t for t in today_trades if t.get("event") in ("CLOSE", "PAPER_CLOSE")]
+        opens  = [t for t in today_trades if t.get("event") in ("OPEN", "PAPER_OPEN")]
+        closed_tickets = {t.get("ticket") for t in closed}
+        # An OPEN is only truly open if its ticket is still in the executor
+        active_tickets = set(self.executor.open_positions.keys())
+        if self.paper_shadow is not self.executor:
+            active_tickets |= set(self.paper_shadow.open_positions.keys())
+        still_open = [t for t in opens if t.get("ticket") in active_tickets]
+        orphaned_open = [t for t in opens
+                         if t.get("ticket") not in active_tickets
+                         and t.get("ticket") not in closed_tickets]
         if today_trades:
-            print(f"\n  TODAY'S TRADES ({len(opens)} opened, {len(closed)} closed):", flush=True)
+            print(f"\n  TODAY'S TRADES ({len(still_open)} open, {len(closed)} closed"
+                  f"{f', {len(orphaned_open)} untracked' if orphaned_open else ''}):", flush=True)
             for t in today_trades:
                 evt = t.get("event", "?")
                 sym = t.get("symbol", "")
                 ts  = t.get("timestamp", "")[:16].replace("T", " ")
-                if evt == "OPEN":
+                ticket = t.get("ticket", "")
+                if evt in ("OPEN", "PAPER_OPEN"):
+                    if ticket in active_tickets:
+                        label = "OPEN "
+                    elif ticket in closed_tickets:
+                        continue  # CLOSE event will show it
+                    else:
+                        label = "GONE "  # position lost (bridge restart, no CLOSE logged)
                     print(
-                        f"    OPEN  #{t.get('ticket','')} {t.get('direction','')} {sym}"
+                        f"    {label} #{ticket} {t.get('direction','')} {sym}"
                         f"  @ {t.get('entry_price', t.get('entry', '')):,.4f}"
                         f"  Grade={t.get('ict_grade','?')}  {ts} UTC",
                         flush=True,
                     )
-                elif evt == "CLOSE":
+                elif evt in ("CLOSE", "PAPER_CLOSE"):
                     pnl = t.get("pnl", 0)
                     sign = "+" if pnl >= 0 else ""
                     result = "WIN " if pnl >= 0 else "LOSS"
                     print(
-                        f"    {result} #{t.get('ticket','')} {t.get('direction','')} {sym}"
+                        f"    {result} #{ticket} {t.get('direction','')} {sym}"
                         f"  Entry={t.get('entry','')}  Exit={t.get('exit','')}  "
                         f"PnL={sign}${pnl:.2f} ({t.get('r_multiple',0):+.1f}R)"
                         f"  {ts} UTC",
@@ -649,6 +789,19 @@ class Orchestrator:
             # Check 2% daily kill switch
             if self._kill_switch_triggered:
                 print("[ANALYSIS] Kill switch active (2% daily loss limit). Sleeping 5m.", flush=True)
+                await asyncio.sleep(300)
+                continue
+
+            # Check TradingView connectivity
+            if not self._tv_healthy:
+                print("[ANALYSIS] TradingView disconnected — skipping analysis. Sleeping 30s.", flush=True)
+                await asyncio.sleep(30)
+                continue
+
+            # High-impact news guard — skip analysis near FOMC/NFP/CPI
+            near_news, news_event = _is_high_impact_news_window(now)
+            if near_news:
+                print(f"[ANALYSIS] Near high-impact news: {news_event} — skipping cycle. Sleeping 5m.", flush=True)
                 await asyncio.sleep(300)
                 continue
 
@@ -798,6 +951,53 @@ class Orchestrator:
             else:
                 analysis.grade = "INVALID"
 
+        # --- Score decay: penalize when price moves against the signal direction ---
+        # If the same direction signal persists but price keeps moving the wrong way,
+        # decay the score to prevent repeated entries into a losing thesis.
+        if analysis.current_price > 0 and analysis.direction in ("BULLISH", "BEARISH"):
+            anchor_key = symbol
+            prev = self._signal_anchor.get(anchor_key)
+            if prev and prev[0] == analysis.direction:
+                # Same direction as before — check if price moved against it
+                anchor_price = prev[1]
+                if analysis.direction == "BULLISH":
+                    adverse_move_pct = (anchor_price - analysis.current_price) / anchor_price * 100
+                else:
+                    adverse_move_pct = (analysis.current_price - anchor_price) / anchor_price * 100
+
+                if adverse_move_pct > 0.05:  # Price moved against thesis by >0.05%
+                    # Decay: 3% score reduction per 0.1% adverse move, capped at 20% total decay
+                    decay_factor = min(adverse_move_pct / 0.1 * 0.03, 0.20)
+                    original_score = analysis.total_score
+                    analysis.total_score *= (1.0 - decay_factor)
+                    analysis.confluence_factors.append(
+                        f"score_decay(-{decay_factor*100:.0f}%, price moved {adverse_move_pct:.2f}% against {analysis.direction})"
+                    )
+                    # Re-grade after decay
+                    thresholds = self.config.grade_thresholds
+                    if analysis.total_score >= thresholds.get("A", 80):
+                        analysis.grade = "A"
+                    elif analysis.total_score >= thresholds.get("B", 65):
+                        analysis.grade = "B"
+                    elif analysis.total_score >= thresholds.get("C", 50):
+                        analysis.grade = "C"
+                    elif analysis.total_score >= thresholds.get("D", 35):
+                        analysis.grade = "D"
+                    else:
+                        analysis.grade = "INVALID"
+                    print(
+                        f"  [{symbol}] Score decay: {original_score:.0f} -> {analysis.total_score:.0f} "
+                        f"(price {adverse_move_pct:.2f}% against {analysis.direction})",
+                        flush=True,
+                    )
+            else:
+                # New direction or first signal — set anchor
+                self._signal_anchor[anchor_key] = (analysis.direction, analysis.current_price)
+
+            # Reset anchor if direction flips
+            if prev and prev[0] != analysis.direction:
+                self._signal_anchor[anchor_key] = (analysis.direction, analysis.current_price)
+
         # Cooldown check: skip Claude API call if we recently got a BUY/SELL for this symbol
         import time as _time
         last_decision_time = self._decision_cooldown.get(symbol, 0)
@@ -848,6 +1048,15 @@ class Orchestrator:
             if risk_override is not None and decision.risk_pct > risk_override:
                 print(f"  [{symbol}] Risk override: {decision.risk_pct:.1%} -> {risk_override:.1%} (per-symbol limit)", flush=True)
                 decision.risk_pct = risk_override
+
+            # Correlation gate: block concentrated risk (same symbol or SMT pair same direction)
+            corr_ok, corr_reason = self.risk_bridge.check_correlation(
+                decision.symbol, decision.action, self.executor.open_positions
+            )
+            if not corr_ok:
+                print(f"  [{symbol}] BLOCKED: {corr_reason}", flush=True)
+                self.session.log_decision(decision)
+                return
 
             # Risk gate: FTMO compliance + position sizing
             approved, lot_size, risk_msg = self.risk_bridge.check_trade(
@@ -909,6 +1118,7 @@ class Orchestrator:
                             )
                             if entity_ids:
                                 self._trade_drawings[f"paper_{paper_ticket}"] = entity_ids
+                                self._save_trade_drawings()
                         except Exception:
                             pass
                         # Persist paper shadow state
@@ -959,6 +1169,7 @@ class Orchestrator:
                     )
                     if entity_ids:
                         self._trade_drawings[result["ticket"]] = entity_ids
+                        self._save_trade_drawings()
                         print(f"  [{symbol}] Chart: {len(entity_ids)} lines drawn (IDs: {entity_ids})", flush=True)
                 except Exception:
                     pass
@@ -1010,6 +1221,7 @@ class Orchestrator:
                         if ticket and ticket in self._trade_drawings:
                             try:
                                 self.tv_client.draw_remove_trade(self._trade_drawings.pop(ticket))
+                                self._save_trade_drawings()
                             except Exception:
                                 pass
                         # Send close alert
@@ -1024,13 +1236,19 @@ class Orchestrator:
                 except Exception as e:
                     print(f"[POSITIONS] Error: {e}", flush=True)
 
-            # Shadow paper executor — check positions using TV quotes (skip if shadow IS the main executor)
+            # Shadow paper executor — check positions (Alpaca-first for crypto, TV fallback)
             if self.paper_shadow is not self.executor and self.paper_shadow.open_positions:
                 try:
-                    # Build price dict from TV quotes
                     shadow_prices: dict[str, float] = {}
                     for pos in self.paper_shadow.open_positions.values():
                         try:
+                            # Try Alpaca first for crypto — fast, no chart switching
+                            alpaca_price = self.price_verifier.get_alpaca_price(pos.symbol)
+                            if alpaca_price and alpaca_price > 0 and price_in_range(pos.symbol, alpaca_price):
+                                shadow_prices[pos.symbol] = alpaca_price
+                                continue
+
+                            # Fallback to TradingView chart quote
                             sym_base = pos.symbol.split(":")[-1]
                             result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
                             if not result.get("chart_ready", False):
@@ -1040,7 +1258,7 @@ class Orchestrator:
                             if chart_sym != sym_base:
                                 continue
                             p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-                            if p > 0:
+                            if p > 0 and price_in_range(pos.symbol, p):
                                 shadow_prices[pos.symbol] = p
                         except Exception:
                             pass
@@ -1065,6 +1283,7 @@ class Orchestrator:
                             if paper_key in self._trade_drawings:
                                 try:
                                     self.tv_client.draw_remove_trade(self._trade_drawings.pop(paper_key))
+                                    self._save_trade_drawings()
                                 except Exception:
                                     pass
                         # Persist paper shadow state after closes
@@ -1081,6 +1300,15 @@ class Orchestrator:
             return
 
         print("[RECONCILE] Checking restored positions against live prices...", flush=True)
+
+        # --- Step 0: Check MT5 for broker-side closes (SL/TP hit while bridge was down) ---
+        if isinstance(self.executor, LiveExecutorAdapter):
+            self._sync_mt5_closed_positions()
+            # If MT5 closed all positions, we're done
+            if not self.executor.open_positions:
+                print("  [RECONCILE] All positions were closed broker-side (MT5)", flush=True)
+                return
+
         to_close: list[tuple[int, str, float]] = []
 
         for ticket, pos in list(self.executor.open_positions.items()):
@@ -1161,18 +1389,36 @@ class Orchestrator:
             print(f"  [RECONCILE] All {len(self.executor.open_positions)} position(s) still valid", flush=True)
 
     def _check_positions_sync(self) -> list[dict]:
-        """Get current prices and check positions."""
+        """Get current prices and check positions.
+
+        Uses Alpaca API directly for crypto (fast, reliable, no chart switching needed).
+        Falls back to TradingView chart quotes for non-crypto symbols.
+        Also checks MT5 for live positions that may have been closed broker-side.
+        """
         prices: dict[str, float] = {}
+
+        # --- Step 1: Check if MT5 already closed any live positions (broker-side SL/TP) ---
+        if isinstance(self.executor, LiveExecutorAdapter):
+            self._sync_mt5_closed_positions()
+
         for pos in self.executor.open_positions.values():
             try:
+                # Try Alpaca first for crypto — fast, no chart switching
+                alpaca_price = self.price_verifier.get_alpaca_price(pos.symbol)
+                if alpaca_price and alpaca_price > 0:
+                    if price_in_range(pos.symbol, alpaca_price):
+                        prices[pos.symbol] = alpaca_price
+                        continue
+                    else:
+                        print(f"[POSITIONS] {pos.symbol} Alpaca price {alpaca_price:.4f} FAILED range check", flush=True)
+
+                # Fallback: TradingView chart quote (for forex, commodities, indices)
                 target_sym = pos.symbol.split(":")[-1]
-                # Use chart_ready to confirm symbol is loaded
                 result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
                 if not result.get("chart_ready", False):
                     print(f"[POSITIONS] Chart not ready for {pos.symbol} — skipping this cycle", flush=True)
                     continue
 
-                # Read verified quote
                 quote = self.tv_client.get_quote()
                 chart_sym = quote.get("symbol", "").split(":")[-1]
                 if chart_sym != target_sym:
@@ -1184,23 +1430,8 @@ class Orchestrator:
                     print(f"[POSITIONS] Zero price for {pos.symbol}", flush=True)
                     continue
 
-                # Cross-check against Alpaca live feed
-                price_ok, alpaca_price = self.price_verifier.verify(pos.symbol, p)
-                if not price_ok:
-                    print(
-                        f"[POSITIONS] {pos.symbol} TV price {p:.4f} doesn't match "
-                        f"Alpaca {alpaca_price:.4f} — skipping",
-                        flush=True,
-                    )
-                    continue
-
-                # Safety net: price range check (for symbols not on Alpaca)
                 if not price_in_range(pos.symbol, p):
-                    print(
-                        f"[POSITIONS] {pos.symbol} price {p:.4f} FAILED range check "
-                        f"— likely stale data, skipping",
-                        flush=True,
-                    )
+                    print(f"[POSITIONS] {pos.symbol} price {p:.4f} FAILED range check", flush=True)
                     continue
 
                 prices[pos.symbol] = p
@@ -1211,6 +1442,95 @@ class Orchestrator:
         if prices:
             return self.executor.check_positions(prices)
         return []
+
+    def _sync_mt5_closed_positions(self) -> None:
+        """Check MT5 for positions that were closed broker-side (SL/TP hit on server).
+
+        MT5 manages SL/TP natively — if the broker closed a position, we need to
+        sync our local state to reflect that.
+        """
+        if not isinstance(self.executor, LiveExecutorAdapter):
+            return
+        try:
+            import MetaTrader5 as mt5
+            if not mt5.terminal_info():
+                return
+
+            to_close = []
+            for ticket, pos in self.executor.open_positions.items():
+                # Check if MT5 still has this position open
+                mt5_pos = mt5.positions_get(ticket=ticket)
+                if mt5_pos is None or len(mt5_pos) == 0:
+                    # Position no longer exists on MT5 — broker closed it
+                    # Get the deal history to find the close price and P&L
+                    from datetime import datetime, timezone, timedelta
+                    now = datetime.now(timezone.utc)
+                    deals = mt5.history_deals_get(
+                        now - timedelta(days=3), now,
+                        position=ticket
+                    )
+                    exit_price = pos.current_price
+                    pnl = 0.0
+                    reason = "BROKER_CLOSE"
+                    if deals:
+                        # Find the closing deal for THIS symbol (entry=1 means closing deal)
+                        mt5_sym = pos.symbol.split(":")[-1]
+                        close_deals = [d for d in deals if d.entry == 1 and d.symbol == mt5_sym]
+                        if close_deals:
+                            last_deal = close_deals[-1]
+                            exit_price = last_deal.price
+                            pnl = last_deal.profit
+                            if last_deal.comment and "sl" in last_deal.comment.lower():
+                                reason = "SL"
+                            elif last_deal.comment and "tp" in last_deal.comment.lower():
+                                reason = "TP"
+
+                    to_close.append((ticket, reason, exit_price, pnl))
+
+            for ticket, reason, exit_price, mt5_pnl in to_close:
+                pos = self.executor.open_positions[ticket]
+                if pos.direction == "BUY":
+                    local_pnl = (exit_price - pos.entry_price) * pos.lot_size
+                else:
+                    local_pnl = (pos.entry_price - exit_price) * pos.lot_size
+                sl_dist = abs(pos.entry_price - pos.sl_price)
+                r_multiple = round(local_pnl / (sl_dist * pos.lot_size), 2) if sl_dist > 0 else 0.0
+
+                print(
+                    f"  [MT5_SYNC] #{ticket} {pos.symbol} closed by broker ({reason}) "
+                    f"Entry={pos.entry_price:.2f} Exit={exit_price:.2f} "
+                    f"PnL={local_pnl:+.2f} ({r_multiple:+.1f}R)",
+                    flush=True,
+                )
+
+                # Update balance and remove from open positions
+                self.executor.balance += local_pnl
+                if local_pnl >= 0:
+                    self.executor.wins += 1
+                else:
+                    self.executor.losses += 1
+                del self.executor.open_positions[ticket]
+
+                # Log the close event
+                self.session.log_trade({
+                    "event": "CLOSE",
+                    "ticket": ticket,
+                    "symbol": pos.symbol,
+                    "direction": pos.direction,
+                    "entry": pos.entry_price,
+                    "exit_price": exit_price,
+                    "pnl": round(local_pnl, 2),
+                    "r_multiple": r_multiple,
+                    "reason": reason,
+                    "balance": round(self.executor.balance, 2),
+                    "mt5_pnl": round(mt5_pnl, 2) if mt5_pnl else None,
+                })
+                self.state_store.save(self.executor, self.mode)
+
+        except ImportError:
+            pass  # MetaTrader5 not installed
+        except Exception as e:
+            print(f"[MT5_SYNC] Error checking MT5 positions: {e}", flush=True)
 
     # ------------------------------------------------------------------
     # Health / monitoring loop
@@ -1258,10 +1578,47 @@ class Orchestrator:
             self.session.save_snapshot(summary)
             self.state_store.save(self.executor, self.mode)
 
+            # TradingView connectivity check
+            try:
+                tv_ok = self.tv_client.health_check()
+                if tv_ok:
+                    if not self._tv_healthy:
+                        print("[HEALTH] TradingView reconnected!", flush=True)
+                        try:
+                            asyncio.ensure_future(self.alerts.send_raw(
+                                "TradingView RECONNECTED — resuming analysis"
+                            ))
+                        except Exception:
+                            pass
+                    self._tv_consecutive_failures = 0
+                    self._tv_healthy = True
+                else:
+                    self._tv_consecutive_failures += 1
+                    if self._tv_consecutive_failures >= 3 and self._tv_healthy:
+                        self._tv_healthy = False
+                        print(
+                            f"[HEALTH] WARNING: TradingView unresponsive "
+                            f"({self._tv_consecutive_failures} consecutive failures) "
+                            f"— pausing new analysis until reconnected",
+                            flush=True,
+                        )
+                        try:
+                            asyncio.ensure_future(self.alerts.send_raw(
+                                f"WARNING: TradingView DISCONNECTED "
+                                f"({self._tv_consecutive_failures} failures). "
+                                f"Open positions still monitored via MT5/Alpaca. "
+                                f"New analysis paused."
+                            ))
+                        except Exception:
+                            pass
+            except Exception:
+                self._tv_consecutive_failures += 1
+
             # Daily summary at 5 PM ET — fires once per day, does NOT stop the loop
             # (system runs 24/7 for crypto; summary is informational only)
             ny_h = _ny_hour(now)
-            et_date = (now - timedelta(hours=4)).strftime("%Y-%m-%d")
+            from zoneinfo import ZoneInfo
+            et_date = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
             if ny_h == 17 and now.minute < 2 and self._last_eod_date != et_date:
                 self._last_eod_date = et_date
                 self._save_end_of_day()

@@ -1,0 +1,21 @@
+{
+  "id": "seasonal_tendencies",
+  "layer": 0,
+  "definition": "Statistically recurring patterns tied to calendar periods — certain months, weeks, or events produce predictable directional biases.",
+  "depends_on": [],
+  "feeds_into": [
+    "daily_bias (seasonal context adds/reduces conviction)"
+  ],
+  "related_to": [
+    "quarterly_shifts (seasonal patterns coincide with quarterly boundaries)"
+  ],
+  "patterns": {
+    "january_effect": "Equities tend bullish early January (new year allocation)",
+    "summer_doldrums": "Jul-Aug: Lower volatility, reduced institutional activity, VIX tends lower",
+    "september_weakness": "Historically weakest month for equities",
+    "Q4_rally": "Oct-Dec: Institutional window dressing, holiday rally tendency",
+    "NFP_week": "First Friday of month: increased volatility around Non-Farm Payrolls",
+    "FOMC_drift": "Pre-FOMC drift upward is statistically documented in equities"
+  },
+  "how_to_use": "Seasonal tendencies are CONTEXT, not signals. They increase/decrease conviction for trades already validated by layers 1-5. Never trade solely on seasonality."
+}

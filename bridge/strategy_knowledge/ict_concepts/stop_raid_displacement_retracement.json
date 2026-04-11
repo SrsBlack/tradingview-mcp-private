@@ -1,0 +1,42 @@
+{
+  "id": "stop_raid_displacement_retracement",
+  "layer": "composite",
+  "definition": "The core 3-step ICT trade pattern that unifies layers 3-5 into a single executable flow. This is the ATOMIC UNIT of an ICT trade.",
+  "composes": [
+    "liquidity_sweep (step 1: the raid)",
+    "displacement (step 2: institutional commitment)",
+    "optimal_trade_entry + fair_value_gaps + order_blocks (step 3: the entry)"
+  ],
+  "steps": {
+    "step_1_stop_raid": {
+      "what": "Price sweeps a liquidity level (stops are hit). This IS the manipulation.",
+      "concepts": [
+        "liquidity_sweep",
+        "judas_swing",
+        "turtle_soup"
+      ],
+      "output": "Sweep extreme (SL reference) + trapped traders (fuel for step 2)"
+    },
+    "step_2_displacement": {
+      "what": "Strong move in the OPPOSITE direction of the raid. Proves the raid was manipulation.",
+      "concepts": [
+        "displacement",
+        "BOS/CHoCH",
+        "CISD"
+      ],
+      "output": "FVG + OB (entry zones) + structural confirmation",
+      "connection": "If step 2 doesn't occur after step 1, step 1 was NOT manipulation — it was a real breakout. ABORT."
+    },
+    "step_3_retracement_entry": {
+      "what": "Price pulls back into the FVG/OB created by displacement. THIS is where you enter.",
+      "concepts": [
+        "fair_value_gaps",
+        "order_blocks",
+        "optimal_trade_entry"
+      ],
+      "output": "Entry price + confirmation",
+      "connection": "The retracement INTO the FVG/OB is the entry. The OTE zone (0.618-0.786 of the displacement) refines the exact price."
+    }
+  },
+  "key_insight": "Most traders fail because they enter at step 1 (chasing the raid) or step 2 (chasing the displacement). The ONLY correct entry is step 3 — the retracement. This pattern chains liquidity_sweep → displacement → FVG/OB → OTE into one atomic action."
+}

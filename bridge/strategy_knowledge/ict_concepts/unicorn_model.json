@@ -1,0 +1,17 @@
+{
+  "id": "unicorn_model",
+  "layer": 5,
+  "definition": "Breaker block + FVG overlap — one of the highest-probability entry patterns.",
+  "depends_on": [
+    "order_blocks (specifically breaker_blocks — a failed OB)",
+    "fair_value_gaps (FVG created when OB was broken through)"
+  ],
+  "feeds_into": [
+    "trade entry (unicorn zone IS the entry)"
+  ],
+  "related_to": [
+    "PD_arrays (unicorn = stacked PD arrays)",
+    "displacement (the move through the OB that creates the breaker IS displacement)"
+  ],
+  "formation_chain": "OB forms → price returns and breaks THROUGH OB → OB becomes breaker (from order_blocks) → the breakthrough move creates FVG (from fair_value_gaps) → overlap of breaker + FVG = unicorn entry zone. This chains order_blocks → breaker_blocks → fair_value_gaps → unicorn."
+}

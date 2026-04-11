@@ -1,0 +1,24 @@
+{
+  "id": "SMT_divergence",
+  "layer": 3,
+  "definition": "When correlated instruments make different structural moves — one sweeps liquidity but the other doesn't — revealing institutional positioning.",
+  "depends_on": [
+    "liquidity (one instrument sweeps, the other doesn't)",
+    "market_structure (divergence is a structural disagreement)"
+  ],
+  "feeds_into": [
+    "trade confirmation — SMT CONFIRMS that a liquidity_sweep is manipulation, not genuine breakout"
+  ],
+  "related_to": [
+    "liquidity_sweep (SMT validates the sweep)",
+    "PO3_AMD (SMT confirms manipulation phase)"
+  ],
+  "how_it_works": "ES makes new low but NQ doesn't → smart money is not uniformly bearish → the low is likely manipulation.",
+  "pairs": {
+    "indices": "ES ↔ NQ (US500 ↔ US100)",
+    "crypto": "BTC ↔ ETH",
+    "forex": "EURUSD ↔ GBPUSD",
+    "metals": "XAUUSD ↔ XAGUSD"
+  },
+  "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence."
+}

@@ -1,0 +1,36 @@
+{
+  "id": "order_blocks",
+  "layer": 4,
+  "definition": "The last opposing candle before a displacement move — the zone where smart money placed their orders.",
+  "depends_on": [
+    "displacement (OB is DEFINED by the displacement that follows it — no displacement, no OB)",
+    "market_structure (OB forms at structure points)"
+  ],
+  "feeds_into": [
+    "trade entry (OB is an entry zone)",
+    "optimal_trade_entry (OTE applied within the OB zone)",
+    "unicorn_model (broken OB becomes breaker → breaker + FVG = unicorn)",
+    "PD_arrays (OBs are premium/discount arrays)"
+  ],
+  "related_to": [
+    "fair_value_gaps (OB + FVG together = strongest entry)",
+    "breaker_blocks (failed OB becomes breaker)",
+    "premium_discount (OB must be in correct zone)"
+  ],
+  "bullish_OB": "Last bearish candle before strong bullish displacement. Body (not wicks) = the zone.",
+  "bearish_OB": "Last bullish candle before strong bearish displacement. Body = the zone.",
+  "quality_chain": {
+    "must_have_displacement": "OB without displacement is just a candle. Displacement (layer 3) CREATES the OB.",
+    "OB_plus_FVG": "If displacement also left a FVG, the OB is highest quality. OB + FVG overlap = best entry zone.",
+    "first_touch": "OBs strongest on first retest. Each touch mitigates orders. Connects to 'mitigation' concept.",
+    "unmitigated": "If price already returned and reacted → mitigated (used up). Don't trade it."
+  },
+  "breaker_block": {
+    "definition": "A failed OB — price broke through it, invalidating the OB. Now acts as S/R in the OPPOSITE direction.",
+    "connection": "Breaker blocks feed into unicorn_model when they overlap with a FVG."
+  },
+  "mitigation_block": {
+    "definition": "Partially tested OB — some orders filled but not all. Lower reliability than fresh OB.",
+    "connection": "Weight lower in scoring. Still valid as confluence with other PD_arrays."
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "ICT_2022_model",
+  "layer": "composite",
+  "definition": "ICT's simplified daily workflow — market_maker_model applied step by step with specific time filters.",
+  "composes": [
+    "market_structure",
+    "draw_on_liquidity",
+    "sessions_kill_zones",
+    "judas_swing",
+    "displacement",
+    "fair_value_gaps",
+    "order_blocks",
+    "optimal_trade_entry"
+  ],
+  "daily_workflow": {
+    "step_1_bias": "market_structure: Read D1/H4 for direction + dealing_range.",
+    "step_2_DOL": "draw_on_liquidity: Identify WHERE price needs to go (PDH/PDL, equal H/L, HTF OBs/FVGs).",
+    "step_3_timing": "sessions_kill_zones: Wait for kill zone.",
+    "step_4_manipulation": "judas_swing / liquidity_sweep: Identify the fake move.",
+    "step_5_confirmation": "displacement: Wait for FVG + BOS/CHoCH confirming real direction.",
+    "step_6_entry": "optimal_trade_entry: Enter retracement into FVG/OB from step 5.",
+    "step_7_management": "SL beyond step 4's sweep. TP at step 2's DOL. Partial at TP1, trail to TP2."
+  },
+  "key_principle": "This model works because it WAITS for all pieces across all layers. Most losses come from skipping a layer."
+}

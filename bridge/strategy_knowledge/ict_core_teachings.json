@@ -1,0 +1,1131 @@
+{
+  "_description": "Core ICT (Inner Circle Trader) methodology teachings with cross-connected concepts. Every concept explicitly links to what it depends on and what it feeds into, preventing confusion and ensuring proper evaluation order.",
+  "_created": "2026-04-11",
+  "_version": "3.0",
+
+  "concept_dependency_graph": {
+    "_purpose": "Shows how every ICT concept connects. Read top-to-bottom: higher concepts inform lower ones. Concepts at the same level are parallel inputs.",
+    "layer_0_macro": {
+      "concepts": ["IPDA", "quarterly_shifts", "seasonal_tendencies"],
+      "role": "MACRO layer. Multi-week/month context. IPDA reference ranges (20/40/60 day), quarterly directional shifts, and seasonal patterns set the broadest bias before any daily analysis.",
+      "feeds_into": ["market_structure", "dealing_range", "daily_bias"]
+    },
+    "layer_1_foundation": {
+      "concepts": ["market_structure", "dealing_range", "liquidity", "session_levels"],
+      "role": "MUST be established first. These define direction, range, and where orders cluster. session_levels (PDH/PDL, PWH/PWL, PMH/PML, Asian range) are the key external liquidity references.",
+      "depends_on": ["IPDA (macro context)"],
+      "feeds_into": ["premium_discount", "PO3_AMD", "draw_on_liquidity", "order_pairing"]
+    },
+    "layer_2_context": {
+      "concepts": ["premium_discount", "sessions_kill_zones", "PO3_AMD", "intraday_profile", "CBDR", "daily_bias"],
+      "role": "Context layer. WHERE in the range? WHEN in the session? WHICH PO3 phase? CBDR defines the pre-market reference. Intraday profile classifies the session type.",
+      "depends_on": ["market_structure", "dealing_range", "liquidity"],
+      "feeds_into": ["displacement", "liquidity_sweep", "judas_swing", "venom_model"]
+    },
+    "layer_3_events": {
+      "concepts": ["liquidity_sweep", "displacement", "judas_swing", "turtle_soup", "SMT_divergence", "CISD", "swing_failure_pattern", "range_expansion_contraction"],
+      "role": "Event layer. Things that HAPPEN confirming manipulation is complete. CISD is pre-CHoCH signal. SFP detects failed swing attempts. Range expansion/contraction detects cycle rhythm.",
+      "depends_on": ["liquidity", "PO3_AMD", "sessions_kill_zones"],
+      "feeds_into": ["order_blocks", "fair_value_gaps", "CRT", "liquidity_void"]
+    },
+    "layer_4_entry_zones": {
+      "concepts": ["order_blocks", "fair_value_gaps", "breaker_blocks", "rejection_blocks", "propulsion_blocks", "PD_arrays", "liquidity_void", "balanced_price_range"],
+      "role": "Entry zone layer. WHERE you place your order. Created BY events in layer 3. Includes advanced block types (rejection, propulsion) and volume-based zones (liquidity void, BPR).",
+      "depends_on": ["displacement", "liquidity_sweep", "market_structure"],
+      "feeds_into": ["optimal_trade_entry", "unicorn_model"]
+    },
+    "layer_5_precision": {
+      "concepts": ["optimal_trade_entry", "fibonacci_extensions", "unicorn_model", "silver_bullet", "volume_profile"],
+      "role": "Precision layer. Fine-tune entry within zones. Fibonacci extensions (127.2%, 161.8%) set targets BEYOND current range. Volume profile (POC/VAH/VAL) validates institutional interest at levels.",
+      "depends_on": ["order_blocks", "fair_value_gaps", "breaker_blocks"],
+      "feeds_into": ["trade_execution"]
+    },
+    "layer_6_execution": {
+      "concepts": ["draw_on_liquidity", "order_pairing", "risk_management", "trade_management"],
+      "role": "Execution layer. Order pairing: when SSL is swept, BSL becomes the target (and vice versa). Set SL at sweep extreme, TP at paired liquidity.",
+      "depends_on": ["all_above"],
+      "output": "The actual trade decision"
+    },
+    "cross_cutting": {
+      "concepts": ["market_maker_model", "ICT_2022_model", "stop_raid_displacement_retracement"],
+      "role": "COMPOSITE MODELS chaining concepts from ALL layers. stop_raid→displacement→retracement is the core 3-step trade pattern that unifies layers 3-5."
+    }
+  },
+
+  "trade_lifecycle_chain": {
+    "_purpose": "The complete chain from analysis to execution. Each step explicitly names which concept(s) it uses and what must be true before proceeding.",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Establish HTF Bias",
+        "concepts_used": ["market_structure", "dealing_range"],
+        "what_to_do": "Read H4/D1 structure. Is it bullish (HH+HL), bearish (LH+LL), or ranging? Define the dealing range (swing high to swing low). This is NON-NEGOTIABLE — skip everything if HTF is unclear.",
+        "output": "Direction (BULLISH/BEARISH/NEUTRAL) + dealing range boundaries",
+        "gate": "If NEUTRAL → reduce to Grade C max. If direction CONFLICTS with signal → Grade D, skip."
+      },
+      {
+        "step": 2,
+        "name": "Identify Premium/Discount Zone",
+        "concepts_used": ["premium_discount", "dealing_range"],
+        "depends_on_step": 1,
+        "what_to_do": "Calculate 50% of the dealing range (equilibrium). Where is current price? Above 50% = premium, below = discount.",
+        "output": "Zone classification (premium/discount/equilibrium)",
+        "gate": "BUY in premium → wrong zone, reduce grade. SELL in discount → wrong zone, reduce grade.",
+        "connection_to_step_1": "The dealing range FROM step 1 defines the premium/discount zones in step 2. You cannot determine premium/discount without first establishing the dealing range."
+      },
+      {
+        "step": 3,
+        "name": "Identify Liquidity Targets",
+        "concepts_used": ["liquidity", "draw_on_liquidity", "equal_highs_lows"],
+        "depends_on_step": 1,
+        "what_to_do": "Map BSL above (swing highs, equal highs) and SSL below (swing lows, equal lows). Identify the draw on liquidity — the nearest untested external liquidity in trade direction. This becomes TP.",
+        "output": "BSL/SSL map + draw on liquidity (TP target)",
+        "gate": "No clear draw on liquidity → no clear TP → reduce conviction.",
+        "connection_to_step_1": "Market structure FROM step 1 defines where swing highs/lows are. Those swings ARE the liquidity levels."
+      },
+      {
+        "step": 4,
+        "name": "Identify Session Phase",
+        "concepts_used": ["sessions_kill_zones", "PO3_AMD"],
+        "depends_on_step": "none (time-based)",
+        "what_to_do": "What session is active? Which PO3 phase are we in (accumulation/manipulation/distribution)? Is a kill zone active?",
+        "output": "Session name + PO3 phase + kill zone status",
+        "gate": "In accumulation → DO NOT TRADE (choppy). In manipulation → DO NOT CHASE (it's the trap). Only enter during distribution phase retracement.",
+        "connection_to_step_3": "Sessions determine WHEN liquidity gets swept. Asian session BUILDS liquidity (step 3's levels). London/NY SWEEPS that liquidity."
+      },
+      {
+        "step": 5,
+        "name": "Wait for Manipulation Event",
+        "concepts_used": ["liquidity_sweep", "judas_swing", "turtle_soup", "SMT_divergence"],
+        "depends_on_steps": [3, 4],
+        "what_to_do": "Has price swept one of the liquidity levels from step 3? Did a Judas swing occur? Does SMT divergence confirm the sweep is manipulation (not breakout)?",
+        "output": "Sweep confirmed (Y/N) + which liquidity was taken + SMT status",
+        "gate": "No sweep → manipulation may not be complete → reduce grade by 1. Sweep + SMT divergence → highest conviction.",
+        "connection_to_step_3": "The liquidity levels mapped in step 3 are WHAT gets swept in step 5. Without step 3's map, you can't identify the sweep.",
+        "connection_to_step_4": "PO3 phase from step 4 tells you WHETHER to expect a sweep now. In accumulation, no sweep yet. At London/NY open, sweep is expected."
+      },
+      {
+        "step": 6,
+        "name": "Confirm Displacement",
+        "concepts_used": ["displacement", "fair_value_gaps", "order_blocks", "market_structure (BOS/CHoCH)"],
+        "depends_on_step": 5,
+        "what_to_do": "After the sweep, did a displacement candle form? (Large body, small wicks, creates FVG). Did it create a BOS or CHoCH confirming direction? Mark the OB (last opposing candle before displacement) and FVG.",
+        "output": "Displacement confirmed (Y/N) + FVG zone + OB zone + BOS/CHoCH type",
+        "gate": "No displacement after sweep → the 'sweep' might be a real breakout → DO NOT ENTER. Wait.",
+        "connection_to_step_5": "Displacement is the PROOF that the sweep in step 5 was manipulation. Sweep without displacement = ambiguous. Sweep + displacement = confirmed trap.",
+        "connection_to_step_1": "The BOS/CHoCH created by displacement must ALIGN with HTF bias from step 1. A LTF CHoCH against HTF is just a pullback."
+      },
+      {
+        "step": 7,
+        "name": "Define Entry Zone",
+        "concepts_used": ["order_blocks", "fair_value_gaps", "optimal_trade_entry", "PD_arrays", "breaker_blocks", "unicorn_model"],
+        "depends_on_step": 6,
+        "what_to_do": "The FVG and OB from step 6 define your entry zone. Apply Fibonacci retracement to the displacement move: the 0.618-0.786 zone (OTE) within the FVG/OB is the ideal entry. Check for PD array stacking (OB + FVG + OTE overlap = highest probability).",
+        "output": "Entry price + entry zone type (OB/FVG/unicorn/breaker)",
+        "gate": "Entry NOT at any PD array → imprecise entry, widen SL. OB + FVG + OTE stack → maximum precision.",
+        "connection_to_step_6": "The FVG and OB identified in step 6 ARE the entry zones in step 7. OTE is applied to the same displacement move from step 6.",
+        "connection_to_step_2": "Entry zone must be in the correct premium/discount zone from step 2. An OB in premium for a long trade = wrong zone even if OB is valid."
+      },
+      {
+        "step": 8,
+        "name": "Set SL, TP, Size — Execute",
+        "concepts_used": ["risk_management", "draw_on_liquidity", "dealing_range"],
+        "depends_on_steps": [3, 7],
+        "what_to_do": "SL: beyond the manipulation extreme from step 5 (the sweep wick), minimum 1.5x ATR from entry. TP1: draw on liquidity from step 3 (partial close 50%). TP2: next liquidity pool. Size: based on grade, FTMO proximity, symbol risk profile.",
+        "output": "SL price + TP1 price + TP2 price + lot size + risk %",
+        "connection_to_step_3": "TP targets ARE the draw on liquidity identified in step 3.",
+        "connection_to_step_5": "SL goes beyond the sweep extreme from step 5 — that's the manipulation zone that shouldn't be revisited if the trade thesis is correct."
+      }
+    ]
+  },
+
+  "core_concepts": {
+    "market_structure": {
+      "id": "market_structure",
+      "layer": 1,
+      "definition": "The sequence of swing highs and swing lows that define the current trend direction.",
+      "depends_on": [],
+      "feeds_into": ["dealing_range", "premium_discount", "liquidity", "displacement"],
+      "related_to": ["dealing_range (structure DEFINES the dealing range boundaries)", "liquidity (swing highs/lows ARE liquidity levels)", "displacement (displacement creates or confirms BOS/CHoCH)"],
+
+      "bullish_structure": "Higher highs (HH) and higher lows (HL). Each new swing low is higher than the previous one.",
+      "bearish_structure": "Lower highs (LH) and lower lows (LL). Each new swing high is lower than the previous one.",
+      "break_of_structure": {
+        "BOS": {
+          "definition": "Break of Structure — price breaks a previous swing high (bullish) or swing low (bearish) in the direction of the existing trend. CONFIRMS trend continuation.",
+          "feeds_into": ["order_blocks (the last opposing candle before BOS becomes the OB)", "fair_value_gaps (BOS displacement often creates FVGs)"],
+          "related_to": "displacement — BOS is often CAUSED BY a displacement candle"
+        },
+        "CHoCH": {
+          "definition": "Change of Character — the FIRST break of a swing point AGAINST the current trend. Signals potential reversal.",
+          "feeds_into": ["dealing_range (new dealing range forms after CHoCH)", "order_blocks (last candle before CHoCH = new OB in reversal direction)"],
+          "related_to": "liquidity_sweep — CHoCH often occurs AFTER a liquidity sweep (the sweep completes manipulation, CHoCH starts distribution)"
+        },
+        "MSS": {
+          "definition": "Market Structure Shift — LTF confirmation of a reversal. After a CHoCH on HTF, wait for MSS on LTF before entering.",
+          "depends_on": "CHoCH (MSS confirms what CHoCH suggested)",
+          "feeds_into": "trade entry — MSS is the LTF trigger that makes it safe to enter"
+        },
+        "CISD": {
+          "definition": "Change In State of Delivery — when price shifts from delivering bearish candles to bullish (or vice versa). The last opposing candle becomes the entry zone.",
+          "related_to": "order_blocks — the CISD candle IS an order block by definition"
+        }
+      },
+      "multi_timeframe_rule": "HTF dictates direction. LTF provides entry timing. A CHoCH on M15 means nothing if H4 is strongly bullish — it's just a pullback, not a reversal.",
+      "common_mistake": "Trading every BOS/CHoCH without HTF context. A M5 CHoCH inside a H1 bullish orderblock is a BUYING opportunity."
+    },
+
+    "dealing_range": {
+      "id": "dealing_range",
+      "layer": 1,
+      "definition": "The range between a significant swing high and swing low that price is currently operating within.",
+      "depends_on": ["market_structure (swings DEFINE the dealing range)"],
+      "feeds_into": ["premium_discount (dealing range is divided into premium/discount at 50%)", "CRT (each candle IS a micro dealing range)", "liquidity (range high/low ARE external liquidity)"],
+      "related_to": ["market_structure (structure creates the swings that bound the range)", "PO3 (daily dealing range follows the PO3 pattern)"],
+
+      "components": {
+        "range_high": "The swing high — also BSL (buy-side liquidity target)",
+        "range_low": "The swing low — also SSL (sell-side liquidity target)",
+        "equilibrium": "50% of the range — fair value. This is WHERE premium_discount divides.",
+        "premium": "Upper half (above 50%) — this IS the premium_discount concept applied",
+        "discount": "Lower half (below 50%) — this IS the premium_discount concept applied"
+      },
+      "nested_dealing_ranges": "Every timeframe has its own dealing range. H4 range contains H1 ranges, which contain M15 ranges. The ACTIVE dealing range is the one on your trading timeframe, but it must align with the HTF range from market_structure.",
+      "connection_note": "The dealing range is the BRIDGE between market_structure (which defines the swings) and premium_discount (which classifies where price is). You cannot have premium/discount without a dealing range, and you cannot have a dealing range without structure."
+    },
+
+    "liquidity": {
+      "id": "liquidity",
+      "layer": 1,
+      "definition": "Resting orders — stop losses and pending orders clustered at predictable price levels.",
+      "depends_on": ["market_structure (swing points create liquidity levels)"],
+      "feeds_into": ["liquidity_sweep (sweeps TARGET these levels)", "draw_on_liquidity (the nearest unswept level is the DOL)", "PO3_AMD (manipulation phase SWEEPS liquidity)", "turtle_soup (turtle soup IS a liquidity sweep + reversal)"],
+      "related_to": ["dealing_range (range high/low are the primary liquidity levels)", "equal_highs_lows (engineered liquidity — a subset of liquidity)"],
+
+      "types": {
+        "buy_side_liquidity_BSL": {
+          "definition": "Stops from shorts + buy-stops from breakout traders sitting ABOVE swing highs, equal highs, resistance.",
+          "created_by": "market_structure — every swing high creates BSL above it",
+          "targeted_by": "liquidity_sweep when price raids above highs"
+        },
+        "sell_side_liquidity_SSL": {
+          "definition": "Stops from longs + sell-stops sitting BELOW swing lows, equal lows, support.",
+          "created_by": "market_structure — every swing low creates SSL below it",
+          "targeted_by": "liquidity_sweep when price raids below lows"
+        }
+      },
+      "external_vs_internal": {
+        "external_liquidity": {
+          "what": "Swing highs and lows — where most stops cluster.",
+          "role": "TARGET — price moves TO these levels to take liquidity. These are your TP.",
+          "connection": "external_liquidity IS draw_on_liquidity. The TP target is always external liquidity."
+        },
+        "internal_liquidity": {
+          "what": "FVGs, order blocks, breaker blocks — price inefficiencies inside the range.",
+          "role": "ENTRY — you enter AT these levels after external liquidity is taken.",
+          "connection": "internal_liquidity = order_blocks + fair_value_gaps + breaker_blocks. These concepts ARE internal liquidity."
+        }
+      },
+      "equal_highs_lows": {
+        "definition": "Two or more swing highs/lows at nearly the same price — engineered liquidity magnets.",
+        "connection": "Equal highs/lows are a SUBSET of liquidity. They form at dealing_range boundaries or within structure. They are HIGH-PRIORITY draw_on_liquidity targets."
+      },
+      "draw_on_liquidity": {
+        "definition": "The nearest unswept external liquidity in the expected direction. This is WHERE price is going.",
+        "depends_on": "market_structure (to identify unswept swing points) + liquidity (to know which levels are unswept)",
+        "feeds_into": "trade execution — draw_on_liquidity IS your TP target",
+        "examples": ["PDH/PDL (previous day's dealing_range extremes)", "PWH/PWL (weekly dealing_range)", "Equal highs/lows", "Unfilled HTF FVGs", "Unmitigated HTF order_blocks"]
+      }
+    },
+
+    "premium_discount": {
+      "id": "premium_discount",
+      "layer": 2,
+      "definition": "Every dealing range divides into premium (upper 50%) and discount (lower 50%) at the equilibrium.",
+      "depends_on": ["dealing_range (provides the range to divide)", "market_structure (determines which direction to trade)"],
+      "feeds_into": ["trade entry decision (BUY only in discount, SELL only in premium)", "optimal_trade_entry (OTE zone should be in correct premium/discount area)"],
+      "related_to": ["order_blocks (an OB in the wrong zone is less reliable)", "fair_value_gaps (an FVG in the wrong zone is less reliable)"],
+
+      "equilibrium": "50% level of dealing range — fair value. Institutional algorithms balance around this.",
+      "rules": {
+        "buy_in_discount": "Longs ONLY below 50% — buying below fair value.",
+        "sell_in_premium": "Shorts ONLY above 50% — selling above fair value.",
+        "zone_violation": "An order_block or fair_value_gap in the WRONG zone (OB for longs in premium) is still technically valid but has significantly lower probability. Reduce grade by 1."
+      },
+      "nested_application": "Premium/discount applies at EVERY timeframe via nested dealing_ranges. HTF discount + LTF discount = strongest alignment."
+    },
+
+    "power_of_three_and_AMD": {
+      "id": "PO3_AMD",
+      "layer": 2,
+      "definition": "Every session/day/week follows: Accumulation → Manipulation → Distribution. This is the Market Maker's algorithm.",
+      "depends_on": ["liquidity (accumulation BUILDS liquidity, manipulation SWEEPS it)", "sessions_kill_zones (sessions determine WHEN each phase occurs)"],
+      "feeds_into": ["liquidity_sweep (manipulation phase IS a liquidity sweep)", "displacement (distribution phase starts WITH displacement)", "judas_swing (the manipulation move IS often a judas swing)"],
+      "related_to": ["market_maker_model (MMM is PO3 applied with premium/discount + structure)", "dealing_range (daily PO3 creates the daily dealing range)"],
+
+      "phases": {
+        "accumulation": {
+          "what": "Smart money builds positions. Sideways, choppy. Retail places breakout orders above/below.",
+          "creates": "liquidity — the breakout orders and stops that accumulate ARE the liquidity for step 3 of the sweep",
+          "when": "Asian session (7 PM - 2 AM ET) or pre-London",
+          "trading_rule": "DO NOT TRADE. This is NOT a signal, it's preparation."
+        },
+        "manipulation": {
+          "what": "Sharp fake move sweeping accumulated liquidity. Price breaks the range to trigger stops.",
+          "IS": "A liquidity_sweep in disguise. The manipulation IS the sweep of the liquidity built in accumulation.",
+          "creates": "The sweep extreme (which becomes your SL reference) + trapped traders who provide fuel for distribution",
+          "when": "London open (2-5 AM ET) or 10:00 AM ET",
+          "trading_rule": "DO NOT CHASE. This move is designed to look like a breakout. It is the TRAP.",
+          "confirmation_via": "SMT_divergence — if correlated instrument does NOT confirm the 'breakout', it's manipulation"
+        },
+        "distribution": {
+          "what": "The real move. After manipulation takes liquidity, price moves to the true target.",
+          "IS": "displacement in the real direction. Distribution starts WITH displacement candles creating FVGs and OBs.",
+          "creates": "FVGs (entry zones) + OBs (entry zones) + BOS/CHoCH (structure confirmation)",
+          "when": "After manipulation completes. NY session 10:30 AM - 2:00 PM ET typically.",
+          "trading_rule": "THIS is when you trade — but enter the RETRACEMENT into the FVG/OB, not the displacement itself."
+        }
+      },
+      "daily_candle_PO3": "Daily open = accumulation reference. Daily low (bullish) or high (bearish) = manipulation. Daily close = distribution result.",
+      "weekly_PO3": "Mon-Tue = accumulation. Wed = manipulation (weekly high/low often forms). Thu-Fri = distribution.",
+      "intraday_AMD_times": {
+        "09_50_10_10": "Primary AMD manipulation window",
+        "10_50_11_10": "Secondary AMD window",
+        "14_00_15_00": "Late distribution / position squaring"
+      }
+    },
+
+    "sessions_and_kill_zones": {
+      "id": "sessions_kill_zones",
+      "layer": 2,
+      "definition": "Time windows when institutional algorithms are most active.",
+      "depends_on": [],
+      "feeds_into": ["PO3_AMD (sessions MAP TO PO3 phases)", "liquidity_sweep (kill zones are WHEN sweeps happen)", "silver_bullet (silver bullets are micro kill zones)"],
+      "related_to": ["PO3_AMD (Asian=accumulation, London=manipulation, NY=distribution)"],
+
+      "kill_zones": {
+        "asian": {
+          "time": "8:00 PM - 12:00 AM ET",
+          "PO3_phase": "ACCUMULATION",
+          "purpose": "Range building. Mark high/low — they WILL be swept in London/NY.",
+          "tradeable": "Low. Only trade if clear HTF setup.",
+          "creates": "Liquidity levels (Asian high/low) that London and NY will sweep"
+        },
+        "london": {
+          "time": "2:00 AM - 5:00 AM ET",
+          "PO3_phase": "MANIPULATION",
+          "purpose": "Sweeps Asian high or low. Judas swing window.",
+          "tradeable": "High for forex and gold.",
+          "targets": "The liquidity (Asian high/low) built during accumulation phase"
+        },
+        "new_york": {
+          "time": "7:00 AM - 10:00 AM ET",
+          "PO3_phase": "MANIPULATION → DISTRIBUTION transition",
+          "purpose": "Highest volume. 10 AM is THE manipulation event.",
+          "tradeable": "Highest probability for all assets.",
+          "targets": "London high/low + PDH/PDL liquidity"
+        },
+        "london_close": {
+          "time": "10:00 AM - 12:00 PM ET",
+          "PO3_phase": "DISTRIBUTION",
+          "purpose": "Distribution continues. London position squaring can create counter-moves.",
+          "tradeable": "Medium. Continuation trades if NY direction established."
+        }
+      },
+      "silver_bullet_windows": {
+        "connection": "Silver bullets are MICRO kill zones where FVGs on M15 have highest probability",
+        "london_SB": {"time": "3:00-4:00 AM ET", "best_for": "Forex, Gold", "entry": "FVG fill on M15"},
+        "NY_AM_SB": {"time": "10:00-11:00 AM ET", "best_for": "Indices, Crypto", "entry": "FVG fill on M15 after 10 AM manipulation"},
+        "NY_PM_SB": {"time": "2:00-3:00 PM ET", "best_for": "Continuation trades", "entry": "FVG fill on M15"}
+      }
+    },
+
+    "liquidity_sweep": {
+      "id": "liquidity_sweep",
+      "layer": 3,
+      "definition": "Price trades through a liquidity level, triggers resting orders, then reverses. This IS the manipulation in PO3.",
+      "depends_on": ["liquidity (sweeps TARGET liquidity levels)", "PO3_AMD (sweep IS the manipulation phase)"],
+      "feeds_into": ["displacement (displacement follows a confirmed sweep)", "order_blocks (the OB before the sweep becomes the entry zone after reversal)", "turtle_soup (turtle soup IS a specific type of sweep + reversal)"],
+      "related_to": ["judas_swing (judas swing IS a sweep at session open)", "SMT_divergence (SMT confirms whether sweep is manipulation or real breakout)"],
+
+      "confirmation": "Sweep is confirmed when price takes the level AND returns inside the prior range. If it keeps going → legitimate breakout, not a sweep.",
+      "chain_after_sweep": "Confirmed sweep → expect displacement → displacement creates FVG + OB → enter retracement into FVG/OB. This chain is THE core ICT trade.",
+      "SL_connection": "The sweep extreme (the wick beyond the liquidity level) becomes your SL reference. If price returns beyond this point, your thesis is wrong."
+    },
+
+    "displacement": {
+      "id": "displacement",
+      "layer": 3,
+      "definition": "Strong aggressive price move (1-3 large-bodied candles) proving institutional commitment.",
+      "depends_on": ["liquidity_sweep (displacement follows confirmed sweep — it's the distribution start)", "market_structure (displacement creates BOS or CHoCH)"],
+      "feeds_into": ["fair_value_gaps (displacement CREATES FVGs)", "order_blocks (the last opposing candle before displacement IS the OB)", "optimal_trade_entry (Fibonacci applied to the displacement move defines OTE)"],
+      "related_to": ["PO3_AMD (displacement IS the start of distribution phase)"],
+
+      "characteristics": ["Large candle body (70%+ body, minimal wicks)", "Creates Fair Value Gap", "Creates or confirms BOS/CHoCH", "Occurs at start of distribution phase"],
+      "critical_chain": "Without displacement, there is no FVG, no OB, and no OTE. Displacement is the PROOF of institutional entry. Everything in layers 4-5 depends on displacement having occurred.",
+      "what_it_proves": "That the liquidity_sweep was manipulation (not breakout). That institutions have committed to the new direction. That the OB and FVG created are valid entry zones."
+    },
+
+    "judas_swing": {
+      "id": "judas_swing",
+      "layer": 3,
+      "definition": "The fake move at session open that goes OPPOSITE to the real direction. It IS a liquidity sweep timed to the session open.",
+      "depends_on": ["sessions_kill_zones (occurs at session opens)", "liquidity (sweeps session liquidity — Asian high/low, PDH/PDL)"],
+      "feeds_into": ["liquidity_sweep (a judas swing IS a liquidity sweep)", "displacement (after judas reversal, displacement confirms real direction)"],
+      "related_to": ["PO3_AMD (judas swing IS the manipulation phase of PO3)", "turtle_soup (turtle soup can be the judas swing's reversal pattern)"],
+
+      "pattern": "First 30-60 minutes of London or NY: price makes convincing move in one direction, sweeps key level, then reverses.",
+      "how_to_distinguish": ["Moderate volume (institutions trapping, not pushing)", "Takes out a key level (Asian high/low, PDH/PDL)", "After the sweep, displacement candles form in OPPOSITE direction"],
+      "trading_rule": "NEVER chase the first move of a session. Wait 30-60 min, identify if judas swing occurred, then trade the reversal."
+    },
+
+    "SMT_divergence": {
+      "id": "SMT_divergence",
+      "layer": 3,
+      "definition": "When correlated instruments make different structural moves — one sweeps liquidity but the other doesn't — revealing institutional positioning.",
+      "depends_on": ["liquidity (one instrument sweeps, the other doesn't)", "market_structure (divergence is a structural disagreement)"],
+      "feeds_into": ["trade confirmation — SMT CONFIRMS that a liquidity_sweep is manipulation, not genuine breakout"],
+      "related_to": ["liquidity_sweep (SMT validates the sweep)", "PO3_AMD (SMT confirms manipulation phase)"],
+
+      "how_it_works": "ES makes new low but NQ doesn't → smart money is not uniformly bearish → the low is likely manipulation.",
+      "pairs": {
+        "indices": "ES ↔ NQ (US500 ↔ US100)",
+        "crypto": "BTC ↔ ETH",
+        "forex": "EURUSD ↔ GBPUSD",
+        "metals": "XAUUSD ↔ XAGUSD"
+      },
+      "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence."
+    },
+
+    "turtle_soup": {
+      "id": "turtle_soup",
+      "layer": 3,
+      "definition": "Failed breakout / liquidity sweep where price breaks a significant level then immediately reverses back. A specific pattern of liquidity_sweep.",
+      "depends_on": ["liquidity (the level that gets swept)", "market_structure (the swing high/low that defines the level)"],
+      "feeds_into": ["trade entry — turtle soup itself IS an entry signal when confirmed"],
+      "related_to": ["liquidity_sweep (turtle soup IS a type of sweep)", "judas_swing (a judas swing can manifest AS a turtle soup pattern)"],
+
+      "buy_pattern": "Price breaks below significant low (takes SSL), closes back above → the low was a trap.",
+      "sell_pattern": "Price breaks above significant high (takes BSL), closes back below → the high was a trap.",
+      "confirmation": "Reversal candle must CLOSE back inside prior range. Wick-through + close-back = turtle soup. Close-beyond = real breakout."
+    },
+
+    "order_blocks": {
+      "id": "order_blocks",
+      "layer": 4,
+      "definition": "The last opposing candle before a displacement move — the zone where smart money placed their orders.",
+      "depends_on": ["displacement (OB is DEFINED by the displacement that follows it — no displacement, no OB)", "market_structure (OB forms at structure points)"],
+      "feeds_into": ["trade entry (OB is an entry zone)", "optimal_trade_entry (OTE applied within the OB zone)", "unicorn_model (broken OB becomes breaker → breaker + FVG = unicorn)", "PD_arrays (OBs are premium/discount arrays)"],
+      "related_to": ["fair_value_gaps (OB + FVG together = strongest entry)", "breaker_blocks (failed OB becomes breaker)", "premium_discount (OB must be in correct zone)"],
+
+      "bullish_OB": "Last bearish candle before strong bullish displacement. Body (not wicks) = the zone.",
+      "bearish_OB": "Last bullish candle before strong bearish displacement. Body = the zone.",
+      "quality_chain": {
+        "must_have_displacement": "OB without displacement is just a candle. Displacement (layer 3) CREATES the OB.",
+        "OB_plus_FVG": "If displacement also left a FVG, the OB is highest quality. OB + FVG overlap = best entry zone.",
+        "first_touch": "OBs strongest on first retest. Each touch mitigates orders. Connects to 'mitigation' concept.",
+        "unmitigated": "If price already returned and reacted → mitigated (used up). Don't trade it."
+      },
+      "breaker_block": {
+        "definition": "A failed OB — price broke through it, invalidating the OB. Now acts as S/R in the OPPOSITE direction.",
+        "connection": "Breaker blocks feed into unicorn_model when they overlap with a FVG."
+      },
+      "mitigation_block": {
+        "definition": "Partially tested OB — some orders filled but not all. Lower reliability than fresh OB.",
+        "connection": "Weight lower in scoring. Still valid as confluence with other PD_arrays."
+      }
+    },
+
+    "fair_value_gaps": {
+      "id": "fair_value_gaps",
+      "layer": 4,
+      "definition": "Three-candle pattern creating a gap (imbalance) where price moved too fast for balanced order flow.",
+      "depends_on": ["displacement (FVGs are CREATED BY displacement — no displacement, no meaningful FVG)"],
+      "feeds_into": ["trade entry (FVG is an entry zone)", "optimal_trade_entry (OTE applied within FVG zone)", "unicorn_model (FVG + breaker overlap = unicorn)", "PD_arrays (FVGs are premium/discount arrays)", "silver_bullet (silver bullet = FVG formed in specific time window)"],
+      "related_to": ["order_blocks (OB + FVG = strongest entry)", "displacement (FVG is the EVIDENCE of displacement)", "premium_discount (FVG in wrong zone is less reliable)"],
+
+      "bullish_FVG": "Gap between candle 1 high and candle 3 low. Below current price.",
+      "bearish_FVG": "Gap between candle 1 low and candle 3 high. Above current price.",
+      "consequent_encroachment": {
+        "definition": "The 50% midpoint of the FVG (CE) — the most precise entry point.",
+        "connection": "CE is the FVG's version of equilibrium (like dealing_range equilibrium). Price reaching CE and holding = FVG respected. Price closing through CE = FVG invalid."
+      },
+      "timeframe_hierarchy": "HTF FVGs (H4/D1) > LTF FVGs (M15/M5). A LTF FVG INSIDE a HTF FVG = highest probability. This nesting mirrors dealing_range nesting.",
+      "inversion_FVG": {
+        "definition": "FVG that was fully filled and traded through — now acts as opposite S/R.",
+        "connection": "Inverted FVGs become OBSTACLES. If your trade path crosses an inverted FVG, reduce conviction."
+      }
+    },
+
+    "PD_arrays": {
+      "id": "PD_arrays",
+      "layer": 4,
+      "definition": "Premium/Discount Arrays — the collective term for all institutional entry/exit zones (OBs, FVGs, breakers, etc.).",
+      "depends_on": ["order_blocks", "fair_value_gaps", "breaker_blocks", "premium_discount"],
+      "feeds_into": ["optimal_trade_entry (OTE is applied within PD arrays)", "trade entry (PD arrays ARE the entry zones)"],
+      "related_to": ["All layer 4 concepts — PD arrays is the UMBRELLA term"],
+
+      "premium_arrays": ["Bearish OBs", "Bearish FVGs", "Bearish Breakers", "Liquidity Voids (sell side)", "Old highs with BSL"],
+      "discount_arrays": ["Bullish OBs", "Bullish FVGs", "Bullish Breakers", "Liquidity Voids (buy side)", "Old lows with SSL"],
+      "stacking": "When multiple PD arrays overlap at same price = 'stack' = highest-probability entry. OB + FVG + OTE at same level = Grade A setup. This is the convergence of order_blocks + fair_value_gaps + optimal_trade_entry."
+    },
+
+    "optimal_trade_entry": {
+      "id": "optimal_trade_entry",
+      "layer": 5,
+      "definition": "The 61.8%-78.6% Fibonacci retracement of a displacement move — where institutions reload during pullbacks.",
+      "depends_on": ["displacement (Fibonacci is drawn on the displacement move)", "fair_value_gaps (OTE zone should overlap with FVG)", "order_blocks (OTE zone should overlap with OB)"],
+      "feeds_into": ["trade entry (OTE defines the precise entry price within the FVG/OB zone)"],
+      "related_to": ["premium_discount (OTE zone should be in correct premium/discount area)", "PD_arrays (OTE is applied WITHIN PD arrays, not independently)"],
+
+      "fibonacci_levels": {
+        "0.5": "Equilibrium — bare minimum retracement. Connects to dealing_range equilibrium concept.",
+        "0.618": "Start of OTE zone. Good entries.",
+        "0.705": "ICT's preferred level. Best confirmation-to-R:R balance.",
+        "0.786": "Deep retracement. Best R:R but lowest probability.",
+        "above_0.786": "Danger — pullback may be reversal. Connects to market_structure — if this level breaks, the displacement may have been a fake."
+      },
+      "application_chain": "displacement (layer 3) → creates FVG + OB (layer 4) → draw Fibonacci on the displacement → OTE zone (0.618-0.786) within the FVG/OB = entry. This IS the layer 3→4→5 chain.",
+      "common_mistake": "Entering at 0.5 without waiting for OTE. The 0.5 is equilibrium, not optimal. Patient wait for 0.618-0.705 dramatically improves win rate."
+    },
+
+    "unicorn_model": {
+      "id": "unicorn_model",
+      "layer": 5,
+      "definition": "Breaker block + FVG overlap — one of the highest-probability entry patterns.",
+      "depends_on": ["order_blocks (specifically breaker_blocks — a failed OB)", "fair_value_gaps (FVG created when OB was broken through)"],
+      "feeds_into": ["trade entry (unicorn zone IS the entry)"],
+      "related_to": ["PD_arrays (unicorn = stacked PD arrays)", "displacement (the move through the OB that creates the breaker IS displacement)"],
+
+      "formation_chain": "OB forms → price returns and breaks THROUGH OB → OB becomes breaker (from order_blocks) → the breakthrough move creates FVG (from fair_value_gaps) → overlap of breaker + FVG = unicorn entry zone. This chains order_blocks → breaker_blocks → fair_value_gaps → unicorn."
+    },
+
+    "CRT_candle_range_theory": {
+      "id": "CRT",
+      "layer": 3,
+      "definition": "Every candle IS a micro dealing range with its own BSL (high), SSL (low), and equilibrium (50%).",
+      "depends_on": ["dealing_range (CRT applies dealing_range theory to individual candles)", "liquidity (candle high/low are micro liquidity levels)"],
+      "feeds_into": ["intraday analysis — previous candle's range defines next candle's liquidity targets"],
+      "related_to": ["PO3_AMD (daily candle PO3: open=accumulation, wick=manipulation, close=distribution)", "dealing_range (CRT IS dealing_range at candle level)"],
+
+      "application": {
+        "daily_candle": "PDH = BSL target, PDL = SSL target, 50% = equilibrium for today's activity.",
+        "4h_candle": "Previous 4H high/low define next 4H's targets.",
+        "weekly_candle": "Mon-Tue establish range. Wed typically sweeps one extreme (manipulation)."
+      },
+      "connection": "CRT is dealing_range + liquidity + PO3 applied fractally to every single candle. It unifies these three concepts at the smallest scale."
+    },
+
+    "IPDA": {
+      "id": "IPDA",
+      "layer": 0,
+      "definition": "Interbank Price Delivery Algorithm — the theory that institutional algorithms reference 20, 40, and 60 trading-day lookback ranges to determine where price 'should' be delivered next.",
+      "depends_on": [],
+      "feeds_into": ["market_structure (IPDA ranges define macro dealing ranges)", "daily_bias (IPDA midpoints act as equilibrium for bias)", "draw_on_liquidity (IPDA range extremes are macro DOL targets)"],
+      "related_to": ["quarterly_shifts (quarterly shifts occur when IPDA 60-day range extreme is taken)", "dealing_range (IPDA ranges ARE macro dealing ranges)", "session_levels (IPDA levels interact with PDH/PDL/PWH/PWL)"],
+
+      "lookback_ranges": {
+        "20_day": "Short-term reference. Price delivery balances within this range most frequently. Midpoint = institutional equilibrium.",
+        "40_day": "Medium-term reference. Used for swing trade bias. When price exits 20-day range, 40-day extremes become targets.",
+        "60_day": "Long-term reference. Quarterly cycle boundary. When price reaches 60-day extremes, watch for quarterly_shift."
+      },
+      "time_and_price": "IPDA integrates TIME with PRICE — specific price levels become active at specific times. A 40-day range midpoint has highest significance during NY kill zone, not Asian session.",
+      "how_to_use": "Before daily analysis, check where price sits within 20/40/60-day ranges. If near a range extreme = high-probability reversal zone. If near midpoint = equilibrium, expect accumulation."
+    },
+
+    "quarterly_shifts": {
+      "id": "quarterly_shifts",
+      "layer": 0,
+      "definition": "2-4 month directional changes in market delivery. Detected via weekly return analysis — when the trend of weekly closes reverses, a quarterly shift has occurred.",
+      "depends_on": ["IPDA (quarterly shifts occur when IPDA 60-day range is exhausted)"],
+      "feeds_into": ["market_structure (quarterly shift changes the HTF bias)", "daily_bias (new quarterly direction overrides old)"],
+      "related_to": ["seasonal_tendencies (quarterly shifts align with seasonal patterns)", "dealing_range (new quarterly range establishes new dealing range)"],
+
+      "detection": "Analyze 8-12 weekly closes. When 3+ consecutive weekly closes reverse the prior quarterly direction, a shift is underway.",
+      "trading_implication": "A quarterly shift changes the macro bias. Trades aligned with the new quarterly direction have significantly higher probability. Counter-quarterly trades should be avoided or sized down.",
+      "typical_timing": "Shifts often align with fiscal quarters: Jan, Apr, Jul, Oct. But can occur at any time when IPDA 60-day range extremes are tested."
+    },
+
+    "seasonal_tendencies": {
+      "id": "seasonal_tendencies",
+      "layer": 0,
+      "definition": "Statistically recurring patterns tied to calendar periods — certain months, weeks, or events produce predictable directional biases.",
+      "depends_on": [],
+      "feeds_into": ["daily_bias (seasonal context adds/reduces conviction)"],
+      "related_to": ["quarterly_shifts (seasonal patterns coincide with quarterly boundaries)"],
+
+      "patterns": {
+        "january_effect": "Equities tend bullish early January (new year allocation)",
+        "summer_doldrums": "Jul-Aug: Lower volatility, reduced institutional activity, VIX tends lower",
+        "september_weakness": "Historically weakest month for equities",
+        "Q4_rally": "Oct-Dec: Institutional window dressing, holiday rally tendency",
+        "NFP_week": "First Friday of month: increased volatility around Non-Farm Payrolls",
+        "FOMC_drift": "Pre-FOMC drift upward is statistically documented in equities"
+      },
+      "how_to_use": "Seasonal tendencies are CONTEXT, not signals. They increase/decrease conviction for trades already validated by layers 1-5. Never trade solely on seasonality."
+    },
+
+    "session_levels": {
+      "id": "session_levels",
+      "layer": 1,
+      "definition": "Key price levels from previous sessions that act as primary liquidity references and draw-on-liquidity targets.",
+      "depends_on": ["dealing_range (previous session ranges define these levels)"],
+      "feeds_into": ["liquidity (session levels ARE the primary external liquidity)", "draw_on_liquidity (nearest unswept session level = TP target)", "liquidity_sweep (sweeps TARGET session levels)"],
+      "related_to": ["CRT (previous day candle high/low = PDH/PDL = session levels)", "PO3_AMD (manipulation phase sweeps these levels)", "order_pairing (PDH and PDL are a PAIRED set — sweep one, target the other)"],
+
+      "levels": {
+        "PDH_PDL": {
+          "definition": "Previous Day High / Previous Day Low",
+          "significance": "Primary intraday liquidity targets. Most common sweep targets during London/NY.",
+          "order_pairing": "PDH and PDL are a PAIR — when price sweeps PDL, PDH becomes the draw on liquidity target (and vice versa)"
+        },
+        "PWH_PWL": {
+          "definition": "Previous Week High / Previous Week Low",
+          "significance": "Swing trade targets. Weekly PO3: manipulation (Wed) often sweeps one, then distribution targets the other.",
+          "order_pairing": "PWH ↔ PWL are paired. Wednesday manipulation sweeps one; Thursday-Friday distribution targets the other."
+        },
+        "PMH_PML": {
+          "definition": "Previous Month High / Previous Month Low",
+          "significance": "Macro targets for position trades. When monthly level is swept, expect multi-day directional move toward the opposite.",
+          "connection": "PMH/PML interact with IPDA 20/40/60 day ranges. A PMH/PML near an IPDA range extreme = very high significance."
+        },
+        "asian_range": {
+          "definition": "Asian session high and low (8 PM - 12 AM ET)",
+          "significance": "London open's primary manipulation targets. Asian range IS the accumulation phase of PO3.",
+          "connection": "Asian range → London sweeps it (manipulation) → NY distributes from the sweep. This IS PO3 applied to sessions."
+        }
+      }
+    },
+
+    "daily_bias": {
+      "id": "daily_bias",
+      "layer": 2,
+      "definition": "The directional lean for the current trading day, determined BEFORE the kill zones activate.",
+      "depends_on": ["market_structure (HTF trend direction)", "IPDA (where price sits in macro range)", "session_levels (which session levels are unswept)", "quarterly_shifts (macro directional context)", "seasonal_tendencies (calendar context)"],
+      "feeds_into": ["trade entry (only take trades aligned with daily bias)", "PO3_AMD (bias tells you WHICH direction distribution will go)"],
+      "related_to": ["CRT (previous daily candle's range predicts today's direction)", "dealing_range (today's range expands from yesterday's levels)"],
+
+      "determination_methods": {
+        "HTF_structure": "H4/D1 BOS or clear HH/HL (bullish) or LH/LL (bearish). Most reliable method.",
+        "previous_day_close": "If price closed near PDH → bullish continuation expected. Near PDL → bearish. Near middle → unclear, reduce conviction.",
+        "IPDA_positioning": "If price is in lower 25% of IPDA 40-day range → bullish bias (discount). Upper 25% → bearish bias (premium).",
+        "session_level_proximity": "If PDL is close and unswept → expect sweep of PDL then rally (bullish). If PDH close and unswept → sweep PDH then sell (bearish).",
+        "CRT_method": "Look at previous daily candle: if high was taken but low held → today likely targets low. If low taken but high held → today targets high."
+      },
+      "key_rule": "Establish bias ONCE before trading starts. Do NOT flip bias during the session. If manipulation goes against bias, it's the trap — hold the bias."
+    },
+
+    "CBDR": {
+      "id": "CBDR",
+      "layer": 2,
+      "definition": "Central Bank Dealers Range — the price range formed between 2:00 PM and 8:00 PM New York time. This is when institutional algorithms reset and set the next day's reference range.",
+      "depends_on": ["sessions_kill_zones (CBDR occurs between NY close and Asian open)"],
+      "feeds_into": ["daily_bias (CBDR range direction hints at next day bias)", "venom_model (Venom uses pre-market range which extends CBDR concept)"],
+      "related_to": ["PO3_AMD (CBDR IS pre-accumulation — the reset before Asian accumulation)", "asian_range (Asian range typically contains or extends CBDR)"],
+
+      "projections": {
+        "definition": "Standard deviation projections above and below the CBDR range provide probable target zones for the next session.",
+        "1_SD": "68% probability price reaches this level — primary target zone",
+        "2_SD": "95% probability boundary — strong reversal zone if reached",
+        "3_SD": "99%+ — extreme extension, near-certain reversal"
+      },
+      "how_to_use": "Map the CBDR range, then project SDs. If price reaches 2 SD during London/NY, expect mean reversion. Use SD projections as TP targets or reversal zones."
+    },
+
+    "intraday_profile": {
+      "id": "intraday_profile",
+      "layer": 2,
+      "definition": "Classification of the day's trading behavior based on early session price action. Determines which trading model to apply.",
+      "depends_on": ["CBDR (pre-market range reference)", "sessions_kill_zones (session timing)", "judas_swing (early session direction)"],
+      "feeds_into": ["trade entry (profile type determines which strategy to use)"],
+      "related_to": ["PO3_AMD (each profile corresponds to a PO3 pattern)", "daily_bias (profile confirms or contradicts bias)"],
+
+      "types": {
+        "london_normal_buy": "London sweeps Asian low (takes SSL) → reverses bullish → NY continues bullish. Classic PO3: Asian=accumulation, London sweep=manipulation, NY=distribution up.",
+        "london_normal_sell": "London sweeps Asian high (takes BSL) → reverses bearish → NY continues bearish. Mirror of buy day.",
+        "london_delayed_buy": "London is indecisive, no clear sweep. Manipulation delayed to NY session. NY sweeps low → rallies. Patience required.",
+        "london_delayed_sell": "London indecisive. NY sweeps high → sells off. Don't force trades during London on these days.",
+        "ranging": "Neither session produces clear manipulation. Low-conviction day. Reduce position sizes or skip."
+      },
+      "connection_to_PO3": "The profile IS PO3 applied with session-specific timing. 'London Normal' = PO3 on time. 'London Delayed' = manipulation pushed to NY. 'Ranging' = no clear PO3 cycle = don't trade."
+    },
+
+    "CISD": {
+      "id": "CISD",
+      "layer": 3,
+      "definition": "Change In State of Delivery — a pre-CHoCH signal where price shifts from consistently delivering bearish candles to bullish ones (or vice versa). The LAST candle of the old delivery state becomes the entry zone.",
+      "depends_on": ["market_structure (CISD is a refinement of CHoCH detection)", "displacement (CISD is confirmed when displacement follows the state change)"],
+      "feeds_into": ["order_blocks (the CISD candle IS an order block)", "trade entry (CISD provides earlier entry than waiting for full CHoCH)"],
+      "related_to": ["market_structure.CHoCH (CISD precedes and anticipates CHoCH)", "order_blocks (CISD candle = OB)", "PO3_AMD (CISD marks the transition from manipulation to distribution)"],
+
+      "vs_CHoCH": "CHoCH requires a swing point to be broken. CISD fires BEFORE that — it detects the shift in candle delivery. CISD is the early warning; CHoCH is the confirmation.",
+      "how_to_trade": "When candle delivery shifts (3+ bearish candles followed by 1 bullish candle with body close above prior candle high), the bullish candle's low is the entry zone. Enter on retest. SL below the manipulation extreme.",
+      "PO3_connection": "CISD typically occurs at the exact moment PO3 transitions from manipulation to distribution. It IS the phase transition signal."
+    },
+
+    "swing_failure_pattern": {
+      "id": "swing_failure_pattern",
+      "layer": 3,
+      "definition": "When price attempts to take out a swing high/low but FAILS to close beyond it — the wick sweeps but the body cannot hold. This signals exhaustion and likely reversal.",
+      "depends_on": ["market_structure (SFP occurs at swing points)", "liquidity (SFP IS a failed liquidity sweep — stops are triggered but the move can't sustain)"],
+      "feeds_into": ["trade entry (SFP itself is an entry signal)", "market_structure (SFP at a key swing creates a potential CHoCH)"],
+      "related_to": ["turtle_soup (SFP is conceptually similar — both are failed breakouts)", "liquidity_sweep (SFP is a sweep that FAILS to follow through)", "rejection_blocks (the SFP candle's wick zone = rejection block)"],
+
+      "vs_turtle_soup": "Turtle soup: price breaks through and closes back inside = confirmed reversal. SFP: price can't even close beyond = exhaustion signal. SFP is WEAKER confirmation than turtle soup but fires earlier.",
+      "buy_SFP": "Price wicks below a prior swing low but closes above it. Indicates buying pressure absorbed the sell-side raid.",
+      "sell_SFP": "Price wicks above a prior swing high but closes below it. Indicates selling pressure absorbed the buy-side raid.",
+      "how_to_use": "SFP at a HTF key level (PDH/PDL, OB, FVG boundary) = high-conviction reversal signal. SFP at a random swing = lower significance."
+    },
+
+    "range_expansion_contraction": {
+      "id": "range_expansion_contraction",
+      "layer": 3,
+      "definition": "Markets cycle between expansion (3-5 candles with increasing range) and contraction (2-3 candles with decreasing range). This rhythm helps predict when the next big move will occur.",
+      "depends_on": ["market_structure (expansion/contraction occur within the structure context)"],
+      "feeds_into": ["PO3_AMD (contraction = accumulation, expansion = distribution)", "displacement (expansion candles often ARE displacement)"],
+      "related_to": ["CBDR (CBDR range width signals upcoming expansion/contraction)", "dealing_range (contraction creates tight dealing ranges that expansion breaks)"],
+
+      "cycle": "Contraction → Expansion → Contraction → Expansion. After 2-3 contracting candles, expect expansion. After 5+ expanding candles, expect contraction (mean reversion).",
+      "trading_rule": "Enter during late contraction (before expansion). Exit or reduce during late expansion (before contraction). DO NOT enter during mid-expansion — you're chasing.",
+      "how_to_detect": "Compare current candle range to average of last 5. If current < 60% of average for 2-3 candles = contraction. If current > 140% for 3+ candles = expansion."
+    },
+
+    "rejection_blocks": {
+      "id": "rejection_blocks",
+      "layer": 4,
+      "definition": "Candles with disproportionately long wicks at key levels — the wick zone represents where institutional orders absorbed aggressive selling/buying and rejected the price.",
+      "depends_on": ["liquidity (rejection occurs at liquidity levels)", "market_structure (rejection at key swings = significant)"],
+      "feeds_into": ["trade entry (rejection block wick zone = entry area on retest)"],
+      "related_to": ["order_blocks (rejection blocks are a TYPE of block, but identified by wick behavior, not body)", "swing_failure_pattern (SFP candles often ARE rejection blocks)", "fair_value_gaps (a rejection block's wick can create a gap that acts like an FVG)"],
+
+      "definition_detail": "A candle where the wick is >60% of the total range. The wick zone (from wick tip to body edge) is the rejection block.",
+      "bullish_rejection": "Long lower wick at support. The wick zone below the body = demand zone. Enter on retest of this zone.",
+      "bearish_rejection": "Long upper wick at resistance. The wick zone above the body = supply zone. Enter on retest.",
+      "quality": "Rejection blocks at PDH/PDL, OB zones, or FVG boundaries are highest quality. Random rejection blocks are less significant."
+    },
+
+    "propulsion_blocks": {
+      "id": "propulsion_blocks",
+      "layer": 4,
+      "definition": "Order blocks created by extreme displacement candles — the displacement is so strong that the OB becomes a 'propulsion zone' with exceptionally high institutional interest.",
+      "depends_on": ["order_blocks (propulsion blocks ARE OBs with extreme displacement)", "displacement (propulsion requires extreme, not just normal displacement)"],
+      "feeds_into": ["trade entry (propulsion blocks are highest-confidence OB entries)"],
+      "related_to": ["order_blocks (propulsion is the STRONGEST grade of OB)", "fair_value_gaps (propulsion blocks always leave large FVGs)"],
+
+      "criteria": "The displacement candle must be >2x the average candle range, with body >80% of range (almost no wick). These are institutional aggression candles.",
+      "significance": "Propulsion blocks are the strongest OBs. First touch has near-90% reaction probability. If a propulsion block is mitigated without reaction, the trend thesis is WRONG."
+    },
+
+    "liquidity_void": {
+      "id": "liquidity_void",
+      "layer": 4,
+      "definition": "An area in the price chart where there was NO trading volume — price jumped through this zone without any order interaction. Unlike FVGs (which are price gaps), liquidity voids are VOLUME gaps.",
+      "depends_on": ["displacement (extreme displacement creates liquidity voids)", "volume_profile (volume data reveals where voids exist)"],
+      "feeds_into": ["trade entry (voids act as magnets — price tends to return to fill them)", "draw_on_liquidity (unfilled voids ARE draw targets)"],
+      "related_to": ["fair_value_gaps (FVG = price gap, liquidity_void = volume gap — related but different)", "balanced_price_range (BPR fills voids)"],
+
+      "vs_FVG": "FVG: gap between candle 1 high and candle 3 low (pure price pattern). Liquidity void: area where volume profile shows zero or near-zero traded volume. An FVG CAN be a liquidity void, but not all FVGs are voids, and voids can exist without FVG pattern.",
+      "how_to_use": "Price fills liquidity voids before continuing. If a void exists between entry and TP, expect price to pause there. If a void exists behind price, expect price to retrace to fill it."
+    },
+
+    "balanced_price_range": {
+      "id": "balanced_price_range",
+      "layer": 4,
+      "definition": "When two opposing FVGs overlap — a bullish FVG and bearish FVG at the same price level. This creates a 'balanced' zone where both buyers and sellers have filled gaps.",
+      "depends_on": ["fair_value_gaps (BPR IS two overlapping FVGs)"],
+      "feeds_into": ["trade entry (BPR = equilibrium zone, expect price to use it as support/resistance)"],
+      "related_to": ["dealing_range.equilibrium (BPR represents localized equilibrium)", "premium_discount (BPR often forms near the 50% level of a dealing range)"],
+
+      "significance": "BPRs are strong support/resistance zones because both sides have expressed interest. Price that breaks through a BPR is likely in genuine breakout, not manipulation.",
+      "how_to_trade": "Look for entries at BPR zones when price retests them. If price respects BPR → continuation trade. If price smashes through BPR → the breakout is likely real (not a sweep)."
+    },
+
+    "fibonacci_extensions": {
+      "id": "fibonacci_extensions",
+      "layer": 5,
+      "definition": "Fibonacci levels BEYOND the current swing range — used for TP targets when price is expected to move beyond the prior swing extreme.",
+      "depends_on": ["optimal_trade_entry (extensions are the TP counterpart to OTE retracement entries)", "market_structure (the swing that defines the Fibonacci range)", "draw_on_liquidity (extensions identify targets at new price levels where no prior reference exists)"],
+      "feeds_into": ["trade execution (extensions define TP2/TP3 targets beyond the current range)"],
+      "related_to": ["optimal_trade_entry (OTE = retracement entry at 0.618-0.786. Extensions = TP targets at 1.272-2.618)", "dealing_range (extensions project BEYOND the current dealing range)"],
+
+      "levels": {
+        "1.0": "Full extension — price reaches the opposite end of the measured swing. This is the basic TP1.",
+        "1.272": "First extension — 27.2% beyond the swing. Common TP2 for moderate moves.",
+        "1.618": "Golden extension — 61.8% beyond the swing. Strong institutional target. High-probability reversal/consolidation zone.",
+        "2.0": "Double extension — swing repeated. Used in strong trends with clear draw on liquidity.",
+        "2.618": "Extreme extension — only in parabolic moves. Rare but significant as exhaustion target."
+      },
+      "how_to_apply": "Draw Fibonacci from the swing low to swing high (or reverse). OTE retracement gives ENTRY (0.618-0.786). Extensions give TP: 1.272 for TP2, 1.618 for TP3. If the trade is strong and 1.0 is reached, project extensions for further targets.",
+      "connection_to_OTE": "OTE and Extensions are TWO SIDES of the same Fibonacci tool. OTE = where to enter (pull-back entry). Extensions = where to exit (target projection). You MUST use both."
+    },
+
+    "volume_profile": {
+      "id": "volume_profile",
+      "layer": 5,
+      "definition": "Distribution of traded volume at each price level over a period. Reveals where institutional orders concentrated (high volume) vs. where price moved freely (low volume).",
+      "depends_on": ["dealing_range (volume profile applied within dealing range context)", "liquidity (volume profile reveals WHERE liquidity actually exists vs. theoretical)"],
+      "feeds_into": ["trade entry (POC/VAH/VAL act as support/resistance)", "draw_on_liquidity (low volume nodes are magnets — price accelerates through them)"],
+      "related_to": ["liquidity_void (low volume areas in profile ARE liquidity voids)", "order_blocks (high volume at OB zones CONFIRMS institutional activity)", "fair_value_gaps (FVGs at low volume zones have highest fill probability)"],
+
+      "key_levels": {
+        "POC": "Point of Control — the single price level with highest traded volume. Acts as strongest magnet. Price tends to return to POC.",
+        "VAH": "Value Area High — upper boundary of the 70% volume zone. Acts as resistance.",
+        "VAL": "Value Area Low — lower boundary of the 70% volume zone. Acts as support.",
+        "HVN": "High Volume Node — price level with concentrated volume. Acts as support/resistance (institutions defended this level).",
+        "LVN": "Low Volume Node — price level with minimal volume. Price accelerates THROUGH these zones (no one defending). LVN zones between entry and TP = price will move fast through them."
+      },
+      "cross_validation": "Volume profile VALIDATES other concepts: An OB at an HVN = confirmed institutional defense. An FVG at an LVN = high probability fill. An OB at an LVN = suspicious (no volume = no institutional activity)."
+    },
+
+    "order_pairing": {
+      "id": "order_pairing",
+      "layer": 6,
+      "definition": "Buy-side and sell-side liquidity operate as PAIRED targets — when one side is swept, the opposite side becomes the draw on liquidity. This is the fundamental mechanism of how price delivery works.",
+      "depends_on": ["liquidity (BSL and SSL are the paired targets)", "session_levels (PDH/PDL, PWH/PWL are naturally paired)"],
+      "feeds_into": ["draw_on_liquidity (swept side eliminates one target, pairing identifies the NEXT target)", "trade execution (SL at swept side, TP at paired target)"],
+      "related_to": ["market_maker_model (MMM buy model sweeps SSL, targets BSL — that IS order pairing)", "CRT (candle high/low are paired — sweep one, target the other)"],
+
+      "core_principle": "Every liquidity level has a PAIR. PDH ↔ PDL. PWH ↔ PWL. Asian High ↔ Asian Low. Equal highs ↔ Equal lows. When price sweeps one side of the pair, the OTHER side becomes the new target.",
+      "application": "After a confirmed liquidity_sweep of SSL (sell-side swept), the draw on liquidity is BSL (buy-side). Your TP = the paired BSL level. This is HOW you determine TP — not from arbitrary R:R multiples but from the paired liquidity target.",
+      "why_it_works": "Institutions sweep one side to fill orders, then drive price to the other side where more orders wait. The pairing IS the institutional order book in action."
+    },
+
+    "stop_raid_displacement_retracement": {
+      "id": "stop_raid_displacement_retracement",
+      "layer": "composite",
+      "definition": "The core 3-step ICT trade pattern that unifies layers 3-5 into a single executable flow. This is the ATOMIC UNIT of an ICT trade.",
+      "composes": ["liquidity_sweep (step 1: the raid)", "displacement (step 2: institutional commitment)", "optimal_trade_entry + fair_value_gaps + order_blocks (step 3: the entry)"],
+
+      "steps": {
+        "step_1_stop_raid": {
+          "what": "Price sweeps a liquidity level (stops are hit). This IS the manipulation.",
+          "concepts": ["liquidity_sweep", "judas_swing", "turtle_soup"],
+          "output": "Sweep extreme (SL reference) + trapped traders (fuel for step 2)"
+        },
+        "step_2_displacement": {
+          "what": "Strong move in the OPPOSITE direction of the raid. Proves the raid was manipulation.",
+          "concepts": ["displacement", "BOS/CHoCH", "CISD"],
+          "output": "FVG + OB (entry zones) + structural confirmation",
+          "connection": "If step 2 doesn't occur after step 1, step 1 was NOT manipulation — it was a real breakout. ABORT."
+        },
+        "step_3_retracement_entry": {
+          "what": "Price pulls back into the FVG/OB created by displacement. THIS is where you enter.",
+          "concepts": ["fair_value_gaps", "order_blocks", "optimal_trade_entry"],
+          "output": "Entry price + confirmation",
+          "connection": "The retracement INTO the FVG/OB is the entry. The OTE zone (0.618-0.786 of the displacement) refines the exact price."
+        }
+      },
+      "key_insight": "Most traders fail because they enter at step 1 (chasing the raid) or step 2 (chasing the displacement). The ONLY correct entry is step 3 — the retracement. This pattern chains liquidity_sweep → displacement → FVG/OB → OTE into one atomic action."
+    },
+
+    "venom_model": {
+      "id": "venom_model",
+      "layer": "composite",
+      "definition": "A specific pre-market trading model for US equity index futures. Uses the 90-minute pre-market range (8:00-9:30 AM NY) as the accumulation phase, then trades the sweep + reversal at market open.",
+      "composes": ["PO3_AMD (pre-market = accumulation, 9:30 open = manipulation, 9:45+ = distribution)", "liquidity_sweep (pre-market high/low get swept at open)", "displacement (post-sweep displacement confirms direction)"],
+
+      "setup": {
+        "step_1": "Mark 90-min pre-market range high/low (8:00-9:30 AM NY)",
+        "step_2": "At 9:30 open, watch for sweep of pre-market high OR low",
+        "step_3": "After sweep, wait for displacement + FVG in opposite direction",
+        "step_4": "Enter retracement into FVG. SL beyond pre-market sweep extreme."
+      },
+      "applicable_to": ["US30", "US100", "US500"],
+      "time_filter": "9:30-10:30 AM NY only",
+      "connection_to_PO3": "Venom IS PO3 applied to the specific 8:00-10:30 AM window with pre-market as the accumulation range."
+    },
+
+    "market_maker_model": {
+      "id": "market_maker_model",
+      "layer": "composite",
+      "definition": "The complete framework combining ALL concepts into a buy/sell model. This is NOT a separate concept — it IS the dependency graph applied as a workflow.",
+      "composes": ["market_structure (step 1)", "premium_discount (step 2)", "PO3_AMD (step 3-4)", "liquidity_sweep (step 4)", "displacement + fair_value_gaps + order_blocks (step 5)", "optimal_trade_entry (step 6)", "draw_on_liquidity (step 7)"],
+
+      "buy_model": {
+        "step_1": "market_structure: HTF bullish (H4/D1 HH+HL)",
+        "step_2": "premium_discount: Price in discount zone of dealing_range",
+        "step_3": "PO3: Accumulation phase (Asian session)",
+        "step_4": "liquidity_sweep: Manipulation sweeps SSL (takes out lows)",
+        "step_5": "displacement: Creates FVG + OB confirming reversal",
+        "step_6": "optimal_trade_entry: Enter retracement into FVG/OB at OTE (0.618-0.705)",
+        "step_7": "draw_on_liquidity: Target BSL (swing highs above)"
+      },
+      "sell_model": {
+        "step_1": "market_structure: HTF bearish (H4/D1 LH+LL)",
+        "step_2": "premium_discount: Price in premium zone of dealing_range",
+        "step_3": "PO3: Distribution in Asian session",
+        "step_4": "liquidity_sweep: Manipulation sweeps BSL (takes out highs)",
+        "step_5": "displacement: Creates FVG + OB confirming reversal",
+        "step_6": "optimal_trade_entry: Enter retracement into FVG/OB at OTE (0.618-0.705)",
+        "step_7": "draw_on_liquidity: Target SSL (swing lows below)"
+      }
+    },
+
+    "ICT_2022_model": {
+      "id": "ICT_2022_model",
+      "layer": "composite",
+      "definition": "ICT's simplified daily workflow — market_maker_model applied step by step with specific time filters.",
+      "composes": ["market_structure", "draw_on_liquidity", "sessions_kill_zones", "judas_swing", "displacement", "fair_value_gaps", "order_blocks", "optimal_trade_entry"],
+
+      "daily_workflow": {
+        "step_1_bias": "market_structure: Read D1/H4 for direction + dealing_range.",
+        "step_2_DOL": "draw_on_liquidity: Identify WHERE price needs to go (PDH/PDL, equal H/L, HTF OBs/FVGs).",
+        "step_3_timing": "sessions_kill_zones: Wait for kill zone.",
+        "step_4_manipulation": "judas_swing / liquidity_sweep: Identify the fake move.",
+        "step_5_confirmation": "displacement: Wait for FVG + BOS/CHoCH confirming real direction.",
+        "step_6_entry": "optimal_trade_entry: Enter retracement into FVG/OB from step 5.",
+        "step_7_management": "SL beyond step 4's sweep. TP at step 2's DOL. Partial at TP1, trail to TP2."
+      },
+      "key_principle": "This model works because it WAITS for all pieces across all layers. Most losses come from skipping a layer."
+    }
+  },
+
+  "conflict_resolution": {
+    "_purpose": "When concepts give contradictory signals, use these rules to resolve. Higher-layer concepts OVERRIDE lower-layer ones.",
+    "rules": [
+      {
+        "conflict": "LTF structure says SELL but HTF structure says BUY",
+        "resolution": "HTF WINS. The LTF SELL signal is a pullback within the HTF trend, not a reversal. Look for LTF BUY entries inside the pullback.",
+        "concepts_involved": ["market_structure (multi-timeframe)"]
+      },
+      {
+        "conflict": "FVG says enter but price is in wrong premium/discount zone",
+        "resolution": "premium_discount WINS. The FVG may be valid technically but entering in the wrong zone means poor R:R. Reduce grade by 1 or skip.",
+        "concepts_involved": ["fair_value_gaps", "premium_discount"]
+      },
+      {
+        "conflict": "OB is present but no displacement created it",
+        "resolution": "displacement requirement WINS. An OB without displacement is just a candle — no institutional proof. Skip the OB.",
+        "concepts_involved": ["order_blocks", "displacement"]
+      },
+      {
+        "conflict": "Kill zone is active but no liquidity sweep occurred yet",
+        "resolution": "Wait. Kill zone provides the WINDOW but liquidity_sweep provides the TRIGGER. Being in a kill zone without a sweep = no entry yet.",
+        "concepts_involved": ["sessions_kill_zones", "liquidity_sweep"]
+      },
+      {
+        "conflict": "SMT says reversal but structure hasn't changed (no CHoCH)",
+        "resolution": "Wait for structure confirmation. SMT is a LEADING indicator, structure is CONFIRMING. SMT without CHoCH = early warning, not entry signal.",
+        "concepts_involved": ["SMT_divergence", "market_structure"]
+      },
+      {
+        "conflict": "OTE zone doesn't overlap with FVG/OB",
+        "resolution": "Prefer FVG/OB as entry over pure Fibonacci level. OTE is precision refinement WITHIN entry zones, not a standalone entry method.",
+        "concepts_involved": ["optimal_trade_entry", "fair_value_gaps", "order_blocks"]
+      },
+      {
+        "conflict": "PO3 says accumulation (don't trade) but HTF structure is very clear",
+        "resolution": "PO3 timing WINS for intraday. Clear HTF structure is for swing trades with wider stops. For intraday, wait for manipulation + distribution phases.",
+        "concepts_involved": ["PO3_AMD", "market_structure"]
+      },
+      {
+        "conflict": "CISD fires but no CHoCH confirmed yet",
+        "resolution": "CISD is early warning — enter with reduced size. Full size only after CHoCH confirms. CISD anticipates CHoCH but doesn't guarantee it.",
+        "concepts_involved": ["CISD", "market_structure.CHoCH"]
+      },
+      {
+        "conflict": "Volume profile shows HVN at entry but FVG says enter",
+        "resolution": "Volume profile VALIDATES the FVG. An FVG at an HVN is stronger — institutional defense confirmed. Enter with higher conviction.",
+        "concepts_involved": ["volume_profile", "fair_value_gaps"]
+      },
+      {
+        "conflict": "OB at LVN (low volume node) — institutional zone but no volume",
+        "resolution": "Reduce conviction. OB at LVN means the zone was NOT heavily defended. Price may accelerate through without reacting.",
+        "concepts_involved": ["order_blocks", "volume_profile"]
+      },
+      {
+        "conflict": "Order pairing says TP at BSL but fibonacci extension says TP at 1.618",
+        "resolution": "Order pairing (liquidity-based TP) takes priority over Fibonacci (mathematical TP). If BSL is before 1.618 extension → TP at BSL. If BSL is beyond 1.618 → use 1.618 as TP1, BSL as TP2.",
+        "concepts_involved": ["order_pairing", "fibonacci_extensions"]
+      },
+      {
+        "conflict": "Intraday profile says London Delayed but kill zone is active",
+        "resolution": "Wait. London Delayed means manipulation is pushed to NY. Don't force entries during London just because the kill zone window is open.",
+        "concepts_involved": ["intraday_profile", "sessions_kill_zones"]
+      },
+      {
+        "conflict": "Quarterly shift conflicts with daily bias",
+        "resolution": "Quarterly shift WINS for swing trades. Daily bias WINS for intraday. A new quarterly shift takes days to fully express — intraday can still move counter to it.",
+        "concepts_involved": ["quarterly_shifts", "daily_bias"]
+      },
+      {
+        "conflict": "Balanced price range blocks the path to TP",
+        "resolution": "BPR = strong obstacle. If a BPR sits between entry and TP, price may stall. Either set TP at the BPR (closer target) or wait for BPR to be broken before entering.",
+        "concepts_involved": ["balanced_price_range", "draw_on_liquidity"]
+      }
+    ]
+  },
+
+  "cross_correlations": {
+    "_purpose": "Explicit scoring interactions between concepts. When two concepts appear together, their combined effect is MORE THAN additive. When they conflict, one gates the other.",
+    "synergies": [
+      {
+        "combination": "OB + FVG overlap",
+        "concepts": ["order_blocks", "fair_value_gaps"],
+        "effect": "Highest-probability entry zone. Both institutional ordering AND delivery imbalance at same price. +10 to ICT score.",
+        "why": "OB = where orders were placed. FVG = where delivery was imbalanced. Together = institutional conviction zone."
+      },
+      {
+        "combination": "Liquidity sweep + SMT divergence",
+        "concepts": ["liquidity_sweep", "SMT_divergence"],
+        "effect": "Confirms sweep is manipulation, not breakout. +8 to reversal confidence.",
+        "why": "One instrument sweeps but correlated one doesn't = the sweep is engineered. Highest-conviction reversal signal."
+      },
+      {
+        "combination": "OTE zone inside OB/FVG stack (PD array stacking)",
+        "concepts": ["optimal_trade_entry", "order_blocks", "fair_value_gaps", "PD_arrays"],
+        "effect": "Maximum precision entry. OTE refines the exact price within the OB/FVG overlap. +5 to score.",
+        "why": "Three independent concepts converge at one price = institutional consensus."
+      },
+      {
+        "combination": "Kill zone + PO3 distribution phase",
+        "concepts": ["sessions_kill_zones", "PO3_AMD"],
+        "effect": "Highest-probability trading window. +6 to session score.",
+        "why": "Kill zone provides liquidity. Distribution phase provides direction. Together = ideal conditions."
+      },
+      {
+        "combination": "CISD + PO3 phase transition",
+        "concepts": ["CISD", "PO3_AMD"],
+        "effect": "CISD at the exact manipulation→distribution transition = earliest confirmed reversal. +5 if CISD fires during distribution phase.",
+        "why": "CISD marks the candle-level phase change. PO3 marks the session-level phase change. Both firing together = double confirmation."
+      },
+      {
+        "combination": "Session level sweep + order pairing target",
+        "concepts": ["session_levels", "order_pairing", "liquidity_sweep"],
+        "effect": "When PDL is swept, order pairing immediately identifies PDH as the draw. TP = PDH. This gives the clearest TP targeting.",
+        "why": "Order pairing turns a defensive event (stop hit) into an offensive target (where price is going next)."
+      },
+      {
+        "combination": "Volume profile HVN at OB zone",
+        "concepts": ["volume_profile", "order_blocks"],
+        "effect": "Confirms institutional activity at the OB. Price defended this level with volume. +5 to OB quality score.",
+        "why": "OB without volume support could be coincidental. OB at HVN = proven institutional defense."
+      },
+      {
+        "combination": "Fibonacci extension target at session level",
+        "concepts": ["fibonacci_extensions", "session_levels"],
+        "effect": "When a 1.618 extension aligns with PWH/PWL or PMH/PML = very high-probability TP target.",
+        "why": "Mathematical projection confirms institutional targeting. Two independent methods pointing to same price."
+      }
+    ],
+    "gates": [
+      {
+        "gate": "Premium/Discount gates OTE",
+        "rule": "OTE score should only count if OTE is in the correct premium/discount zone. OTE for longs in premium = no OTE bonus.",
+        "concepts": ["optimal_trade_entry", "premium_discount"]
+      },
+      {
+        "gate": "Displacement gates OB validity",
+        "rule": "Order blocks only score if preceded by genuine displacement. OB without displacement = 0 OB score.",
+        "concepts": ["displacement", "order_blocks"]
+      },
+      {
+        "gate": "Kill zone gates session score",
+        "rule": "Session score only applies if the current kill zone matches the PO3 phase. Kill zone during accumulation = session score halved.",
+        "concepts": ["sessions_kill_zones", "PO3_AMD"]
+      },
+      {
+        "gate": "Daily bias gates trade direction",
+        "rule": "Trades against established daily bias should be auto-downgraded by 1 grade level. Bias is determined pre-session and does NOT flip mid-day.",
+        "concepts": ["daily_bias", "trade_direction"]
+      },
+      {
+        "gate": "Liquidity void between entry and TP",
+        "rule": "If a liquidity_void exists between entry and TP, expect price to accelerate through it (good — faster TP hit). But if a BPR or HVN sits between entry and TP, expect price to stall there (bad — may not reach TP).",
+        "concepts": ["liquidity_void", "balanced_price_range", "volume_profile", "draw_on_liquidity"]
+      }
+    ]
+  },
+
+  "entry_models": {
+    "grade_a_criteria": {
+      "description": "ALL layers satisfied. Every concept aligned.",
+      "layer_checklist": {
+        "layer_0": "IPDA context known + quarterly shift direction aligned + no adverse seasonal pattern",
+        "layer_1": "HTF structure + dealing range + liquidity levels + session levels (PDH/PDL/PWH/PWL) all clear",
+        "layer_2": "Correct premium/discount zone + active kill zone + PO3 in distribution phase + daily bias aligned + intraday profile identified",
+        "layer_3": "Confirmed liquidity sweep + displacement + CISD or CHoCH + optional SMT divergence",
+        "layer_4": "Valid OB + FVG at entry zone, preferably stacked. Propulsion block = best. Volume profile confirms HVN at zone.",
+        "layer_5": "Entry at OTE (0.618-0.786) within OB/FVG. Fibonacci extensions set TP2/TP3. Volume profile validates level."
+      },
+      "expected_win_rate": "65-75%",
+      "risk": "Full (1%)"
+    },
+    "grade_b_criteria": {
+      "description": "Missing 1-2 elements from layers 2-5. Layer 1 MUST be satisfied.",
+      "common_gaps": ["No SMT (layer 3)", "OTE not reached (layer 5)", "Kill zone expired (layer 2)", "FVG but no OB overlap (layer 4)"],
+      "expected_win_rate": "55-65%",
+      "risk": "Reduced (0.5-0.6%)"
+    },
+    "grade_c_criteria": {
+      "description": "Multiple gaps. Layer 1 satisfied but layers 3-5 incomplete.",
+      "expected_win_rate": "45-55%",
+      "risk": "Minimal (0.25-0.3%)"
+    },
+    "grade_d_skip": {
+      "description": "Layer 1 NOT satisfied (HTF against direction) OR no liquidity event AND no FVG/OB.",
+      "action": "Do not trade."
+    }
+  },
+
+  "risk_management_ict": {
+    "position_sizing": {
+      "rule": "Risk fixed percentage per trade, adjusted by grade. NEVER fixed dollar amount.",
+      "ftmo_rules": {
+        "daily_loss_limit": "5% initial balance — hard stop",
+        "max_drawdown": "10% initial balance — account closure",
+        "position_limit": "Max 3, reduced to 2 if correlated (via SMT_pairs)"
+      }
+    },
+    "stop_loss": {
+      "placement": "Beyond the manipulation extreme (liquidity_sweep wick from step 5). Min 1.5x ATR from entry.",
+      "connection": "SL is anchored to the liquidity_sweep event. If the sweep extreme is revisited, your thesis (that it was manipulation) is WRONG.",
+      "swing_trades": "SL beyond HTF OB/FVG zone, not just LTF entry zone.",
+      "common_error": "SL at exact OB/FVG edge — institutions will sweep 5-10 pips beyond. Add buffer."
+    },
+    "take_profit": {
+      "tp1": "draw_on_liquidity from step 3 — nearest external liquidity. Partial 50% here.",
+      "tp2": "Next liquidity pool. Trail remaining 50%.",
+      "connection": "TP targets ARE the liquidity levels from step 3. This is why step 3 (mapping liquidity) is essential — it defines your exit."
+    },
+    "trade_management": {
+      "breakeven": "After TP1 or 1R profit → move SL to breakeven.",
+      "trailing": "After breakeven → trail 0.5R behind each new structure point.",
+      "max_trades": "2-3 per day. More = overtrading.",
+      "loss_rule": "2 consecutive losses → pause 1 hour. 3 → stop for day."
+    }
+  },
+
+  "common_mistakes": {
+    "mistake_1_chasing": {
+      "what": "Entering during manipulation instead of waiting for distribution retracement",
+      "concepts_violated": ["PO3_AMD", "displacement"],
+      "fix": "Wait for displacement AFTER sweep. Enter the retracement."
+    },
+    "mistake_2_wrong_zone": {
+      "what": "Buying in premium or selling in discount",
+      "concepts_violated": ["premium_discount", "dealing_range"],
+      "fix": "Always classify zone before entry."
+    },
+    "mistake_3_ignoring_htf": {
+      "what": "Trading LTF against HTF structure",
+      "concepts_violated": ["market_structure (multi-timeframe rule)"],
+      "fix": "HTF = direction. LTF = timing. Never trade LTF against HTF."
+    },
+    "mistake_4_tight_stops": {
+      "what": "SL at exact OB/FVG edge",
+      "concepts_violated": ["liquidity (your SL IS liquidity that will be swept)", "risk_management"],
+      "fix": "Buffer beyond manipulation zone. Minimum 1.5x ATR."
+    },
+    "mistake_5_no_DOL": {
+      "what": "No draw on liquidity identified",
+      "concepts_violated": ["draw_on_liquidity", "liquidity"],
+      "fix": "No DOL = no clear TP = skip."
+    },
+    "mistake_6_no_displacement": {
+      "what": "Entering at OB/FVG that was NOT preceded by displacement",
+      "concepts_violated": ["displacement", "order_blocks", "fair_value_gaps"],
+      "fix": "OB/FVG without displacement = unproven zone. Wait for displacement to validate."
+    }
+  }
+}

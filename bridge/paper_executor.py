@@ -68,6 +68,24 @@ class PaperExecutor:
         self.grade_a_wins = 0
         self.grade_a_losses = 0
 
+        # Slippage simulation: half-spread applied against trader on entry & exit
+        # Keys are base symbol names (no exchange prefix)
+        self._slippage_bps: dict[str, float] = {
+            "BTCUSD": 3.0,    # ~$2 on $70k
+            "ETHUSD": 5.0,    # ~$0.10 on $2k
+            "SOLUSD": 10.0,   # ~$0.015 on $150
+            "AVAXUSD": 15.0,
+            "LINKUSD": 15.0,
+            "DOGEUSD": 20.0,
+            "EURUSD": 0.5,    # tight forex spread
+            "GBPUSD": 0.8,
+            "XAUUSD": 3.0,
+            "UKOIL": 5.0,
+            "US30": 2.0,
+            "US100": 2.0,
+            "US500": 1.5,
+        }
+
     # ------------------------------------------------------------------
     # Open position
     # ------------------------------------------------------------------
@@ -118,11 +136,22 @@ class PaperExecutor:
                 return {"success": False, "ticket": 0, "message": "Invalid SL distance"}
             lot_size = round(risk_amount / risk_distance, 4)
 
+        # Apply slippage: entry price moved against trader
+        entry_price = decision.entry_price
+        base_sym = decision.symbol.split(":")[-1]
+        slip_bps = self._slippage_bps.get(base_sym, 2.0)
+        slip_amount = entry_price * (slip_bps / 10_000)
+        if decision.action == "BUY":
+            entry_price += slip_amount  # buy higher
+        else:
+            entry_price -= slip_amount  # sell lower
+        entry_price = round(entry_price, 5)
+
         position = PaperPosition(
             ticket=ticket,
             symbol=decision.symbol,
             direction=decision.action,
-            entry_price=decision.entry_price,
+            entry_price=entry_price,
             sl_price=decision.sl_price,
             tp_price=decision.tp_price,
             tp2_price=decision.tp2_price,

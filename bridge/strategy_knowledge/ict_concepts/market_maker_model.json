@@ -1,0 +1,32 @@
+{
+  "id": "market_maker_model",
+  "layer": "composite",
+  "definition": "The complete framework combining ALL concepts into a buy/sell model. This is NOT a separate concept — it IS the dependency graph applied as a workflow.",
+  "composes": [
+    "market_structure (step 1)",
+    "premium_discount (step 2)",
+    "PO3_AMD (step 3-4)",
+    "liquidity_sweep (step 4)",
+    "displacement + fair_value_gaps + order_blocks (step 5)",
+    "optimal_trade_entry (step 6)",
+    "draw_on_liquidity (step 7)"
+  ],
+  "buy_model": {
+    "step_1": "market_structure: HTF bullish (H4/D1 HH+HL)",
+    "step_2": "premium_discount: Price in discount zone of dealing_range",
+    "step_3": "PO3: Accumulation phase (Asian session)",
+    "step_4": "liquidity_sweep: Manipulation sweeps SSL (takes out lows)",
+    "step_5": "displacement: Creates FVG + OB confirming reversal",
+    "step_6": "optimal_trade_entry: Enter retracement into FVG/OB at OTE (0.618-0.705)",
+    "step_7": "draw_on_liquidity: Target BSL (swing highs above)"
+  },
+  "sell_model": {
+    "step_1": "market_structure: HTF bearish (H4/D1 LH+LL)",
+    "step_2": "premium_discount: Price in premium zone of dealing_range",
+    "step_3": "PO3: Distribution in Asian session",
+    "step_4": "liquidity_sweep: Manipulation sweeps BSL (takes out highs)",
+    "step_5": "displacement: Creates FVG + OB confirming reversal",
+    "step_6": "optimal_trade_entry: Enter retracement into FVG/OB at OTE (0.618-0.705)",
+    "step_7": "draw_on_liquidity: Target SSL (swing lows below)"
+  }
+}

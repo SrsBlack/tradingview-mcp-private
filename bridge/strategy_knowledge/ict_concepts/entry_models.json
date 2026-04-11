@@ -1,0 +1,35 @@
+{
+  "grade_a_criteria": {
+    "description": "ALL layers satisfied. Every concept aligned.",
+    "layer_checklist": {
+      "layer_0": "IPDA context known + quarterly shift direction aligned + no adverse seasonal pattern",
+      "layer_1": "HTF structure + dealing range + liquidity levels + session levels (PDH/PDL/PWH/PWL) all clear",
+      "layer_2": "Correct premium/discount zone + active kill zone + PO3 in distribution phase + daily bias aligned + intraday profile identified",
+      "layer_3": "Confirmed liquidity sweep + displacement + CISD or CHoCH + optional SMT divergence",
+      "layer_4": "Valid OB + FVG at entry zone, preferably stacked. Propulsion block = best. Volume profile confirms HVN at zone.",
+      "layer_5": "Entry at OTE (0.618-0.786) within OB/FVG. Fibonacci extensions set TP2/TP3. Volume profile validates level."
+    },
+    "expected_win_rate": "65-75%",
+    "risk": "Full (1%)"
+  },
+  "grade_b_criteria": {
+    "description": "Missing 1-2 elements from layers 2-5. Layer 1 MUST be satisfied.",
+    "common_gaps": [
+      "No SMT (layer 3)",
+      "OTE not reached (layer 5)",
+      "Kill zone expired (layer 2)",
+      "FVG but no OB overlap (layer 4)"
+    ],
+    "expected_win_rate": "55-65%",
+    "risk": "Reduced (0.5-0.6%)"
+  },
+  "grade_c_criteria": {
+    "description": "Multiple gaps. Layer 1 satisfied but layers 3-5 incomplete.",
+    "expected_win_rate": "45-55%",
+    "risk": "Minimal (0.25-0.3%)"
+  },
+  "grade_d_skip": {
+    "description": "Layer 1 NOT satisfied (HTF against direction) OR no liquidity event AND no FVG/OB.",
+    "action": "Do not trade."
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "_purpose": "Explicit scoring interactions between concepts. When two concepts appear together, their combined effect is MORE THAN additive. When they conflict, one gates the other.",
+  "synergies": [
+    {
+      "combination": "OB + FVG overlap",
+      "concepts": [
+        "order_blocks",
+        "fair_value_gaps"
+      ],
+      "effect": "Highest-probability entry zone. Both institutional ordering AND delivery imbalance at same price. +10 to ICT score.",
+      "why": "OB = where orders were placed. FVG = where delivery was imbalanced. Together = institutional conviction zone."
+    },
+    {
+      "combination": "Liquidity sweep + SMT divergence",
+      "concepts": [
+        "liquidity_sweep",
+        "SMT_divergence"
+      ],
+      "effect": "Confirms sweep is manipulation, not breakout. +8 to reversal confidence.",
+      "why": "One instrument sweeps but correlated one doesn't = the sweep is engineered. Highest-conviction reversal signal."
+    },
+    {
+      "combination": "OTE zone inside OB/FVG stack (PD array stacking)",
+      "concepts": [
+        "optimal_trade_entry",
+        "order_blocks",
+        "fair_value_gaps",
+        "PD_arrays"
+      ],
+      "effect": "Maximum precision entry. OTE refines the exact price within the OB/FVG overlap. +5 to score.",
+      "why": "Three independent concepts converge at one price = institutional consensus."
+    },
+    {
+      "combination": "Kill zone + PO3 distribution phase",
+      "concepts": [
+        "sessions_kill_zones",
+        "PO3_AMD"
+      ],
+      "effect": "Highest-probability trading window. +6 to session score.",
+      "why": "Kill zone provides liquidity. Distribution phase provides direction. Together = ideal conditions."
+    },
+    {
+      "combination": "CISD + PO3 phase transition",
+      "concepts": [
+        "CISD",
+        "PO3_AMD"
+      ],
+      "effect": "CISD at the exact manipulation→distribution transition = earliest confirmed reversal. +5 if CISD fires during distribution phase.",
+      "why": "CISD marks the candle-level phase change. PO3 marks the session-level phase change. Both firing together = double confirmation."
+    },
+    {
+      "combination": "Session level sweep + order pairing target",
+      "concepts": [
+        "session_levels",
+        "order_pairing",
+        "liquidity_sweep"
+      ],
+      "effect": "When PDL is swept, order pairing immediately identifies PDH as the draw. TP = PDH. This gives the clearest TP targeting.",
+      "why": "Order pairing turns a defensive event (stop hit) into an offensive target (where price is going next)."
+    },
+    {
+      "combination": "Volume profile HVN at OB zone",
+      "concepts": [
+        "volume_profile",
+        "order_blocks"
+      ],
+      "effect": "Confirms institutional activity at the OB. Price defended this level with volume. +5 to OB quality score.",
+      "why": "OB without volume support could be coincidental. OB at HVN = proven institutional defense."
+    },
+    {
+      "combination": "Fibonacci extension target at session level",
+      "concepts": [
+        "fibonacci_extensions",
+        "session_levels"
+      ],
+      "effect": "When a 1.618 extension aligns with PWH/PWL or PMH/PML = very high-probability TP target.",
+      "why": "Mathematical projection confirms institutional targeting. Two independent methods pointing to same price."
+    }
+  ],
+  "gates": [
+    {
+      "gate": "Premium/Discount gates OTE",
+      "rule": "OTE score should only count if OTE is in the correct premium/discount zone. OTE for longs in premium = no OTE bonus.",
+      "concepts": [
+        "optimal_trade_entry",
+        "premium_discount"
+      ]
+    },
+    {
+      "gate": "Displacement gates OB validity",
+      "rule": "Order blocks only score if preceded by genuine displacement. OB without displacement = 0 OB score.",
+      "concepts": [
+        "displacement",
+        "order_blocks"
+      ]
+    },
+    {
+      "gate": "Kill zone gates session score",
+      "rule": "Session score only applies if the current kill zone matches the PO3 phase. Kill zone during accumulation = session score halved.",
+      "concepts": [
+        "sessions_kill_zones",
+        "PO3_AMD"
+      ]
+    },
+    {
+      "gate": "Daily bias gates trade direction",
+      "rule": "Trades against established daily bias should be auto-downgraded by 1 grade level. Bias is determined pre-session and does NOT flip mid-day.",
+      "concepts": [
+        "daily_bias",
+        "trade_direction"
+      ]
+    },
+    {
+      "gate": "Liquidity void between entry and TP",
+      "rule": "If a liquidity_void exists between entry and TP, expect price to accelerate through it (good — faster TP hit). But if a BPR or HVN sits between entry and TP, expect price to stall there (bad — may not reach TP).",
+      "concepts": [
+        "liquidity_void",
+        "balanced_price_range",
+        "volume_profile",
+        "draw_on_liquidity"
+      ]
+    }
+  ]
+}

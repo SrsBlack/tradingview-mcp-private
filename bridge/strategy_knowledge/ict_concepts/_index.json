@@ -1,0 +1,318 @@
+{
+  "version": "3.0",
+  "concept_dependency_graph": {
+    "_purpose": "Shows how every ICT concept connects. Read top-to-bottom: higher concepts inform lower ones. Concepts at the same level are parallel inputs.",
+    "layer_0_macro": {
+      "concepts": [
+        "IPDA",
+        "quarterly_shifts",
+        "seasonal_tendencies"
+      ],
+      "role": "MACRO layer. Multi-week/month context. IPDA reference ranges (20/40/60 day), quarterly directional shifts, and seasonal patterns set the broadest bias before any daily analysis.",
+      "feeds_into": [
+        "market_structure",
+        "dealing_range",
+        "daily_bias"
+      ]
+    },
+    "layer_1_foundation": {
+      "concepts": [
+        "market_structure",
+        "dealing_range",
+        "liquidity",
+        "session_levels"
+      ],
+      "role": "MUST be established first. These define direction, range, and where orders cluster. session_levels (PDH/PDL, PWH/PWL, PMH/PML, Asian range) are the key external liquidity references.",
+      "depends_on": [
+        "IPDA (macro context)"
+      ],
+      "feeds_into": [
+        "premium_discount",
+        "PO3_AMD",
+        "draw_on_liquidity",
+        "order_pairing"
+      ]
+    },
+    "layer_2_context": {
+      "concepts": [
+        "premium_discount",
+        "sessions_kill_zones",
+        "PO3_AMD",
+        "intraday_profile",
+        "CBDR",
+        "daily_bias"
+      ],
+      "role": "Context layer. WHERE in the range? WHEN in the session? WHICH PO3 phase? CBDR defines the pre-market reference. Intraday profile classifies the session type.",
+      "depends_on": [
+        "market_structure",
+        "dealing_range",
+        "liquidity"
+      ],
+      "feeds_into": [
+        "displacement",
+        "liquidity_sweep",
+        "judas_swing",
+        "venom_model"
+      ]
+    },
+    "layer_3_events": {
+      "concepts": [
+        "liquidity_sweep",
+        "displacement",
+        "judas_swing",
+        "turtle_soup",
+        "SMT_divergence",
+        "CISD",
+        "swing_failure_pattern",
+        "range_expansion_contraction"
+      ],
+      "role": "Event layer. Things that HAPPEN confirming manipulation is complete. CISD is pre-CHoCH signal. SFP detects failed swing attempts. Range expansion/contraction detects cycle rhythm.",
+      "depends_on": [
+        "liquidity",
+        "PO3_AMD",
+        "sessions_kill_zones"
+      ],
+      "feeds_into": [
+        "order_blocks",
+        "fair_value_gaps",
+        "CRT",
+        "liquidity_void"
+      ]
+    },
+    "layer_4_entry_zones": {
+      "concepts": [
+        "order_blocks",
+        "fair_value_gaps",
+        "breaker_blocks",
+        "rejection_blocks",
+        "propulsion_blocks",
+        "PD_arrays",
+        "liquidity_void",
+        "balanced_price_range"
+      ],
+      "role": "Entry zone layer. WHERE you place your order. Created BY events in layer 3. Includes advanced block types (rejection, propulsion) and volume-based zones (liquidity void, BPR).",
+      "depends_on": [
+        "displacement",
+        "liquidity_sweep",
+        "market_structure"
+      ],
+      "feeds_into": [
+        "optimal_trade_entry",
+        "unicorn_model"
+      ]
+    },
+    "layer_5_precision": {
+      "concepts": [
+        "optimal_trade_entry",
+        "fibonacci_extensions",
+        "unicorn_model",
+        "silver_bullet",
+        "volume_profile"
+      ],
+      "role": "Precision layer. Fine-tune entry within zones. Fibonacci extensions (127.2%, 161.8%) set targets BEYOND current range. Volume profile (POC/VAH/VAL) validates institutional interest at levels.",
+      "depends_on": [
+        "order_blocks",
+        "fair_value_gaps",
+        "breaker_blocks"
+      ],
+      "feeds_into": [
+        "trade_execution"
+      ]
+    },
+    "layer_6_execution": {
+      "concepts": [
+        "draw_on_liquidity",
+        "order_pairing",
+        "risk_management",
+        "trade_management"
+      ],
+      "role": "Execution layer. Order pairing: when SSL is swept, BSL becomes the target (and vice versa). Set SL at sweep extreme, TP at paired liquidity.",
+      "depends_on": [
+        "all_above"
+      ],
+      "output": "The actual trade decision"
+    },
+    "cross_cutting": {
+      "concepts": [
+        "market_maker_model",
+        "ICT_2022_model",
+        "stop_raid_displacement_retracement"
+      ],
+      "role": "COMPOSITE MODELS chaining concepts from ALL layers. stop_raid→displacement→retracement is the core 3-step trade pattern that unifies layers 3-5."
+    }
+  },
+  "trade_lifecycle_chain": {
+    "_purpose": "The complete chain from analysis to execution. Each step explicitly names which concept(s) it uses and what must be true before proceeding.",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Establish HTF Bias",
+        "concepts_used": [
+          "market_structure",
+          "dealing_range"
+        ],
+        "what_to_do": "Read H4/D1 structure. Is it bullish (HH+HL), bearish (LH+LL), or ranging? Define the dealing range (swing high to swing low). This is NON-NEGOTIABLE — skip everything if HTF is unclear.",
+        "output": "Direction (BULLISH/BEARISH/NEUTRAL) + dealing range boundaries",
+        "gate": "If NEUTRAL → reduce to Grade C max. If direction CONFLICTS with signal → Grade D, skip."
+      },
+      {
+        "step": 2,
+        "name": "Identify Premium/Discount Zone",
+        "concepts_used": [
+          "premium_discount",
+          "dealing_range"
+        ],
+        "depends_on_step": 1,
+        "what_to_do": "Calculate 50% of the dealing range (equilibrium). Where is current price? Above 50% = premium, below = discount.",
+        "output": "Zone classification (premium/discount/equilibrium)",
+        "gate": "BUY in premium → wrong zone, reduce grade. SELL in discount → wrong zone, reduce grade.",
+        "connection_to_step_1": "The dealing range FROM step 1 defines the premium/discount zones in step 2. You cannot determine premium/discount without first establishing the dealing range."
+      },
+      {
+        "step": 3,
+        "name": "Identify Liquidity Targets",
+        "concepts_used": [
+          "liquidity",
+          "draw_on_liquidity",
+          "equal_highs_lows"
+        ],
+        "depends_on_step": 1,
+        "what_to_do": "Map BSL above (swing highs, equal highs) and SSL below (swing lows, equal lows). Identify the draw on liquidity — the nearest untested external liquidity in trade direction. This becomes TP.",
+        "output": "BSL/SSL map + draw on liquidity (TP target)",
+        "gate": "No clear draw on liquidity → no clear TP → reduce conviction.",
+        "connection_to_step_1": "Market structure FROM step 1 defines where swing highs/lows are. Those swings ARE the liquidity levels."
+      },
+      {
+        "step": 4,
+        "name": "Identify Session Phase",
+        "concepts_used": [
+          "sessions_kill_zones",
+          "PO3_AMD"
+        ],
+        "depends_on_step": "none (time-based)",
+        "what_to_do": "What session is active? Which PO3 phase are we in (accumulation/manipulation/distribution)? Is a kill zone active?",
+        "output": "Session name + PO3 phase + kill zone status",
+        "gate": "In accumulation → DO NOT TRADE (choppy). In manipulation → DO NOT CHASE (it's the trap). Only enter during distribution phase retracement.",
+        "connection_to_step_3": "Sessions determine WHEN liquidity gets swept. Asian session BUILDS liquidity (step 3's levels). London/NY SWEEPS that liquidity."
+      },
+      {
+        "step": 5,
+        "name": "Wait for Manipulation Event",
+        "concepts_used": [
+          "liquidity_sweep",
+          "judas_swing",
+          "turtle_soup",
+          "SMT_divergence"
+        ],
+        "depends_on_steps": [
+          3,
+          4
+        ],
+        "what_to_do": "Has price swept one of the liquidity levels from step 3? Did a Judas swing occur? Does SMT divergence confirm the sweep is manipulation (not breakout)?",
+        "output": "Sweep confirmed (Y/N) + which liquidity was taken + SMT status",
+        "gate": "No sweep → manipulation may not be complete → reduce grade by 1. Sweep + SMT divergence → highest conviction.",
+        "connection_to_step_3": "The liquidity levels mapped in step 3 are WHAT gets swept in step 5. Without step 3's map, you can't identify the sweep.",
+        "connection_to_step_4": "PO3 phase from step 4 tells you WHETHER to expect a sweep now. In accumulation, no sweep yet. At London/NY open, sweep is expected."
+      },
+      {
+        "step": 6,
+        "name": "Confirm Displacement",
+        "concepts_used": [
+          "displacement",
+          "fair_value_gaps",
+          "order_blocks",
+          "market_structure (BOS/CHoCH)"
+        ],
+        "depends_on_step": 5,
+        "what_to_do": "After the sweep, did a displacement candle form? (Large body, small wicks, creates FVG). Did it create a BOS or CHoCH confirming direction? Mark the OB (last opposing candle before displacement) and FVG.",
+        "output": "Displacement confirmed (Y/N) + FVG zone + OB zone + BOS/CHoCH type",
+        "gate": "No displacement after sweep → the 'sweep' might be a real breakout → DO NOT ENTER. Wait.",
+        "connection_to_step_5": "Displacement is the PROOF that the sweep in step 5 was manipulation. Sweep without displacement = ambiguous. Sweep + displacement = confirmed trap.",
+        "connection_to_step_1": "The BOS/CHoCH created by displacement must ALIGN with HTF bias from step 1. A LTF CHoCH against HTF is just a pullback."
+      },
+      {
+        "step": 7,
+        "name": "Define Entry Zone",
+        "concepts_used": [
+          "order_blocks",
+          "fair_value_gaps",
+          "optimal_trade_entry",
+          "PD_arrays",
+          "breaker_blocks",
+          "unicorn_model"
+        ],
+        "depends_on_step": 6,
+        "what_to_do": "The FVG and OB from step 6 define your entry zone. Apply Fibonacci retracement to the displacement move: the 0.618-0.786 zone (OTE) within the FVG/OB is the ideal entry. Check for PD array stacking (OB + FVG + OTE overlap = highest probability).",
+        "output": "Entry price + entry zone type (OB/FVG/unicorn/breaker)",
+        "gate": "Entry NOT at any PD array → imprecise entry, widen SL. OB + FVG + OTE stack → maximum precision.",
+        "connection_to_step_6": "The FVG and OB identified in step 6 ARE the entry zones in step 7. OTE is applied to the same displacement move from step 6.",
+        "connection_to_step_2": "Entry zone must be in the correct premium/discount zone from step 2. An OB in premium for a long trade = wrong zone even if OB is valid."
+      },
+      {
+        "step": 8,
+        "name": "Set SL, TP, Size — Execute",
+        "concepts_used": [
+          "risk_management",
+          "draw_on_liquidity",
+          "dealing_range"
+        ],
+        "depends_on_steps": [
+          3,
+          7
+        ],
+        "what_to_do": "SL: beyond the manipulation extreme from step 5 (the sweep wick), minimum 1.5x ATR from entry. TP1: draw on liquidity from step 3 (partial close 50%). TP2: next liquidity pool. Size: based on grade, FTMO proximity, symbol risk profile.",
+        "output": "SL price + TP1 price + TP2 price + lot size + risk %",
+        "connection_to_step_3": "TP targets ARE the draw on liquidity identified in step 3.",
+        "connection_to_step_5": "SL goes beyond the sweep extreme from step 5 — that's the manipulation zone that shouldn't be revisited if the trade thesis is correct."
+      }
+    ]
+  },
+  "concepts": [
+    "market_structure",
+    "dealing_range",
+    "liquidity",
+    "premium_discount",
+    "power_of_three_and_AMD",
+    "sessions_and_kill_zones",
+    "liquidity_sweep",
+    "displacement",
+    "judas_swing",
+    "SMT_divergence",
+    "turtle_soup",
+    "order_blocks",
+    "fair_value_gaps",
+    "PD_arrays",
+    "optimal_trade_entry",
+    "unicorn_model",
+    "CRT_candle_range_theory",
+    "IPDA",
+    "quarterly_shifts",
+    "seasonal_tendencies",
+    "session_levels",
+    "daily_bias",
+    "CBDR",
+    "intraday_profile",
+    "CISD",
+    "swing_failure_pattern",
+    "range_expansion_contraction",
+    "rejection_blocks",
+    "propulsion_blocks",
+    "liquidity_void",
+    "balanced_price_range",
+    "fibonacci_extensions",
+    "volume_profile",
+    "order_pairing",
+    "stop_raid_displacement_retracement",
+    "venom_model",
+    "market_maker_model",
+    "ICT_2022_model"
+  ],
+  "sections": [
+    "conflict_resolution",
+    "cross_correlations",
+    "entry_models",
+    "risk_management",
+    "common_mistakes",
+    "market_philosophy"
+  ]
+}

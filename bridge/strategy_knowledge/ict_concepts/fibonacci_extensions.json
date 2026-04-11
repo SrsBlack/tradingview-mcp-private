@@ -1,0 +1,26 @@
+{
+  "id": "fibonacci_extensions",
+  "layer": 5,
+  "definition": "Fibonacci levels BEYOND the current swing range — used for TP targets when price is expected to move beyond the prior swing extreme.",
+  "depends_on": [
+    "optimal_trade_entry (extensions are the TP counterpart to OTE retracement entries)",
+    "market_structure (the swing that defines the Fibonacci range)",
+    "draw_on_liquidity (extensions identify targets at new price levels where no prior reference exists)"
+  ],
+  "feeds_into": [
+    "trade execution (extensions define TP2/TP3 targets beyond the current range)"
+  ],
+  "related_to": [
+    "optimal_trade_entry (OTE = retracement entry at 0.618-0.786. Extensions = TP targets at 1.272-2.618)",
+    "dealing_range (extensions project BEYOND the current dealing range)"
+  ],
+  "levels": {
+    "1.0": "Full extension — price reaches the opposite end of the measured swing. This is the basic TP1.",
+    "1.272": "First extension — 27.2% beyond the swing. Common TP2 for moderate moves.",
+    "1.618": "Golden extension — 61.8% beyond the swing. Strong institutional target. High-probability reversal/consolidation zone.",
+    "2.0": "Double extension — swing repeated. Used in strong trends with clear draw on liquidity.",
+    "2.618": "Extreme extension — only in parabolic moves. Rare but significant as exhaustion target."
+  },
+  "how_to_apply": "Draw Fibonacci from the swing low to swing high (or reverse). OTE retracement gives ENTRY (0.618-0.786). Extensions give TP: 1.272 for TP2, 1.618 for TP3. If the trade is strong and 1.0 is reached, project extensions for further targets.",
+  "connection_to_OTE": "OTE and Extensions are TWO SIDES of the same Fibonacci tool. OTE = where to enter (pull-back entry). Extensions = where to exit (target projection). You MUST use both."
+}

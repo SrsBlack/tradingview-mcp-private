@@ -1,0 +1,33 @@
+{
+  "id": "PD_arrays",
+  "layer": 4,
+  "definition": "Premium/Discount Arrays — the collective term for all institutional entry/exit zones (OBs, FVGs, breakers, etc.).",
+  "depends_on": [
+    "order_blocks",
+    "fair_value_gaps",
+    "breaker_blocks",
+    "premium_discount"
+  ],
+  "feeds_into": [
+    "optimal_trade_entry (OTE is applied within PD arrays)",
+    "trade entry (PD arrays ARE the entry zones)"
+  ],
+  "related_to": [
+    "All layer 4 concepts — PD arrays is the UMBRELLA term"
+  ],
+  "premium_arrays": [
+    "Bearish OBs",
+    "Bearish FVGs",
+    "Bearish Breakers",
+    "Liquidity Voids (sell side)",
+    "Old highs with BSL"
+  ],
+  "discount_arrays": [
+    "Bullish OBs",
+    "Bullish FVGs",
+    "Bullish Breakers",
+    "Liquidity Voids (buy side)",
+    "Old lows with SSL"
+  ],
+  "stacking": "When multiple PD arrays overlap at same price = 'stack' = highest-probability entry. OB + FVG + OTE at same level = Grade A setup. This is the convergence of order_blocks + fair_value_gaps + optimal_trade_entry."
+}

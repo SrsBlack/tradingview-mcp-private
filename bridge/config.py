@@ -76,11 +76,13 @@ SYMBOL_MAP: dict[str, str] = {
     "US100":  "US100",
     "SPX500": "US500",
     "US500":  "US500",
-    # Crypto — FTMO doesn't offer crypto; will be paper-only
+    # Crypto
     "BTCUSD":  "BTCUSD",
     "ETHUSD":  "ETHUSD",
     "SOLUSD":  "SOLUSD",
+    "DOGEUSD": "DOGEUSD",
 }
+# NOTE: AVAXUSD and LINKUSD removed — not available on FTMO broker
 
 # TradingView base name → FTMO/MT5 broker symbol name
 # FTMO uses .cash suffix for CFD indices and commodities
@@ -97,6 +99,7 @@ TV_TO_FTMO: dict[str, str] = {
     "BTCUSD": "BTCUSD",
     "ETHUSD": "ETHUSD",
     "SOLUSD": "SOLUSD",
+    "DOGEUSD": "DOGEUSD",
 }
 
 
@@ -123,6 +126,7 @@ SMT_PAIRS: dict[str, str] = {
     "BTCUSD": "ETHUSD",
     "ETHUSD": "BTCUSD",
     "SOLUSD": "BTCUSD",
+    "DOGEUSD": "BTCUSD",
 }
 
 # Timeframe strings: TV CLI → trading-ai-v2 names
@@ -151,6 +155,7 @@ PRICE_RANGES: dict[str, tuple[float, float]] = {
     "BTCUSD":  (10_000, 200_000),  # BTC ATH ~109k; 200k gives headroom
     "ETHUSD":  (100,    10_000),   # ETH ATH ~4,800; 10k gives headroom, rejects 47k contamination
     "SOLUSD":  (1,      1_000),    # SOL ATH ~260; 1k gives headroom, rejects 70k contamination
+    "DOGEUSD": (0.001,  5),        # DOGE ATH ~0.74; 5 gives headroom
     "EURUSD":  (0.80,   1.60),     # EUR/USD never outside 0.82–1.60 in modern history
     "GBPUSD":  (1.00,   2.00),     # GBP/USD realistic range
     "YM1!":    (10_000, 50_000),   # Dow futures; ATH ~45k

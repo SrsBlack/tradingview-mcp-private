@@ -1,0 +1,25 @@
+{
+  "id": "intraday_profile",
+  "layer": 2,
+  "definition": "Classification of the day's trading behavior based on early session price action. Determines which trading model to apply.",
+  "depends_on": [
+    "CBDR (pre-market range reference)",
+    "sessions_kill_zones (session timing)",
+    "judas_swing (early session direction)"
+  ],
+  "feeds_into": [
+    "trade entry (profile type determines which strategy to use)"
+  ],
+  "related_to": [
+    "PO3_AMD (each profile corresponds to a PO3 pattern)",
+    "daily_bias (profile confirms or contradicts bias)"
+  ],
+  "types": {
+    "london_normal_buy": "London sweeps Asian low (takes SSL) → reverses bullish → NY continues bullish. Classic PO3: Asian=accumulation, London sweep=manipulation, NY=distribution up.",
+    "london_normal_sell": "London sweeps Asian high (takes BSL) → reverses bearish → NY continues bearish. Mirror of buy day.",
+    "london_delayed_buy": "London is indecisive, no clear sweep. Manipulation delayed to NY session. NY sweeps low → rallies. Patience required.",
+    "london_delayed_sell": "London indecisive. NY sweeps high → sells off. Don't force trades during London on these days.",
+    "ranging": "Neither session produces clear manipulation. Low-conviction day. Reduce position sizes or skip."
+  },
+  "connection_to_PO3": "The profile IS PO3 applied with session-specific timing. 'London Normal' = PO3 on time. 'London Delayed' = manipulation pushed to NY. 'Ranging' = no clear PO3 cycle = don't trade."
+}

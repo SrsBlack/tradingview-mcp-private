@@ -1,0 +1,21 @@
+{
+  "id": "liquidity_sweep",
+  "layer": 3,
+  "definition": "Price trades through a liquidity level, triggers resting orders, then reverses. This IS the manipulation in PO3.",
+  "depends_on": [
+    "liquidity (sweeps TARGET liquidity levels)",
+    "PO3_AMD (sweep IS the manipulation phase)"
+  ],
+  "feeds_into": [
+    "displacement (displacement follows a confirmed sweep)",
+    "order_blocks (the OB before the sweep becomes the entry zone after reversal)",
+    "turtle_soup (turtle soup IS a specific type of sweep + reversal)"
+  ],
+  "related_to": [
+    "judas_swing (judas swing IS a sweep at session open)",
+    "SMT_divergence (SMT confirms whether sweep is manipulation or real breakout)"
+  ],
+  "confirmation": "Sweep is confirmed when price takes the level AND returns inside the prior range. If it keeps going → legitimate breakout, not a sweep.",
+  "chain_after_sweep": "Confirmed sweep → expect displacement → displacement creates FVG + OB → enter retracement into FVG/OB. This chain is THE core ICT trade.",
+  "SL_connection": "The sweep extreme (the wick beyond the liquidity level) becomes your SL reference. If price returns beyond this point, your thesis is wrong."
+}

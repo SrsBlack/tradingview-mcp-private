@@ -1,0 +1,22 @@
+{
+  "id": "swing_failure_pattern",
+  "layer": 3,
+  "definition": "When price attempts to take out a swing high/low but FAILS to close beyond it — the wick sweeps but the body cannot hold. This signals exhaustion and likely reversal.",
+  "depends_on": [
+    "market_structure (SFP occurs at swing points)",
+    "liquidity (SFP IS a failed liquidity sweep — stops are triggered but the move can't sustain)"
+  ],
+  "feeds_into": [
+    "trade entry (SFP itself is an entry signal)",
+    "market_structure (SFP at a key swing creates a potential CHoCH)"
+  ],
+  "related_to": [
+    "turtle_soup (SFP is conceptually similar — both are failed breakouts)",
+    "liquidity_sweep (SFP is a sweep that FAILS to follow through)",
+    "rejection_blocks (the SFP candle's wick zone = rejection block)"
+  ],
+  "vs_turtle_soup": "Turtle soup: price breaks through and closes back inside = confirmed reversal. SFP: price can't even close beyond = exhaustion signal. SFP is WEAKER confirmation than turtle soup but fires earlier.",
+  "buy_SFP": "Price wicks below a prior swing low but closes above it. Indicates buying pressure absorbed the sell-side raid.",
+  "sell_SFP": "Price wicks above a prior swing high but closes below it. Indicates selling pressure absorbed the buy-side raid.",
+  "how_to_use": "SFP at a HTF key level (PDH/PDL, OB, FVG boundary) = high-conviction reversal signal. SFP at a random swing = lower significance."
+}

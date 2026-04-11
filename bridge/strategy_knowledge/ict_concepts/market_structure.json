@@ -1,0 +1,48 @@
+{
+  "id": "market_structure",
+  "layer": 1,
+  "definition": "The sequence of swing highs and swing lows that define the current trend direction.",
+  "depends_on": [],
+  "feeds_into": [
+    "dealing_range",
+    "premium_discount",
+    "liquidity",
+    "displacement"
+  ],
+  "related_to": [
+    "dealing_range (structure DEFINES the dealing range boundaries)",
+    "liquidity (swing highs/lows ARE liquidity levels)",
+    "displacement (displacement creates or confirms BOS/CHoCH)"
+  ],
+  "bullish_structure": "Higher highs (HH) and higher lows (HL). Each new swing low is higher than the previous one.",
+  "bearish_structure": "Lower highs (LH) and lower lows (LL). Each new swing high is lower than the previous one.",
+  "break_of_structure": {
+    "BOS": {
+      "definition": "Break of Structure — price breaks a previous swing high (bullish) or swing low (bearish) in the direction of the existing trend. CONFIRMS trend continuation.",
+      "feeds_into": [
+        "order_blocks (the last opposing candle before BOS becomes the OB)",
+        "fair_value_gaps (BOS displacement often creates FVGs)"
+      ],
+      "related_to": "displacement — BOS is often CAUSED BY a displacement candle"
+    },
+    "CHoCH": {
+      "definition": "Change of Character — the FIRST break of a swing point AGAINST the current trend. Signals potential reversal.",
+      "feeds_into": [
+        "dealing_range (new dealing range forms after CHoCH)",
+        "order_blocks (last candle before CHoCH = new OB in reversal direction)"
+      ],
+      "related_to": "liquidity_sweep — CHoCH often occurs AFTER a liquidity sweep (the sweep completes manipulation, CHoCH starts distribution)"
+    },
+    "MSS": {
+      "definition": "Market Structure Shift — LTF confirmation of a reversal. After a CHoCH on HTF, wait for MSS on LTF before entering.",
+      "depends_on": "CHoCH (MSS confirms what CHoCH suggested)",
+      "feeds_into": "trade entry — MSS is the LTF trigger that makes it safe to enter"
+    },
+    "CISD": {
+      "definition": "Change In State of Delivery — when price shifts from delivering bearish candles to bullish (or vice versa). The last opposing candle becomes the entry zone.",
+      "related_to": "order_blocks — the CISD candle IS an order block by definition"
+    }
+  },
+  "multi_timeframe_rule": "HTF dictates direction. LTF provides entry timing. A CHoCH on M15 means nothing if H4 is strongly bullish — it's just a pullback, not a reversal.",
+  "common_mistake": "Trading every BOS/CHoCH without HTF context. A M5 CHoCH inside a H1 bullish orderblock is a BUYING opportunity."
+}

@@ -1,0 +1,25 @@
+{
+  "id": "displacement",
+  "layer": 3,
+  "definition": "Strong aggressive price move (1-3 large-bodied candles) proving institutional commitment.",
+  "depends_on": [
+    "liquidity_sweep (displacement follows confirmed sweep — it's the distribution start)",
+    "market_structure (displacement creates BOS or CHoCH)"
+  ],
+  "feeds_into": [
+    "fair_value_gaps (displacement CREATES FVGs)",
+    "order_blocks (the last opposing candle before displacement IS the OB)",
+    "optimal_trade_entry (Fibonacci applied to the displacement move defines OTE)"
+  ],
+  "related_to": [
+    "PO3_AMD (displacement IS the start of distribution phase)"
+  ],
+  "characteristics": [
+    "Large candle body (70%+ body, minimal wicks)",
+    "Creates Fair Value Gap",
+    "Creates or confirms BOS/CHoCH",
+    "Occurs at start of distribution phase"
+  ],
+  "critical_chain": "Without displacement, there is no FVG, no OB, and no OTE. Displacement is the PROOF of institutional entry. Everything in layers 4-5 depends on displacement having occurred.",
+  "what_it_proves": "That the liquidity_sweep was manipulation (not breakout). That institutions have committed to the new direction. That the OB and FVG created are valid entry zones."
+}

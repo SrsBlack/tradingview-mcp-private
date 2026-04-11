@@ -1,0 +1,19 @@
+{
+  "id": "turtle_soup",
+  "layer": 3,
+  "definition": "Failed breakout / liquidity sweep where price breaks a significant level then immediately reverses back. A specific pattern of liquidity_sweep.",
+  "depends_on": [
+    "liquidity (the level that gets swept)",
+    "market_structure (the swing high/low that defines the level)"
+  ],
+  "feeds_into": [
+    "trade entry — turtle soup itself IS an entry signal when confirmed"
+  ],
+  "related_to": [
+    "liquidity_sweep (turtle soup IS a type of sweep)",
+    "judas_swing (a judas swing can manifest AS a turtle soup pattern)"
+  ],
+  "buy_pattern": "Price breaks below significant low (takes SSL), closes back above → the low was a trap.",
+  "sell_pattern": "Price breaks above significant high (takes BSL), closes back below → the high was a trap.",
+  "confirmation": "Reversal candle must CLOSE back inside prior range. Wick-through + close-back = turtle soup. Close-beyond = real breakout."
+}

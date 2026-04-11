@@ -1,0 +1,58 @@
+{
+  "id": "liquidity",
+  "layer": 1,
+  "definition": "Resting orders — stop losses and pending orders clustered at predictable price levels.",
+  "depends_on": [
+    "market_structure (swing points create liquidity levels)"
+  ],
+  "feeds_into": [
+    "liquidity_sweep (sweeps TARGET these levels)",
+    "draw_on_liquidity (the nearest unswept level is the DOL)",
+    "PO3_AMD (manipulation phase SWEEPS liquidity)",
+    "turtle_soup (turtle soup IS a liquidity sweep + reversal)"
+  ],
+  "related_to": [
+    "dealing_range (range high/low are the primary liquidity levels)",
+    "equal_highs_lows (engineered liquidity — a subset of liquidity)"
+  ],
+  "types": {
+    "buy_side_liquidity_BSL": {
+      "definition": "Stops from shorts + buy-stops from breakout traders sitting ABOVE swing highs, equal highs, resistance.",
+      "created_by": "market_structure — every swing high creates BSL above it",
+      "targeted_by": "liquidity_sweep when price raids above highs"
+    },
+    "sell_side_liquidity_SSL": {
+      "definition": "Stops from longs + sell-stops sitting BELOW swing lows, equal lows, support.",
+      "created_by": "market_structure — every swing low creates SSL below it",
+      "targeted_by": "liquidity_sweep when price raids below lows"
+    }
+  },
+  "external_vs_internal": {
+    "external_liquidity": {
+      "what": "Swing highs and lows — where most stops cluster.",
+      "role": "TARGET — price moves TO these levels to take liquidity. These are your TP.",
+      "connection": "external_liquidity IS draw_on_liquidity. The TP target is always external liquidity."
+    },
+    "internal_liquidity": {
+      "what": "FVGs, order blocks, breaker blocks — price inefficiencies inside the range.",
+      "role": "ENTRY — you enter AT these levels after external liquidity is taken.",
+      "connection": "internal_liquidity = order_blocks + fair_value_gaps + breaker_blocks. These concepts ARE internal liquidity."
+    }
+  },
+  "equal_highs_lows": {
+    "definition": "Two or more swing highs/lows at nearly the same price — engineered liquidity magnets.",
+    "connection": "Equal highs/lows are a SUBSET of liquidity. They form at dealing_range boundaries or within structure. They are HIGH-PRIORITY draw_on_liquidity targets."
+  },
+  "draw_on_liquidity": {
+    "definition": "The nearest unswept external liquidity in the expected direction. This is WHERE price is going.",
+    "depends_on": "market_structure (to identify unswept swing points) + liquidity (to know which levels are unswept)",
+    "feeds_into": "trade execution — draw_on_liquidity IS your TP target",
+    "examples": [
+      "PDH/PDL (previous day's dealing_range extremes)",
+      "PWH/PWL (weekly dealing_range)",
+      "Equal highs/lows",
+      "Unfilled HTF FVGs",
+      "Unmitigated HTF order_blocks"
+    ]
+  }
+}

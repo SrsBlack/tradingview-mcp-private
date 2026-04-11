@@ -1,0 +1,26 @@
+{
+  "id": "dealing_range",
+  "layer": 1,
+  "definition": "The range between a significant swing high and swing low that price is currently operating within.",
+  "depends_on": [
+    "market_structure (swings DEFINE the dealing range)"
+  ],
+  "feeds_into": [
+    "premium_discount (dealing range is divided into premium/discount at 50%)",
+    "CRT (each candle IS a micro dealing range)",
+    "liquidity (range high/low ARE external liquidity)"
+  ],
+  "related_to": [
+    "market_structure (structure creates the swings that bound the range)",
+    "PO3 (daily dealing range follows the PO3 pattern)"
+  ],
+  "components": {
+    "range_high": "The swing high — also BSL (buy-side liquidity target)",
+    "range_low": "The swing low — also SSL (sell-side liquidity target)",
+    "equilibrium": "50% of the range — fair value. This is WHERE premium_discount divides.",
+    "premium": "Upper half (above 50%) — this IS the premium_discount concept applied",
+    "discount": "Lower half (below 50%) — this IS the premium_discount concept applied"
+  },
+  "nested_dealing_ranges": "Every timeframe has its own dealing range. H4 range contains H1 ranges, which contain M15 ranges. The ACTIVE dealing range is the one on your trading timeframe, but it must align with the HTF range from market_structure.",
+  "connection_note": "The dealing range is the BRIDGE between market_structure (which defines the swings) and premium_discount (which classifies where price is). You cannot have premium/discount without a dealing range, and you cannot have a dealing range without structure."
+}

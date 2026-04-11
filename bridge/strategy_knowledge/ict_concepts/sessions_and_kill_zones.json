@@ -1,0 +1,61 @@
+{
+  "id": "sessions_kill_zones",
+  "layer": 2,
+  "definition": "Time windows when institutional algorithms are most active.",
+  "depends_on": [],
+  "feeds_into": [
+    "PO3_AMD (sessions MAP TO PO3 phases)",
+    "liquidity_sweep (kill zones are WHEN sweeps happen)",
+    "silver_bullet (silver bullets are micro kill zones)"
+  ],
+  "related_to": [
+    "PO3_AMD (Asian=accumulation, London=manipulation, NY=distribution)"
+  ],
+  "kill_zones": {
+    "asian": {
+      "time": "8:00 PM - 12:00 AM ET",
+      "PO3_phase": "ACCUMULATION",
+      "purpose": "Range building. Mark high/low — they WILL be swept in London/NY.",
+      "tradeable": "Low. Only trade if clear HTF setup.",
+      "creates": "Liquidity levels (Asian high/low) that London and NY will sweep"
+    },
+    "london": {
+      "time": "2:00 AM - 5:00 AM ET",
+      "PO3_phase": "MANIPULATION",
+      "purpose": "Sweeps Asian high or low. Judas swing window.",
+      "tradeable": "High for forex and gold.",
+      "targets": "The liquidity (Asian high/low) built during accumulation phase"
+    },
+    "new_york": {
+      "time": "7:00 AM - 10:00 AM ET",
+      "PO3_phase": "MANIPULATION → DISTRIBUTION transition",
+      "purpose": "Highest volume. 10 AM is THE manipulation event.",
+      "tradeable": "Highest probability for all assets.",
+      "targets": "London high/low + PDH/PDL liquidity"
+    },
+    "london_close": {
+      "time": "10:00 AM - 12:00 PM ET",
+      "PO3_phase": "DISTRIBUTION",
+      "purpose": "Distribution continues. London position squaring can create counter-moves.",
+      "tradeable": "Medium. Continuation trades if NY direction established."
+    }
+  },
+  "silver_bullet_windows": {
+    "connection": "Silver bullets are MICRO kill zones where FVGs on M15 have highest probability",
+    "london_SB": {
+      "time": "3:00-4:00 AM ET",
+      "best_for": "Forex, Gold",
+      "entry": "FVG fill on M15"
+    },
+    "NY_AM_SB": {
+      "time": "10:00-11:00 AM ET",
+      "best_for": "Indices, Crypto",
+      "entry": "FVG fill on M15 after 10 AM manipulation"
+    },
+    "NY_PM_SB": {
+      "time": "2:00-3:00 PM ET",
+      "best_for": "Continuation trades",
+      "entry": "FVG fill on M15"
+    }
+  }
+}

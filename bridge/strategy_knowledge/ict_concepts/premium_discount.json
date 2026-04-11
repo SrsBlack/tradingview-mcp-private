@@ -1,0 +1,24 @@
+{
+  "id": "premium_discount",
+  "layer": 2,
+  "definition": "Every dealing range divides into premium (upper 50%) and discount (lower 50%) at the equilibrium.",
+  "depends_on": [
+    "dealing_range (provides the range to divide)",
+    "market_structure (determines which direction to trade)"
+  ],
+  "feeds_into": [
+    "trade entry decision (BUY only in discount, SELL only in premium)",
+    "optimal_trade_entry (OTE zone should be in correct premium/discount area)"
+  ],
+  "related_to": [
+    "order_blocks (an OB in the wrong zone is less reliable)",
+    "fair_value_gaps (an FVG in the wrong zone is less reliable)"
+  ],
+  "equilibrium": "50% level of dealing range — fair value. Institutional algorithms balance around this.",
+  "rules": {
+    "buy_in_discount": "Longs ONLY below 50% — buying below fair value.",
+    "sell_in_premium": "Shorts ONLY above 50% — selling above fair value.",
+    "zone_violation": "An order_block or fair_value_gap in the WRONG zone (OB for longs in premium) is still technically valid but has significantly lower probability. Reduce grade by 1."
+  },
+  "nested_application": "Premium/discount applies at EVERY timeframe via nested dealing_ranges. HTF discount + LTF discount = strongest alignment."
+}

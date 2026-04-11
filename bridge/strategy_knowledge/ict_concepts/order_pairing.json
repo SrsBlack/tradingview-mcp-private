@@ -1,0 +1,20 @@
+{
+  "id": "order_pairing",
+  "layer": 6,
+  "definition": "Buy-side and sell-side liquidity operate as PAIRED targets — when one side is swept, the opposite side becomes the draw on liquidity. This is the fundamental mechanism of how price delivery works.",
+  "depends_on": [
+    "liquidity (BSL and SSL are the paired targets)",
+    "session_levels (PDH/PDL, PWH/PWL are naturally paired)"
+  ],
+  "feeds_into": [
+    "draw_on_liquidity (swept side eliminates one target, pairing identifies the NEXT target)",
+    "trade execution (SL at swept side, TP at paired target)"
+  ],
+  "related_to": [
+    "market_maker_model (MMM buy model sweeps SSL, targets BSL — that IS order pairing)",
+    "CRT (candle high/low are paired — sweep one, target the other)"
+  ],
+  "core_principle": "Every liquidity level has a PAIR. PDH ↔ PDL. PWH ↔ PWL. Asian High ↔ Asian Low. Equal highs ↔ Equal lows. When price sweeps one side of the pair, the OTHER side becomes the new target.",
+  "application": "After a confirmed liquidity_sweep of SSL (sell-side swept), the draw on liquidity is BSL (buy-side). Your TP = the paired BSL level. This is HOW you determine TP — not from arbitrary R:R multiples but from the paired liquidity target.",
+  "why_it_works": "Institutions sweep one side to fill orders, then drive price to the other side where more orders wait. The pairing IS the institutional order book in action."
+}
