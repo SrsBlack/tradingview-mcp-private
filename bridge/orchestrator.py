@@ -623,6 +623,11 @@ class Orchestrator:
             if paper_restored:
                 print(f"[PAPER] Restored {len(paper_restored)} shadow position(s) from state", flush=True)
 
+        # --- Mirror live MT5 positions into paper shadow ---
+        # Ensures paper always tracks what live is doing, even across restarts
+        if self.paper_shadow is not self.executor and restored_positions:
+            self._mirror_live_to_paper(restored_positions)
+
         # --- Load today's closed trades from session store for display ---
         today_trades = self._load_todays_trades()
 
@@ -858,42 +863,47 @@ class Orchestrator:
         # Run ICT pipeline (synchronous — subprocess calls)
         analysis = self.pipeline.analyze_symbol(symbol)
 
+        # Always log the full analysis — even if we skip the trade.
+        # This is the core audit trail for verifying setup quality.
+        ea_signals = []
+        skip_reason = None
+
         # Skip if data could not be fetched (chart still loading, symbol unavailable, etc.)
         if analysis.error == "DATA_UNAVAILABLE":
+            skip_reason = "DATA_UNAVAILABLE"
             print(f"  [{symbol}] DATA_UNAVAILABLE — skipping (chart not loaded)", flush=True)
-            return
 
         # Price sanity check — reject if price is outside expected range for this symbol
-        if analysis.current_price > 0 and not price_in_range(symbol, analysis.current_price):
+        elif analysis.current_price > 0 and not price_in_range(symbol, analysis.current_price):
             rng = PRICE_RANGES.get(symbol.split(":")[-1], ("?", "?"))
-            print(f"  [{symbol}] PRICE_ERROR — got {analysis.current_price:.4f}, expected {rng[0]}-{rng[1]}. Chart not switched correctly, skipping.", flush=True)
-            return
+            skip_reason = f"PRICE_ERROR: got {analysis.current_price:.4f}, expected {rng[0]}-{rng[1]}"
+            print(f"  [{symbol}] {skip_reason}. Chart not switched correctly, skipping.", flush=True)
 
         # Sweep gate: liquidity sweep is required for any trade
-        if not analysis.sweep_detected:
+        elif not analysis.sweep_detected:
+            skip_reason = "NO_SWEEP"
             print(f"  [{symbol}] NO_SWEEP — skipping (no liquidity sweep detected)", flush=True)
-            return
 
-        # Run EA+ICT strategy ensemble in parallel
-        ea_signals = []
-        try:
-            ea_signals = self.strategy_engine.process_symbol(symbol)
-        except Exception as e:
-            print(f"  [{symbol}] EA ensemble error: {e}", flush=True)
+        else:
+            # Run EA+ICT strategy ensemble in parallel
+            try:
+                ea_signals = self.strategy_engine.process_symbol(symbol)
+            except Exception as e:
+                print(f"  [{symbol}] EA ensemble error: {e}", flush=True)
 
-        # Log analysis
-        log_entry = {
-            "symbol": analysis.symbol,
-            "grade": analysis.grade,
-            "score": analysis.total_score,
-            "direction": analysis.direction,
-            "confluence": analysis.confluence_factors,
-            "ea_signals": len(ea_signals),
-        }
+        # Log full analysis with skip reason if applicable
+        log_entry = analysis.to_dict()
+        log_entry["ea_signals"] = len(ea_signals)
         if ea_signals:
             log_entry["ea_direction"] = ea_signals[0].direction.value
             log_entry["ea_score"] = ea_signals[0].final_score
+        if skip_reason:
+            log_entry["skip_reason"] = skip_reason
         self.session.log_analysis(log_entry)
+
+        # If skipped, don't proceed to decision
+        if skip_reason:
+            return
 
         ea_info = ""
         if ea_signals:
@@ -1026,6 +1036,55 @@ class Orchestrator:
         if decision.reasoning:
             print(f"  [{symbol}] Reason: {decision.reasoning}", flush=True)
 
+        # ── Paper shadow: ALWAYS record trade decisions for audit ──
+        # Must run BEFORE kill switch / correlation gates so paper captures
+        # every trade Claude decides on, even if live blocks it.
+        if decision.is_trade and self.paper_shadow is not self.executor:
+            paper_lot = self._fallback_paper_lots(decision)
+            live_block_reason = ""
+            try:
+                shadow_result = self.paper_shadow.open_position(decision, lot_size=paper_lot)
+                if shadow_result["success"]:
+                    paper_ticket = shadow_result["ticket"]
+                    print(f"  [{symbol}] Paper #{paper_ticket}: {decision.action} @ {decision.entry_price:.2f}", flush=True)
+                    self.session.log_trade({
+                        "event": "PAPER_OPEN",
+                        "ticket": paper_ticket,
+                        "symbol": decision.symbol,
+                        "direction": decision.action,
+                        "entry_price": decision.entry_price,
+                        "sl_price": decision.sl_price,
+                        "tp_price": decision.tp_price,
+                        "tp2_price": decision.tp2_price,
+                        "lot_size": paper_lot,
+                        "risk_pct": decision.risk_pct,
+                        "ict_grade": decision.grade,
+                        "ict_score": decision.ict_score,
+                        "confidence": decision.confidence,
+                        "reasoning": decision.reasoning,
+                        "mode": "paper_shadow",
+                    })
+                    # Draw paper trade on TradingView (P- prefix distinguishes from live)
+                    try:
+                        entity_ids = self.tv_client.draw_trade(
+                            symbol=decision.symbol,
+                            direction=decision.action,
+                            entry=decision.entry_price,
+                            sl=decision.sl_price,
+                            tp1=decision.tp_price,
+                            tp2=decision.tp2_price,
+                            grade=f"P-{decision.grade}",
+                            ticket=paper_ticket,
+                        )
+                        if entity_ids:
+                            self._trade_drawings[f"paper_{paper_ticket}"] = entity_ids
+                            self._save_trade_drawings()
+                    except Exception:
+                        pass
+                    self.paper_state_store.save(self.paper_shadow, "paper_shadow")
+            except Exception as e:
+                print(f"  [{symbol}] Paper shadow error: {e}", flush=True)
+
         # Check daily loss kill switch (2%)
         daily_pnl_pct = self.executor.daily_pnl / self.executor.initial_balance if self.executor.initial_balance else 0
         if daily_pnl_pct <= -0.02 and not self._kill_switch_triggered:
@@ -1054,7 +1113,7 @@ class Orchestrator:
                 decision.symbol, decision.action, self.executor.open_positions
             )
             if not corr_ok:
-                print(f"  [{symbol}] BLOCKED: {corr_reason}", flush=True)
+                print(f"  [{symbol}] BLOCKED (live): {corr_reason}", flush=True)
                 self.session.log_decision(decision)
                 return
 
@@ -1070,61 +1129,6 @@ class Orchestrator:
                 daily_pnl=self.executor.daily_pnl,
                 peak_balance=self.executor.peak_balance,
             )
-
-            # ── Paper shadow: ALWAYS record trade decisions for audit ──
-            # Records even if risk rejects or live executor fails.
-            # In paper mode, main executor IS the paper executor — skip shadow to avoid dupes.
-            if self.paper_shadow is not self.executor:
-                paper_lot = lot_size if lot_size and lot_size > 0 else self._fallback_paper_lots(decision)
-                try:
-                    shadow_result = self.paper_shadow.open_position(decision, lot_size=paper_lot)
-                    if shadow_result["success"]:
-                        paper_ticket = shadow_result["ticket"]
-                        blocked_by = ""
-                        if not approved:
-                            blocked_by = f" (LIVE BLOCKED: {risk_msg})"
-                        print(f"  [{symbol}] Paper #{paper_ticket}: {decision.action} @ {decision.entry_price:.2f}{blocked_by}", flush=True)
-                        # Log paper trade to session
-                        self.session.log_trade({
-                            "event": "PAPER_OPEN",
-                            "ticket": paper_ticket,
-                            "symbol": decision.symbol,
-                            "direction": decision.action,
-                            "entry_price": decision.entry_price,
-                            "sl_price": decision.sl_price,
-                            "tp_price": decision.tp_price,
-                            "tp2_price": decision.tp2_price,
-                            "lot_size": paper_lot,
-                            "risk_pct": decision.risk_pct,
-                            "ict_grade": decision.grade,
-                            "ict_score": decision.ict_score,
-                            "confidence": decision.confidence,
-                            "reasoning": decision.reasoning,
-                            "live_approved": approved,
-                            "live_risk_msg": risk_msg if not approved else "",
-                            "mode": "paper_shadow",
-                        })
-                        # Draw paper trade on TradingView (P- prefix distinguishes from live)
-                        try:
-                            entity_ids = self.tv_client.draw_trade(
-                                symbol=decision.symbol,
-                                direction=decision.action,
-                                entry=decision.entry_price,
-                                sl=decision.sl_price,
-                                tp1=decision.tp_price,
-                                tp2=decision.tp2_price,
-                                grade=f"P-{decision.grade}",
-                                ticket=paper_ticket,
-                            )
-                            if entity_ids:
-                                self._trade_drawings[f"paper_{paper_ticket}"] = entity_ids
-                                self._save_trade_drawings()
-                        except Exception:
-                            pass
-                        # Persist paper shadow state
-                        self.paper_state_store.save(self.paper_shadow, "paper_shadow")
-                except Exception as e:
-                    print(f"  [{symbol}] Paper shadow error: {e}", flush=True)
 
             if not approved:
                 print(f"  [{symbol}] Risk rejected: {risk_msg}", flush=True)
@@ -1293,6 +1297,54 @@ class Orchestrator:
                     print(f"[PAPER] Shadow position check error: {e}", flush=True)
 
             await asyncio.sleep(self.position_interval)
+
+    def _mirror_live_to_paper(self, restored_positions: list[dict]) -> None:
+        """Mirror bridge-opened live positions into paper shadow.
+
+        Only mirrors positions from `restored_positions` (which come from the
+        bridge's own state_store.py — NOT from MT5 directly). This means only
+        trades opened by our bridge system are mirrored, never trades from
+        other EAs or manual trades on the same MT5 account.
+        """
+        paper_symbols_tickets = {
+            (p.symbol, p.entry_price) for p in self.paper_shadow.open_positions.values()
+        }
+
+        mirrored = 0
+        for pos_dict in restored_positions:
+            key = (pos_dict.get("symbol", ""), pos_dict.get("entry_price", 0))
+            if key in paper_symbols_tickets:
+                continue  # already in paper
+
+            # Build a minimal TradeDecision to open in paper
+            from bridge.decision_types import TradeDecision
+            decision = TradeDecision(
+                action=pos_dict.get("direction", "BUY"),
+                symbol=pos_dict.get("symbol", ""),
+                entry_price=pos_dict.get("entry_price", 0),
+                sl_price=pos_dict.get("sl_price", 0),
+                tp_price=pos_dict.get("tp_price", 0),
+                tp2_price=pos_dict.get("tp2_price", 0),
+                confidence=80,
+                risk_pct=pos_dict.get("risk_pct", 0.0075),
+                reasoning="Mirrored from live MT5 position on startup",
+                grade=pos_dict.get("ict_grade", "B"),
+                ict_score=pos_dict.get("ict_score", 0),
+                model_used="mirror",
+            )
+            lot_size = pos_dict.get("lot_size", self._fallback_paper_lots(decision))
+            try:
+                result = self.paper_shadow.open_position(decision, lot_size=lot_size)
+                if result["success"]:
+                    mirrored += 1
+                    print(f"  [PAPER] Mirrored live #{pos_dict.get('ticket')} "
+                          f"{pos_dict.get('symbol')} @ {pos_dict.get('entry_price')}", flush=True)
+            except Exception as e:
+                print(f"  [PAPER] Mirror error: {e}", flush=True)
+
+        if mirrored:
+            self.paper_state_store.save(self.paper_shadow, "paper_shadow")
+            print(f"[PAPER] Mirrored {mirrored} live position(s) into paper shadow", flush=True)
 
     def _reconcile_restored_positions(self) -> None:
         """Check restored positions against live prices — close any that hit SL/TP while bridge was down."""
