@@ -20,5 +20,62 @@
     "forex": "EURUSD ↔ GBPUSD",
     "metals": "XAUUSD ↔ XAGUSD"
   },
+  "operational_definition": "SMT fires when: Instrument A makes a new swing high or swing low within the current session window, but correlated Instrument B does NOT make a corresponding swing high or swing low within the same 2–3 candle window on the same timeframe. The divergence must be at the swing level — not tick-level noise.",
+  "significance_scoring": {
+    "strong_SMT": {
+      "condition": "Both instruments are at key levels (session high/low, OB, FVG) but only one sweeps",
+      "confluence_points": 8,
+      "note": "Highest conviction — institutional positioning is clearest at key levels"
+    },
+    "moderate_SMT": {
+      "condition": "One instrument is at a key level, the other is in open price space",
+      "confluence_points": 5,
+      "note": "Valid signal but less precise — use with additional confluence"
+    },
+    "weak_SMT": {
+      "condition": "Both instruments are in open price space with only structural disagreement",
+      "confluence_points": 3,
+      "note": "Lowest weight — do not trade on weak SMT alone"
+    }
+  },
+  "pair_specific_rules": {
+    "ES_NQ": {
+      "pair": "ES ↔ NQ (US500 ↔ US100)",
+      "reliability": "Most reliable SMT pair. High daily correlation means divergence is significant.",
+      "lead_instrument": "NQ leads on reversals — tech-heavy index tends to show institutional intent first.",
+      "signal": "If NQ makes new high but ES doesn't → NQ high is likely manipulation. Fade NQ toward ES level."
+    },
+    "BTC_ETH": {
+      "pair": "BTC ↔ ETH",
+      "reliability": "Reliable during trending crypto markets. Correlation weakens during alt-season.",
+      "lead_instrument": "BTC leads. ETH is the confirmation instrument.",
+      "signal": "If BTC sweeps low but ETH doesn't → bullish BTC signal. Institutions are buying the BTC dip while ETH holds (no distribution)."
+    },
+    "EURUSD_GBPUSD": {
+      "pair": "EURUSD ↔ GBPUSD",
+      "reliability": "USD-driven correlation. Both pairs move opposite to DXY strength.",
+      "lead_instrument": "DXY-driven — when USD is the mover, both pairs should react similarly.",
+      "signal": "If EURUSD makes new low but GBPUSD doesn't → USD weakness incoming. Bullish for EUR and GBP."
+    },
+    "XAUUSD_XAGUSD": {
+      "pair": "XAUUSD ↔ XAGUSD",
+      "reliability": "Moderate. Silver is more volatile and can diverge without institutional significance.",
+      "lead_instrument": "Gold leads. Silver is the confirmation instrument.",
+      "signal": "If gold sweeps high but silver doesn't → likely gold reversal. Institutions distributing gold while silver (smaller market) is not participating."
+    },
+    "DXY_inverse": {
+      "pair": "EURUSD ↔ DXY (inverse correlation)",
+      "reliability": "High — DXY is the direct driver of EUR/USD pricing.",
+      "signal": "If DXY makes new high but EURUSD does NOT make a new low → DXY reversal likely. Fade DXY strength, go long EURUSD."
+    }
+  },
+  "timeframe_rule": "Use the same timeframe for both instruments when assessing SMT. M15 for intraday sessions, H4 for swing-level analysis. Do NOT compare M15 on one instrument with H1 on another — mismatched timeframes produce false divergences.",
+  "session_validity": "SMT is valid for the current session only. A London session SMT does not carry into the NY session — each session resets the structural context. Reassess SMT at each session open.",
+  "bridge_usage": "When a liquidity sweep is detected on the primary symbol, check the correlated instrument for SMT divergence. If SMT is confirmed → add the appropriate confluence points to the setup grade. If correlated instrument data is unavailable → proceed without SMT but flag lower confidence in the signal. SMT confirmation can elevate a Grade B setup to Grade A when combined with other confluences.",
+  "common_mistakes": [
+    "1. Using uncorrelated pairs as SMT. EURUSD vs XAUUSD is not a direct SMT pair — their correlation is indirect and context-dependent.",
+    "2. Comparing different timeframes across the two instruments. Always use matching timeframes.",
+    "3. Treating every minor divergence as SMT — the concept requires swing-level structural disagreement, not tick-level or 1-minute noise."
+  ],
   "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence."
 }

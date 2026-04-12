@@ -16,6 +16,45 @@
     "PO3_AMD (CISD marks the transition from manipulation to distribution)"
   ],
   "vs_CHoCH": "CHoCH requires a swing point to be broken. CISD fires BEFORE that — it detects the shift in candle delivery. CISD is the early warning; CHoCH is the confirmation.",
-  "how_to_trade": "When candle delivery shifts (3+ bearish candles followed by 1 bullish candle with body close above prior candle high), the bullish candle's low is the entry zone. Enter on retest. SL below the manipulation extreme.",
-  "PO3_connection": "CISD typically occurs at the exact moment PO3 transitions from manipulation to distribution. It IS the phase transition signal."
+  "operational_trigger": {
+    "definition": "CISD fires when all three conditions are met simultaneously:",
+    "condition_1": "3 or more consecutive candles deliver in ONE direction — all bearish bodies (bodies, not wicks) OR all bullish bodies. Wicks on the opposite side are acceptable; BODIES must be same-direction.",
+    "condition_2": "The NEXT candle's body closes BEYOND the prior candle's body extreme in the opposite direction. For bullish CISD: body closes ABOVE the body high of the last bearish candle. For bearish CISD: body closes BELOW the body low of the last bullish candle.",
+    "condition_3": "That reversal candle IS the entry zone — its body defines the order block. The 50% of the reversal candle body is the optimal entry. The full body is the entry zone range."
+  },
+  "candle_counting_rules": {
+    "minimum": "3 consecutive same-direction BODY candles required before CISD can trigger. Fewer than 3 = not a valid CISD setup.",
+    "optimal": "4-6 consecutive candles of same delivery produce the highest probability CISD. More candles = more compressed delivery = more powerful reversal.",
+    "the_trigger_candle": "The 4th+ candle (the reversal candle) is the CISD candle. It becomes both the signal and the entry zone.",
+    "invalidation": "If ANY candle in the 3+ sequence has a body that closes beyond the delivery extreme (e.g., a bullish candle body closes above a bearish sequence extreme), restart the count."
+  },
+  "CISD_vs_CHoCH_timing": {
+    "CISD_timing": "CISD fires 1-3 candles BEFORE CHoCH confirms. It is the early entry signal.",
+    "CHoCH_timing": "CHoCH requires a swing point break — this takes at least 1-2 additional candles beyond CISD.",
+    "trade_off": "CISD = earlier entry, better R:R, lower structural confirmation. CHoCH = later entry, worse R:R, higher structural confirmation.",
+    "recommendation": "Use CISD only when HTF alignment is already confirmed. The reduced confirmation is acceptable when HTF context is strong."
+  },
+  "risk_reward": {
+    "CISD_entry": "Entry at 50% of CISD candle body (OTE within CISD). SL below CISD candle low (bullish) or above CISD candle high (bearish).",
+    "advantage": "Earlier entry = smaller SL distance = larger position size for same risk = better R:R. Target remains same HTF draw.",
+    "disadvantage": "No structural confirmation yet. Price could continue the original delivery direction. This is why HTF alignment is mandatory.",
+    "typical_RR": "CISD entries often achieve 5:1 to 10:1 R:R when HTF aligned, vs 2:1 to 4:1 for waiting for CHoCH confirmation."
+  },
+  "timeframe_application": {
+    "high_conviction": "M15 CISD inside an H4 order block with H4 bullish bias = maximum conviction entry.",
+    "medium_conviction": "M15 CISD at H4 equilibrium (50% of H4 dealing range) with daily bias aligned.",
+    "low_conviction": "M15 CISD against H4 trend direction = do not trade. The CISD is likely just a pullback within the H4 delivery.",
+    "rule": "CISD timeframe must be AT LEAST 2 degrees lower than the HTF bias timeframe (H4 bias requires M15 or lower CISD; Daily bias requires H1 or lower CISD)."
+  },
+  "entry_mechanics": {
+    "step_1": "Identify the CISD candle — the reversal candle that closes against the prior 3+ candle delivery direction.",
+    "step_2": "Mark the CISD candle body: top of body (high) and bottom of body (low). This zone is the order block.",
+    "step_3": "Wait for price to retrace BACK INTO the CISD candle body. Do not chase the initial move.",
+    "step_4": "Optimal entry is at the 50% level of the CISD candle body (the midpoint).",
+    "step_5_bullish": "For bullish CISD: place SL below the CISD candle low (below the wick, not just the body).",
+    "step_5_bearish": "For bearish CISD: place SL above the CISD candle high.",
+    "TP": "First target = prior swing high (for bullish) or prior swing low (for bearish). Extended target = HTF draw on liquidity."
+  },
+  "PO3_connection": "CISD typically occurs at the exact moment PO3 transitions from manipulation to distribution. It IS the phase transition signal.",
+  "how_to_trade": "When candle delivery shifts (3+ bearish candles followed by 1 bullish candle with body close above prior candle high), the bullish candle's low is the entry zone. Enter on retest. SL below the manipulation extreme."
 }

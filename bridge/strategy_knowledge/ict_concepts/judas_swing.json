@@ -20,5 +20,38 @@
     "Takes out a key level (Asian high/low, PDH/PDL)",
     "After the sweep, displacement candles form in OPPOSITE direction"
   ],
+  "confirmation_criteria": {
+    "note": "ALL 3 criteria must be met before classifying a move as a Judas swing",
+    "criteria": [
+      "1. TIMING: Occurs within first 30–60 minutes of London (2:00–3:00 AM ET) or NY (9:30–10:00 AM ET) session open.",
+      "2. LEVEL: Sweeps a specific, identifiable level — Asian session high or low, PDH, PDL, or a visible equal high/low (EQH/EQL).",
+      "3. REVERSAL: A displacement candle forms in the opposite direction within 15–30 minutes of the sweep. Without this candle, it is not confirmed."
+    ]
+  },
+  "volume_signature": "Judas swing volume is moderate — not climactic. Institutions are trapping retail, not driving a genuine breakout. If volume is 3x+ the 20-period average on the sweep candle, treat it as a potential genuine breakout, not a Judas. High-volume sweeps require additional confirmation before fading.",
+  "judas_vs_genuine_breakout": {
+    "judas_swing": "Sweep of key level + immediate reversal displacement within 15–30 min + moderate volume.",
+    "genuine_breakout": "Sweep of key level + continuation candles in the direction of the break + increasing volume with each successive candle + displacement IN the direction of the break, not against it."
+  },
+  "time_filter": "If the initial move has NOT reversed within 60 minutes of the sweep, it is likely NOT a Judas swing — it is the real direction. Do not fade moves that hold for more than one hour after the sweep.",
+  "trading_sequence": [
+    "1. Identify the sweep level (Asian high/low, PDH/PDL, EQH/EQL).",
+    "2. Wait for reversal displacement candle to form in the opposite direction.",
+    "3. Mark the FVG or OB created by the displacement candle.",
+    "4. Enter on the first retest of the FVG or OB (limit order or confirmation entry).",
+    "5. Place SL below the sweep extreme (the actual low/high of the judas wick + 1-2 ticks buffer).",
+    "6. TP = opposite session level. If sweep was PDL, target PDH area. If sweep was Asian low, target Asian high or PDH."
+  ],
+  "rr_expectations": "Judas swing setups typically offer 3:1 to 5:1 R:R because entry is positioned near the structural extreme (the sweep low/high). This is among the highest R:R ICT setups when properly identified.",
+  "common_mistakes": [
+    "1. Entering DURING the Judas swing in the direction of the initial move — waiting for reversal confirmation is mandatory.",
+    "2. Trading a Judas swing that goes against the HTF daily bias — Judas swings should fade toward the bias direction, not against it.",
+    "3. Calling every pullback or minor sweep a 'Judas swing' — the concept requires a session-open timing context and a specific identifiable level being swept."
+  ],
+  "session_specific_behavior": {
+    "london": "London Judas tends to sweep Asian session levels (Asian high or Asian low). This is the most reliable Judas timing.",
+    "new_york": "NY Judas tends to sweep London session levels or PDH/PDL. The 9:30–10:00 AM ET window is the primary NY Judas zone.",
+    "asian": "Asian session rarely produces true Judas swings — the session IS accumulation, not manipulation. Avoid applying this concept during Asian hours."
+  },
   "trading_rule": "NEVER chase the first move of a session. Wait 30-60 min, identify if judas swing occurred, then trade the reversal."
 }

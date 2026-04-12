@@ -14,6 +14,51 @@
     "fair_value_gaps (FVG = price gap, liquidity_void = volume gap — related but different)",
     "balanced_price_range (BPR fills voids)"
   ],
+  "formation_conditions": {
+    "primary_trigger": "Created by large single-candle moves — typically 3% or greater move on the timeframe being analyzed — accompanied by above-average volume on the displacement candle itself but ZERO volume through the gap zone.",
+    "volume_signature": "The displacement candle shows 2x or greater average volume. The BODY of the candle (the void zone) shows near-zero volume on the volume profile — no orders were matched as price moved through that area.",
+    "the_mechanism": "When price moves so fast (e.g., on a news event or liquidity sweep) that no counter-party orders are available at intermediate prices, price jumps from one level to another. The zone between the opening price and closing price of that move is the void — no trades occurred there.",
+    "visual_identification": "Long-bodied candles with minimal wicks. The candle body is the void. The small wicks indicate brief order matching at the extremes, but the body itself represents a price range that was traversed without meaningful order interaction."
+  },
+  "identification_methods": {
+    "volume_profile": "On a volume profile (horizontal histogram), the void appears as a price range with less than 10% of the average volume per price level. This is the most accurate identification method.",
+    "price_chart": "On a candlestick chart, look for: long candle body, minimal wicks, sudden price jump, followed by price moving away without filling the gap. The body zone = the void.",
+    "confirmation": "The cleaner the body (fewer wicks through the range), the purer the void. Candles with many small wicks through the body zone indicate some order matching occurred — a partial void, not a clean void."
+  },
+  "void_vs_FVG_comparison": {
+    "FVG_definition": "Fair Value Gap: a price pattern using 3 candles where candle 1 high (or low) does not overlap with candle 3 low (or high). Pure price-based gap pattern.",
+    "void_definition": "Liquidity Void: a volume-based gap where volume profile shows near-zero traded volume across a price range. Can span any number of candles.",
+    "overlap": "An FVG that ALSO shows near-zero volume on the volume profile = HIGHEST PRIORITY retracement target. The price pattern confirms it AND the volume data confirms it.",
+    "FVG_without_void": "FVG with normal volume = price gap pattern only. Standard fill probability. Lower priority than void-confirmed FVG.",
+    "void_without_FVG": "Volume void without an FVG price pattern = still a fill target, but identified only via volume profile. Requires volume data to detect.",
+    "priority_ranking": "1st: FVG + volume void (both confirm) | 2nd: Volume void alone | 3rd: FVG alone"
+  },
+  "fill_behavior": {
+    "partial_fill_rate": "Approximately 80% of liquidity voids get at least partially filled within 5 trading sessions. Voids are strong draw targets.",
+    "full_fill": "Price retraces through the ENTIRE void zone, from one end to the other. After a full fill, the void is neutralized and price can continue.",
+    "partial_fill": "Price enters the void zone but reverses before crossing through it completely. The void partially acts as support/resistance — price respects the far edge.",
+    "respect_pattern": "When price touches the near edge of a void and immediately reverses, this is called a void 'respect.' The void boundary acts as strong S/R.",
+    "session_count": "Use trading sessions (not calendar days) to count the 5-session partial fill window. Weekend gaps reset the count."
+  },
+  "trading_application": {
+    "void_above_as_draw": "If a void exists ABOVE current price and HTF bias is bullish, the void IS the draw. Price will likely move up to fill the void before continuing higher or reversing at the void's upper edge.",
+    "void_below_as_draw": "If a void exists BELOW current price and HTF bias is bearish, the void IS the draw. Enter short targeting the void fill.",
+    "void_as_TP": "When a void sits between entry and final target, use the NEAR EDGE of the void as TP1. Price often pauses at void boundaries before deciding to fill or respect.",
+    "void_as_confirmation": "If price enters a void and displaces through it cleanly (no reversal), this is strong momentum confirmation. Add to position at the void midpoint.",
+    "entry_on_partial_fill": "Price pulls back into a void (partial fill) then reverses = high probability entry zone. The void midpoint often acts as equilibrium for the retracement."
+  },
+  "SL_placement_guide": {
+    "rule": "Place SL on the other side of an unfilled void — voids act as support/resistance until filled.",
+    "bullish_trade": "If entering long at the bottom edge of an unfilled void above, SL goes below the void's lower boundary. A void that has not been filled will typically hold as support.",
+    "bearish_trade": "If entering short at the top edge of an unfilled void below, SL goes above the void's upper boundary.",
+    "rationale": "An unfilled void creates a price range where no orders were matched. If price returns to the void without filling it, the void boundary acts as a magnet — price is unlikely to invalidate the trade without first filling the void."
+  },
+  "void_expiration": {
+    "definition": "Voids that survive more than 20 trading sessions without being tested become 'stale voids.'",
+    "stale_behavior": "Stale voids still attract price eventually but with reduced urgency. They are still valid draw targets but should not be primary targets — treat as secondary targets.",
+    "never_forget": "No void fully disappears from the chart. Voids that are 6-12 months old can still be filled on a sudden high-volatility move. Mark them on HTF charts and revisit when price approaches.",
+    "priority_decay": "Fresh void (0-5 sessions) = highest priority draw. Aged void (6-20 sessions) = medium priority. Stale void (20+ sessions) = low priority but still valid."
+  },
   "vs_FVG": "FVG: gap between candle 1 high and candle 3 low (pure price pattern). Liquidity void: area where volume profile shows zero or near-zero traded volume. An FVG CAN be a liquidity void, but not all FVGs are voids, and voids can exist without FVG pattern.",
   "how_to_use": "Price fills liquidity voids before continuing. If a void exists between entry and TP, expect price to pause there. If a void exists behind price, expect price to retrace to fill it."
 }

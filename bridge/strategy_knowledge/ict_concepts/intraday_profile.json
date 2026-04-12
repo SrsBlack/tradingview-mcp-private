@@ -21,5 +21,45 @@
     "london_delayed_sell": "London indecisive. NY sweeps high → sells off. Don't force trades during London on these days.",
     "ranging": "Neither session produces clear manipulation. Low-conviction day. Reduce position sizes or skip."
   },
+  "detection_timing": "Profile type can be identified by 10:30 AM ET at the latest. Before that, you're guessing. Do not commit to a model before London has had time to act (2:00-5:00 AM ET) and NY has opened (9:30 AM ET).",
+  "detection_checklists": {
+    "london_normal_buy": [
+      "1. Asian range established (clear high and low from 8 PM–2 AM ET).",
+      "2. London sweeps Asian LOW within first 60 minutes of open (2:00–3:00 AM ET).",
+      "3. Displacement candle forms bullish within 15–30 min of the sweep.",
+      "4. BOS above Asian range high confirms bullish intent — this is the entry trigger."
+    ],
+    "london_normal_sell": [
+      "1. Asian range established.",
+      "2. London sweeps Asian HIGH within first 60 minutes of open.",
+      "3. Displacement candle forms bearish within 15–30 min of the sweep.",
+      "4. BOS below Asian range low confirms bearish intent — entry trigger."
+    ],
+    "london_delayed_buy": [
+      "1. London session has no clear sweep of Asian levels — price stays inside or barely touches Asian range.",
+      "2. Price drifts or chops through London session with no displacement.",
+      "3. NY open (9:30 AM ET) sweeps Asian low or London session low → reversal begins.",
+      "4. Entry comes in the 9:30–10:30 ET window after reversal displacement confirms."
+    ],
+    "london_delayed_sell": [
+      "1. London session has no clear sweep of Asian levels.",
+      "2. Price stays flat or drifts up without displacement.",
+      "3. NY open sweeps Asian high or London session high → sells off.",
+      "4. Entry 9:30–10:30 ET after bearish displacement confirms."
+    ],
+    "ranging": [
+      "1. CBDR width is greater than 60% of the ADR — pre-market range already consumed most of the day's expected move.",
+      "2. London fails to break Asian range in either direction.",
+      "3. No displacement candle forms in London or early NY.",
+      "Action: Reduce position size by 50% or skip the session entirely."
+    ]
+  },
+  "profile_to_strategy_mapping": {
+    "london_normal": "Standard ICT entry model: OB + FVG after sweep. Enter on retest of displacement FVG. Target is opposite session high/low.",
+    "london_delayed": "Wait for NY Silver Bullet window (10:00–11:00 AM ET). Do not force trades during London. Use the same OB+FVG entry but only after NY sweep and reversal displacement.",
+    "ranging": "Avoid standard setups. If trading, micro-scalp only within established range. Do not attempt swing entries."
+  },
+  "failure_mode": "If a London Normal setup triggers but price reverses against the trade after the initial move, this becomes a 'whipsaw day'. The profile mislabeled, or manipulation extended. Do not re-enter in the same direction. Avoid the rest of the session or wait for next kill zone with fresh context.",
+  "bridge_usage": "After 10:30 AM ET, classify the day profile. If delayed → only analyze setups during NY Silver Bullet window (10:00–11:00 AM ET). If ranging → reduce max open positions from 3 to 1 and require Grade A confluence minimum. Profile classification overrides default session entry logic.",
   "connection_to_PO3": "The profile IS PO3 applied with session-specific timing. 'London Normal' = PO3 on time. 'London Delayed' = manipulation pushed to NY. 'Ranging' = no clear PO3 cycle = don't trade."
 }

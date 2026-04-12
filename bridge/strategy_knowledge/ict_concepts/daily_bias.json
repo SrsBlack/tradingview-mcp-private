@@ -24,5 +24,53 @@
     "session_level_proximity": "If PDL is close and unswept → expect sweep of PDL then rally (bullish). If PDH close and unswept → sweep PDH then sell (bearish).",
     "CRT_method": "Look at previous daily candle: if high was taken but low held → today likely targets low. If low taken but high held → today targets high."
   },
+  "bias_determination_checklist": {
+    "run_before": "8:00 AM ET — complete this checklist before any kill zone activates",
+    "factors": [
+      {
+        "factor": "H4/D1 market structure",
+        "bullish_signal": "Higher highs + higher lows on H4 or D1",
+        "bearish_signal": "Lower highs + lower lows on H4 or D1",
+        "weight_pct": 40
+      },
+      {
+        "factor": "IPDA positioning in 40-day range",
+        "bullish_signal": "Price in lower 25% of 40-day range (discount)",
+        "bearish_signal": "Price in upper 25% of 40-day range (premium)",
+        "weight_pct": 20
+      },
+      {
+        "factor": "Previous day close location",
+        "bullish_signal": "Close near PDH",
+        "bearish_signal": "Close near PDL",
+        "weight_pct": 15
+      },
+      {
+        "factor": "Unswept session levels",
+        "bullish_signal": "PDL unswept → expect manipulation toward PDL first, then rally",
+        "bearish_signal": "PDH unswept → expect manipulation toward PDH first, then sell-off",
+        "weight_pct": 15
+      },
+      {
+        "factor": "Seasonal/DOW context",
+        "bullish_signal": "See seasonal_tendencies for bullish calendar patterns",
+        "bearish_signal": "See seasonal_tendencies for bearish calendar patterns",
+        "weight_pct": 10
+      }
+    ]
+  },
+  "confidence_scoring": {
+    "high": "4 or more factors align → 80%+ confidence. Use full position size.",
+    "moderate": "Exactly 3 factors align → ~60% confidence. Use standard position size.",
+    "low": "2 or fewer factors align → ~40% confidence. Use half position or skip the session entirely."
+  },
+  "bias_flip_rules": "Do NOT flip bias during the session UNLESS: (1) A HTF CHoCH occurs on H4 or higher timeframe, AND (2) A displacement candle confirms the reversal direction, AND (3) You are not inside the manipulation window — a temporary move against bias mimics a reversal but is not one. All 3 conditions must be true before reconsidering bias.",
+  "when_bias_is_wrong": "If the manipulation phase goes against your bias and HOLDS — meaning no reversal within 60 minutes — your bias was incorrect. Do NOT add to a losing thesis. Do NOT revenge trade. Close the position and wait for the next session with a fresh bias assessment.",
+  "bias_vs_manipulation": "Bias tells you the DISTRIBUTION direction for the day. Manipulation ALWAYS moves against bias first to collect liquidity. If bias is bullish, expect a sweep of lows before the rally begins. This is not a bias failure — it is the expected manipulation phase. Hold bias through the sweep.",
+  "bridge_integration": {
+    "grade_A": "Requires bias alignment (signal direction matches daily bias). No exceptions.",
+    "grade_B": "Allows neutral bias (no clear directional lean from checklist). Proceed with reduced size.",
+    "grade_C_D": "Must NOT trade against a clear daily bias. If signal direction opposes bias, skip the setup regardless of other confluence."
+  },
   "key_rule": "Establish bias ONCE before trading starts. Do NOT flip bias during the session. If manipulation goes against bias, it's the trap — hold the bias."
 }

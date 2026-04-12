@@ -1,0 +1,69 @@
+{
+  "id": "market_philosophy",
+  "layer": 0,
+  "definition": "ICT's foundational framework for understanding why markets move. Price is not driven by supply and demand — it is an algorithmically delivered mechanism that harvests retail liquidity to fill institutional orders.",
+  "depends_on": [],
+  "feeds_into": [
+    "liquidity (understanding WHERE pools are is the core skill)",
+    "market_structure (structure exists to BUILD and DELIVER to liquidity pools)",
+    "sessions_kill_zones (institutions deliver price at specific scheduled times)",
+    "daily_bias (all bias work flows from understanding the institutional draw)"
+  ],
+  "related_to": [
+    "seasonal_tendencies (macro context layer that frames institutional intent)",
+    "IPDA (the algorithmic delivery engine that executes this philosophy)"
+  ],
+  "retail_vs_institutional": {
+    "the_core_asymmetry": "Retail traders trade WITH the crowd. Institutions trade AGAINST the crowd because they need the crowd's stop orders to fill their own large orders.",
+    "retail_behavior": "Retail places stops at obvious swing highs (for shorts) and obvious swing lows (for longs). These stops cluster at technical levels that everyone can see on a chart.",
+    "institutional_need": "A hedge fund buying 50,000 contracts cannot simply place a market order — there are not enough sellers at one price. They need a WAVE of retail sell orders (triggered stops) to absorb their buy order.",
+    "the_mechanism": "Institutions accumulate a position, then drive price TOWARD the retail stop cluster, trigger those stops (creating a wave of market orders on the opposite side), fill their large institutional order against those stops, then reverse price in their intended direction.",
+    "key_insight": "Retail IS the liquidity. Retail stops ARE the institutional entry orders. This is not conspiracy — it is the mechanical reality of how large orders get filled in any market."
+  },
+  "stop_loss_hunting": {
+    "definition": "The deliberate movement of price to a level where retail stop orders are clustered, triggering those stops to create the order flow needed for institutional entry.",
+    "is_it_random": "No. Stop hunts occur at predictable levels: swing highs, swing lows, round numbers, PDH/PDL, session highs/lows, and equal highs/lows. These are all ICT-defined liquidity pools.",
+    "the_sweep_pattern": "Price spikes BEYOND the obvious level (taking stops), then immediately reverses. The spike candle is the manipulation phase of PO3. The reversal IS the institutional entry.",
+    "how_to_use": "Do not place stops at the obvious level. Recognize the sweep as a SIGNAL that institutional entry is occurring. Enter WITH institutions after the sweep, not before it.",
+    "common_mistake": "Retail sees the spike and panics (or gets stopped out). Informed traders see the spike and prepare to enter in the opposite direction."
+  },
+  "draw_on_liquidity": {
+    "definition": "Price always moves TOWARD a liquidity pool — either a BSL (buy stop liquidity above swing highs) or SSL (sell stop liquidity below swing lows). The current draw determines direction.",
+    "the_rule": "Price moves TO liquidity, not away from it. At any given moment, there is always a defined draw — the next significant pool of resting orders.",
+    "identifying_the_draw": "Look for: equal highs or lows, prior session highs/lows, weekly/monthly opens, round numbers, and overnight gaps. The nearest significant pool on the HTF is the draw.",
+    "hierarchy": "Monthly liquidity > Weekly liquidity > Daily liquidity > Session liquidity > Intraday liquidity. Higher timeframe draws override lower timeframe ones.",
+    "trading_application": "Once the draw is identified, only take trades that go IN THE DIRECTION of the draw. Counter-draw trades are low probability."
+  },
+  "IPDA_framework": {
+    "definition": "Interbank Price Delivery Algorithm — ICT's model for the algorithmic engine that delivers price. Markets are not random; they operate on a programmed delivery mechanism.",
+    "IPDA_lookback": "The algorithm references the prior 20, 40, and 60 trading days to identify where liquidity pools reside. These are the 'reference points' the algorithm uses to target price.",
+    "time_and_price": "The algorithm does not just target price levels — it targets PRICE at SPECIFIC TIMES. This is why kill zones exist. The algorithm is scheduled to deliver price to certain zones during certain session windows.",
+    "quarterly_shift": "Every 13 weeks (quarter), the IPDA shifts reference points. The first 2 weeks of a new quarter often see the prior quarter's trend reversed as the algorithm resets.",
+    "implication": "Trading is not about reading supply and demand — it is about reading the ALGORITHM: where is it going (the draw), when will it get there (kill zones), and what manipulation must occur first (PO3 manipulation phase)."
+  },
+  "why_retail_loses": {
+    "primary_reason": "Retail places stops at the exact levels institutions need to fill orders. By using textbook technical analysis, retail telegraphs their stop placement to the algorithm.",
+    "secondary_reason": "Retail trades INTO liquidity pools (buying breakouts at highs, selling breakdowns at lows) — the exact moment institutions are exiting, not entering.",
+    "tertiary_reason": "Retail uses indicators that are all derivatives of price — they confirm what already happened, not what is about to happen.",
+    "the_90_percent_rule": "90% of retail traders lose because they are the product, not the participant. Their stop orders are the raw material that institutions require to conduct business.",
+    "the_fix": "Stop placing stops at obvious levels. Stop buying breakouts. Stop selling breakdowns. Instead: identify the draw, wait for the sweep (manipulation), then enter in the direction of the draw with stops beyond the sweep extreme."
+  },
+  "kill_zone_scheduling": {
+    "definition": "The algorithm delivers price at specific, recurring time windows. These are not arbitrary — they correspond to institutional trading desk opening hours globally.",
+    "windows": {
+      "Asian": "8 PM - midnight ET: Accumulation phase. Low volatility range building.",
+      "London": "2 AM - 5 AM ET: First major manipulation. London traders hunt stops from Asian session.",
+      "NY_AM": "7 AM - 10 AM ET: Highest conviction window. NY open drives the real directional move.",
+      "NY_PM": "1:30 PM - 4 PM ET: Secondary distribution or reversal window.",
+      "CBDR": "2 PM - 8 PM ET: Algorithm resets. Sets reference range for next 24-hour cycle."
+    },
+    "key_rule": "The manipulation (sweep) almost always occurs DURING a kill zone. Entries made during kill zones have statistically higher success rates."
+  },
+  "core_trading_rules": {
+    "rule_1": "Trade FROM liquidity, not INTO it. Enter AFTER a liquidity sweep, not before. Buying into resistance or selling into support means trading against institutional exits.",
+    "rule_2": "The draw determines direction. Never take a trade without first identifying the HTF draw on liquidity.",
+    "rule_3": "Manipulation precedes distribution. Every real move is preceded by a false move in the opposite direction (the stop hunt). Wait for the false move before entering.",
+    "rule_4": "Time validates price. A perfect setup at the wrong time (outside kill zones) has reduced probability. A valid setup during a kill zone has maximum probability.",
+    "rule_5": "HTF controls. A LTF setup against the HTF draw is a losing trade regardless of how perfect it looks on the lower timeframe."
+  }
+}

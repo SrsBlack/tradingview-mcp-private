@@ -9,6 +9,44 @@
   "related_to": [
     "quarterly_shifts (seasonal patterns coincide with quarterly boundaries)"
   ],
+  "monthly_breakdown": {
+    "EURUSD": {
+      "bullish_months": ["January", "March", "September"],
+      "bearish_months": ["June", "November"],
+      "notes": "Jan: New year USD weakness. Mar: Quarter-end flows. Sep: European Q3 repatriation. Jun/Nov: Risk-off USD strength phases."
+    },
+    "XAUUSD": {
+      "strong_months": ["January", "February", "September", "October"],
+      "weak_months": ["June", "July"],
+      "notes": "Jan-Feb: New year safe-haven demand, Chinese New Year buying. Sep-Oct: Pre-Q4 safe haven positioning. Jun-Jul: Summer risk-on reduces gold demand."
+    },
+    "US_indices": {
+      "weak": "September is historically the worst month for equities (S&P 500 averages negative returns).",
+      "strong": "November through April — the 'best 6 months' seasonal window. Santa rally in December is well-documented.",
+      "sell_in_may": "May through October historically underperforms. Reduce equity conviction during this window.",
+      "notes": "October can be volatile (capitulation lows before Q4 rally). April is often strong (tax refund season retail buying)."
+    },
+    "BTC_crypto": {
+      "strong_quarters": ["Q1 (Jan-Mar)", "Q4 (Oct-Dec)"],
+      "weak_quarters": ["Q2 (Apr-Jun)", "Q3 (Jul-Sep)"],
+      "halving_exception": "Post-halving years (2013, 2017, 2021, 2025) see Q2-Q3 weakness replaced by extended bull phases. The halving cycle overrides seasonal tendencies.",
+      "notes": "BTC January typically bullish (new year FOMO). September weakest historically. December sees year-end positioning."
+    }
+  },
+  "weekly_patterns": {
+    "monday": "Range building. Institutional desks re-open after weekend. Low conviction directional movement. Often retraces Friday's close move. Avoid new directional entries.",
+    "tuesday": "Continuation or reversal setup day. Monday's range is tested. Tuesday often establishes the weekly bias direction. Watch for Tuesday reversal patterns when Monday was a strong directional day.",
+    "wednesday": "HIGHEST VOLATILITY DAY. Most common day for weekly manipulation sweep. Wednesday sweeps Monday's high or Monday's low approximately 60-70% of the time. This IS the weekly manipulation day.",
+    "thursday": "Distribution day. After Wednesday's manipulation, Thursday delivers the real directional weekly move. Highest conviction entry day.",
+    "friday": "Reduced volume and position squaring. Institutions reduce exposure ahead of weekend. Avoid new entries. Best used to close existing positions from Thursday's distribution move."
+  },
+  "intraday_seasonal": {
+    "930_1030_ET": "Highest volume window of the day. NY open establishes the intraday direction. The 9:30-10:30 candle is the highest probability manipulation or distribution candle. Never miss this window.",
+    "1030_1200_ET": "Continuation or first retracement. Volume drops slightly. Good for scaling into Thursday/Friday continuation moves.",
+    "1200_1300_ET": "Lunch doldrums. Volume drops sharply. Spreads widen. Avoid new entries. This is a dead zone for intraday trading.",
+    "1300_1530_ET": "PM session push. Institutions re-enter. Second high-conviction window of day, especially on trending days. 2:00-2:30 ET often sees a directional push before CBDR begins.",
+    "1530_1600_ET": "Market-on-close (MOC) orders execute. Final 30 minutes can be chaotic — institutional position management for EOD."
+  },
   "patterns": {
     "january_effect": "Equities tend bullish early January (new year allocation)",
     "summer_doldrums": "Jul-Aug: Lower volatility, reduced institutional activity, VIX tends lower",
@@ -16,6 +54,27 @@
     "Q4_rally": "Oct-Dec: Institutional window dressing, holiday rally tendency",
     "NFP_week": "First Friday of month: increased volatility around Non-Farm Payrolls",
     "FOMC_drift": "Pre-FOMC drift upward is statistically documented in equities"
+  },
+  "bridge_usage": {
+    "conviction_increase": "During historically strong months for the instrument being traded, add +5 confluence points to any setup that already passes the standard validation threshold.",
+    "conviction_decrease": "During summer doldrums (July-August) and September for equities, reduce position size by 25%. Seasonal headwinds reduce follow-through probability.",
+    "doldrum_filter": "Jul-Aug: Accept only A+ setups (highest confluence). Reject B and C grade setups. Lower activity = lower reliability of intraday patterns.",
+    "high_probability_windows": "During the best 6 months window (Nov-Apr for equities), lower the confluence threshold by 1 criterion. The seasonal tailwind compensates for slightly reduced technical confirmation.",
+    "quarterly_rebalancing_edge": "End of quarter months (March, June, September, December) — the last 2 weeks often see institutional rebalancing flows that create predictable mean-reversion moves. Add +5 points if setup aligns with expected rebalancing direction."
+  },
+  "quarterly_shift_rules": {
+    "definition": "Every 13 weeks (quarter end: March, June, September, December), institutional portfolios rebalance. This creates predictable price behavior.",
+    "last_2_weeks_of_quarter": "Institutional rebalancing creates directional flows as funds adjust allocations. The dominant direction of the prior quarter often reverses in the last 2 weeks as profits are taken.",
+    "first_2_weeks_of_new_quarter": "New quarter often sees the prior quarter's trend initially reversed as the IPDA resets its 20/40/60-day lookback windows. This is the quarterly shift — expect counter-trend moves in early January, April, July, October.",
+    "week_3_of_new_quarter": "By week 3 of a new quarter, the new quarterly trend direction is usually established. This is when trend-following setups resume maximum conviction."
+  },
+  "event_calendar_integration": {
+    "NFP": "Non-Farm Payrolls — first Friday of each month. Extreme volatility. Spreads widen. Stop hunting is aggressive. Avoid entries 30 minutes before and during NFP. Post-NFP (15+ minutes after) can offer high conviction continuation or reversal setups.",
+    "CPI": "Consumer Price Index — mid-month (usually 2nd Wednesday). USD-affecting. Treat like NFP for risk management. Wait for the initial spike and reversal before entering.",
+    "FOMC": "Federal Open Market Committee — 8 meetings per year. Highest impact single event. The week of FOMC, reduce position size 50%. The FOMC drift (pre-meeting drift up in equities) is well-documented — do not fade it.",
+    "OpEx": "Options Expiration — third Friday of each month. Maximum pain pinning creates reduced ranges the week of OpEx. Breakouts during OpEx week are unreliable. Post-OpEx Monday often sees a relief move.",
+    "quarter_end_rebalancing": "Last trading day of each quarter — extreme institutional flows. Vol spikes, spreads widen. Avoid trading the final hour of quarter-end.",
+    "calendar_rule": "Know the economic calendar for the week before taking swing positions. NFP and FOMC weeks require reduced size and tighter management regardless of how perfect the technical setup is."
   },
   "how_to_use": "Seasonal tendencies are CONTEXT, not signals. They increase/decrease conviction for trades already validated by layers 1-5. Never trade solely on seasonality."
 }

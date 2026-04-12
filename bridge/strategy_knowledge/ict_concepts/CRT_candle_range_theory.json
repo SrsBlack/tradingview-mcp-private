@@ -13,10 +13,46 @@
     "PO3_AMD (daily candle PO3: open=accumulation, wick=manipulation, close=distribution)",
     "dealing_range (CRT IS dealing_range at candle level)"
   ],
+  "fractal_application": {
+    "definition": "Every timeframe's candle is a complete dealing range. CRT applies identically across all timeframes — the rules do not change, only the scale.",
+    "daily_candle": "PDH = BSL target. PDL = SSL target. 50% = equilibrium for current day. Once one extreme is swept, the opposite extreme becomes the draw.",
+    "weekly_candle": "PWH = weekly BSL. PWL = weekly SSL. Once one weekly extreme is swept, opposite weekly extreme is the target for the remaining sessions.",
+    "4h_candle": "Previous 4H high/low define the next 4H session's liquidity targets. Treat each 4H candle as a mini dealing range.",
+    "target_selection_rule": "Once a candle's HIGH is swept (BSL taken), the LOW becomes the next target (SSL). Once the LOW is swept, the HIGH becomes the target. This alternation is the fractal engine."
+  },
+  "weekly_PO3": {
+    "definition": "The weekly candle itself follows Power of Three — the 5-session week has its own accumulation, manipulation, and distribution phases.",
+    "monday": "Accumulation. Monday typically establishes the opening range. Low conviction directional movement. Range building.",
+    "tuesday": "Continuation of accumulation or first reversal signal. Often Monday's range is tested. Sets up Wednesday.",
+    "wednesday": "MANIPULATION. Highest probability day for a weekly extreme sweep. Wednesday most commonly sweeps Monday's high OR Monday's low, triggering the weekly manipulation phase.",
+    "thursday": "Distribution begins. After Wednesday's manipulation (sweep), Thursday delivers the REAL move in the opposite direction. Highest conviction directional day.",
+    "friday": "Reduced volume. Partial consolidation of Thursday's distribution. Often prices close near the opposite weekly extreme from Wednesday's sweep. Avoid new entries."
+  },
+  "candle_anatomy_as_PO3": {
+    "open": "The candle open IS the accumulation price. The opening price is where institutional algorithms begin building position.",
+    "first_wick": "The initial wick (against the eventual close direction) IS the manipulation phase. Price briefly moves wrong to sweep stops.",
+    "body": "The candle body IS the distribution phase. The body from open to close represents the real institutional delivery.",
+    "closing_wick": "The wick at the close end IS the preview for the NEXT candle's manipulation target. If price closes bullish with a long upper wick, the next candle will likely sweep that wick high."
+  },
+  "session_candle_theory": {
+    "definition": "Each trading session's candle (Asian, London, NY) is a CRT fractal at the session level.",
+    "asian_candle": "Asian session candle = micro accumulation. The Asian range IS the reference range for London and NY. Asian high = BSL, Asian low = SSL.",
+    "london_candle": "London session candle = manipulation. London ALMOST ALWAYS sweeps one side of the Asian range (the manipulation). The swept side tells you which direction London intends to go.",
+    "ny_candle": "NY session candle = distribution. After London's manipulation, NY delivers the real directional move toward the HTF draw."
+  },
   "application": {
     "daily_candle": "PDH = BSL target, PDL = SSL target, 50% = equilibrium for today's activity.",
     "4h_candle": "Previous 4H high/low define next 4H's targets.",
     "weekly_candle": "Mon-Tue establish range. Wed typically sweeps one extreme (manipulation)."
   },
+  "how_to_trade": {
+    "step_1": "Identify the prior candle's high (BSL) and low (SSL) on your operating timeframe.",
+    "step_2": "Determine which side is the current draw based on HTF bias.",
+    "step_3": "Wait for price to sweep the manipulation side first (often opposite of the real move).",
+    "step_4": "After the sweep, enter in the direction of the draw. SL beyond the swept extreme.",
+    "example_bullish": "After PDH is swept (BSL taken with a wick above), price reverses. PDL becomes the SSL target (draw). Enter long on displacement after the PDH sweep.",
+    "example_bearish": "After PDL is swept (SSL taken), PDH becomes the BSL target. Enter short on displacement after the PDL sweep."
+  },
+  "common_mistake": "Expecting BOTH extremes to be swept in one session. The algorithm typically sweeps only ONE side per candle cycle. If the high is taken first, expect the low to be the target — do not wait for both sweeps before entering.",
   "connection": "CRT is dealing_range + liquidity + PO3 applied fractally to every single candle. It unifies these three concepts at the smallest scale."
 }

@@ -13,11 +13,48 @@
     "PO3_AMD (CBDR IS pre-accumulation — the reset before Asian accumulation)",
     "asian_range (Asian range typically contains or extends CBDR)"
   ],
-  "projections": {
-    "definition": "Standard deviation projections above and below the CBDR range provide probable target zones for the next session.",
-    "1_SD": "68% probability price reaches this level — primary target zone",
-    "2_SD": "95% probability boundary — strong reversal zone if reached",
-    "3_SD": "99%+ — extreme extension, near-certain reversal"
+  "time_window": {
+    "start": "2:00 PM New York time",
+    "end": "8:00 PM New York time",
+    "context": "Occurs after the New York session closes and before the Asian session opens. This is the transition window where institutional desks reset their reference ranges for the next 24-hour cycle."
   },
-  "how_to_use": "Map the CBDR range, then project SDs. If price reaches 2 SD during London/NY, expect mean reversion. Use SD projections as TP targets or reversal zones."
+  "CBR_calculation": {
+    "formula": "CBR = CBDR High - CBDR Low",
+    "definition": "The Central Bank Range (CBR) is the pip/point distance between the highest and lowest price print during the 2 PM - 8 PM ET window.",
+    "purpose": "CBR becomes the unit of measurement for standard deviation projections. It represents the baseline volatility expectation for the next session."
+  },
+  "SD_projections": {
+    "definition": "Standard deviation projections above and below the CBDR range provide probable target zones for the next session.",
+    "calculation": {
+      "1_SD_above": "CBDR High + (1 x CBR)",
+      "1_SD_below": "CBDR Low - (1 x CBR)",
+      "2_SD_above": "CBDR High + (2 x CBR)",
+      "2_SD_below": "CBDR Low - (2 x CBR)",
+      "3_SD_above": "CBDR High + (3 x CBR)",
+      "3_SD_below": "CBDR Low - (3 x CBR)"
+    },
+    "probability": {
+      "1_SD": "68% probability price reaches this level — primary target zone",
+      "2_SD": "95% probability boundary — strong reversal zone if reached",
+      "3_SD": "99%+ — extreme extension, near-certain reversal"
+    }
+  },
+  "asian_range_relationship": {
+    "definition": "The Asian session (8 PM - midnight ET) runs immediately after CBDR. Its behavior relative to CBDR defines the next day's type.",
+    "contained": "Asian range stays within CBDR boundaries — confirms tight institutional range, compression building. Expect a larger London/NY move.",
+    "breaks_one_side": "Asian range extends beyond one CBDR boundary — that extension is the manipulation side. London often reverses from Asian extreme.",
+    "breaks_both_sides": "Rare. Signals high volatility session ahead. CBDR projections become less reliable."
+  },
+  "day_type_rules": {
+    "trending_day": "If London breaks ABOVE CBDR High + 1 SD, the day is likely trending bullish. Look for continuation entries on pullbacks to 1 SD level.",
+    "ranging_day": "If London/NY price remains CONTAINED within 1 SD of CBDR, a ranging day is expected. Fade extremes, target the opposite CBDR boundary.",
+    "reversal_signal": "If price reaches 2 SD during London, expect mean reversion toward CBDR range during NY session."
+  },
+  "bridge_usage": {
+    "trending_conviction": "CBDR width < 30% of ADR = tight range = compression = trending day expected. Assign higher conviction (+10 points) to directional trades.",
+    "ranging_conviction": "CBDR width > 60% of ADR = wide CBDR = already distributed = ranging day likely. Reduce position size, lower conviction.",
+    "sweep_direction": "Always confirm which side of CBDR was swept first (London manipulation). The sweep direction tells you which 1 SD projection is the false move and which is the real target.",
+    "adr_comparison": "ADR = Average Daily Range (20-day). CBR/ADR ratio is the key filter for day type classification."
+  },
+  "common_mistake": "Using CBDR projections without confirming the sweep direction with London or NY price action. The projection alone does not tell you which direction — the SWEEP tells you direction, the SD levels tell you targets."
 }
