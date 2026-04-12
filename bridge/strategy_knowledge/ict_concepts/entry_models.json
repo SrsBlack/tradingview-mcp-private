@@ -1,7 +1,7 @@
 {
   "id": "entry_models",
   "layer": 5,
-  "definition": "Grade-based entry model with confluence scoring table. Each layer contributes points; total score determines trade grade and risk allocation.",
+  "definition": "Grade-based entry model with confluence scoring. Weighted components sum to 100, plus synergy bonuses (capped +5). Liquidity sweep is a binary gate, not scored. Grade determines risk allocation.",
   "depends_on": [
     "market_structure (Layer 1: HTF bias and structure alignment)",
     "displacement (Layer 3: event confirmation)",
@@ -12,118 +12,136 @@
     "risk_management (grade → risk percentage)"
   ],
 
-  "confluence_scoring_table": {
-    "_description": "Each factor adds points. Total determines grade. Minimum score for live trade: 55.",
-    "layer_0_macro": {
-      "max_points": 15,
-      "factors": [
-        { "factor": "IPDA context aligned", "points": 5, "required": false },
-        { "factor": "Quarterly shift direction confirmed", "points": 5, "required": false },
-        { "factor": "No adverse seasonal pattern", "points": 5, "required": false }
-      ]
+  "scoring_weights": {
+    "_description": "Config-driven weights (config.yaml). Must sum to 100. Liquidity is 0 because sweep is a gate, not a gradient.",
+    "structure": {
+      "weight": 30,
+      "scoring": "CHoCH = 60% of weight, BOS = 40%. Bias aligned = +40%. Capped at weight max.",
+      "required": false,
+      "note": "HTF structure (H4/D1) is the #1 signal. CHoCH > BOS for reversals."
     },
-    "layer_1_foundation": {
-      "max_points": 25,
-      "factors": [
-        { "factor": "HTF market structure aligned (4H/Daily)", "points": 10, "required": true },
-        { "factor": "Dealing range identified", "points": 5, "required": true },
-        { "factor": "Key liquidity levels mapped", "points": 5, "required": true },
-        { "factor": "Session levels clear (PDH/PDL/PWH/PWL)", "points": 5, "required": false }
-      ]
+    "liquidity": {
+      "weight": 0,
+      "scoring": "GATE — not scored. If no opposite-direction sweep exists, pipeline skips the trade entirely.",
+      "required": true,
+      "note": "ICT: sweep is binary. SSL sweep (BEARISH) confirms BULLISH, BSL sweep (BULLISH) confirms BEARISH. Continuation sweeps (same-direction) are intentionally excluded — they are trend-following, not ICT reversal confirmation."
     },
-    "layer_2_context": {
-      "max_points": 20,
-      "factors": [
-        { "factor": "In premium/discount zone (correct side)", "points": 5, "required": false },
-        { "factor": "Active kill zone", "points": 5, "required": false },
-        { "factor": "PO3/AMD phase aligned", "points": 5, "required": false },
-        { "factor": "Daily bias confirmed", "points": 5, "required": false }
-      ]
+    "order_block": {
+      "weight": 20,
+      "scoring": "OB present near price = 60%. High quality OB = +40%. Mid quality = +25%.",
+      "required": false
     },
-    "layer_3_trigger": {
-      "max_points": 20,
-      "factors": [
-        { "factor": "Liquidity sweep confirmed", "points": 8, "required": true },
-        { "factor": "Displacement present (3+ ATR candle)", "points": 4, "required": false },
-        { "factor": "CISD or CHoCH on LTF", "points": 5, "required": false },
-        { "factor": "SMT divergence confirmed", "points": 3, "required": false }
-      ]
+    "fvg": {
+      "weight": 18,
+      "scoring": "Active FVG in direction = 50%. Quality tier bonus = 0-30%. Price inside FVG = +20%.",
+      "required": false
     },
-    "layer_4_entry_zone": {
-      "max_points": 10,
-      "factors": [
-        { "factor": "Order block at entry", "points": 4, "required": false },
-        { "factor": "FVG at entry", "points": 3, "required": false },
-        { "factor": "OB + FVG stacked (propulsion)", "points": 3, "required": false }
-      ]
+    "session": {
+      "weight": 12,
+      "scoring": "Kill zone = 60%. Silver Bullet = +30%. Macro time = +20%. Lunch = -50% penalty.",
+      "required": false
     },
-    "layer_5_precision": {
-      "max_points": 10,
-      "factors": [
-        { "factor": "Entry at OTE (0.618-0.786 fib)", "points": 5, "required": false },
-        { "factor": "DOL target >= 2R from entry", "points": 5, "required": true }
-      ]
+    "ote": {
+      "weight": 12,
+      "scoring": "Price in OTE zone (0.618-0.786 fib) = 100%. Correct P/D zone but not OTE = 40%.",
+      "required": false
+    },
+    "smt": {
+      "weight": 8,
+      "scoring": "SMT divergence confirmed = 100% of weight.",
+      "required": false
     }
   },
 
-  "score_to_grade_mapping": {
-    "grade_A": { "min_score": 80, "max_score": 100, "risk_pct": 1.0, "expected_win_rate": "65-75%", "description": "All layers aligned — full conviction" },
-    "grade_B": { "min_score": 55, "max_score": 79, "risk_pct": 0.5, "expected_win_rate": "55-65%", "description": "Strong setup, missing 1-2 non-critical elements" },
-    "grade_C": { "min_score": 35, "max_score": 54, "risk_pct": 0.25, "expected_win_rate": "45-55%", "description": "Paper trade only unless exceptional context" },
-    "grade_D": { "min_score": 0, "max_score": 34, "risk_pct": 0, "expected_win_rate": "<45%", "description": "Do not trade — insufficient confluence" }
+  "synergy_bonuses": {
+    "_description": "Additive bonuses for genuine ICT confluences. Capped at +5 total. Score capped at 100.",
+    "ob_fvg_stacked": {
+      "points": 3,
+      "condition": "Active OB present AND price is inside a directional FVG",
+      "ict_basis": "Propulsion block — OB + FVG overlap is the highest-probability entry zone in ICT"
+    },
+    "sweep_displacement": {
+      "points": 2,
+      "condition": "Liquidity sweep confirmed AND active FVG exists in trade direction",
+      "ict_basis": "Sweep + FVG = displacement confirmation. The sweep creates the imbalance, the FVG proves it."
+    }
   },
 
-  "required_factors_gate": {
-    "_rule": "Even if total score is high, trade is BLOCKED if any required factor is missing",
-    "required_factors": [
-      "HTF market structure aligned (Layer 1)",
-      "Dealing range identified (Layer 1)",
-      "Key liquidity levels mapped (Layer 1)",
-      "Liquidity sweep confirmed (Layer 3)",
-      "DOL target >= 2R from entry (Layer 5)"
-    ],
-    "missing_required_action": "Downgrade to max Grade C regardless of score"
+  "sweep_direction_logic": {
+    "_critical": "This is the most important directional logic in the system.",
+    "definition": "sweep_direction = the direction price moved TO execute the sweep",
+    "BSL_sweep": "Direction.BULLISH — price swept UP through highs. Confirms BEARISH reversal.",
+    "SSL_sweep": "Direction.BEARISH — price swept DOWN through lows. Confirms BULLISH reversal.",
+    "filter": "scorer uses `sweep_direction != trade_direction` — only opposite-direction sweeps count",
+    "continuation_sweeps": "Intentionally excluded. Same-direction sweeps are trend-following, not ICT manipulation confirmation. Do NOT 'fix' the != filter to ==."
+  },
+
+  "score_to_grade_mapping": {
+    "grade_A": { "min_score": 80, "max_score": 100, "risk_pct": "1.0% (from rules.json)", "expected_win_rate": "65-75%", "description": "All components aligned — full conviction" },
+    "grade_B": { "min_score": 65, "max_score": 79, "risk_pct": "0.5% (from rules.json)", "expected_win_rate": "55-65%", "description": "Strong setup, missing 1-2 non-critical elements" },
+    "grade_C": { "min_score": 50, "max_score": 64, "risk_pct": "0.25% (from rules.json)", "expected_win_rate": "45-55%", "description": "Paper trade only unless exceptional context" },
+    "grade_D": { "min_score": 35, "max_score": 49, "risk_pct": "0%", "expected_win_rate": "<45%", "description": "Do not trade — insufficient confluence" },
+    "INVALID": { "min_score": 0, "max_score": 34, "risk_pct": "0%", "description": "Below minimum threshold" }
+  },
+
+  "gates": {
+    "_description": "Hard gates that block trades regardless of score. Code implements one; Claude prompt handles qualitative gates.",
+    "code_gate": {
+      "liquidity_sweep": "No opposite-direction sweep = trade skipped by pipeline. This is the only hard-coded gate."
+    },
+    "claude_prompt_gates": {
+      "_note": "These are enforced qualitatively by Claude's decision prompt, not by the numeric scorer.",
+      "wrong_zone": "BUY in premium or SELL in discount = auto-downgrade or SKIP",
+      "no_structure": "No HTF structure alignment = Claude flags as low-confidence",
+      "no_2R_target": "Draw-on-liquidity target < 2R = Claude should reduce position or skip"
+    }
   },
 
   "grade_a_criteria": {
-    "description": "Score >= 80. ALL required factors met. Every layer contributing.",
-    "layer_checklist": {
-      "layer_0": "IPDA context known + quarterly shift direction aligned + no adverse seasonal pattern",
-      "layer_1": "HTF structure + dealing range + liquidity levels + session levels all clear",
-      "layer_2": "Correct premium/discount zone + active kill zone + PO3 aligned + daily bias confirmed",
-      "layer_3": "Confirmed liquidity sweep + displacement + CISD or CHoCH + optional SMT",
-      "layer_4": "Valid OB + FVG at entry zone, preferably stacked",
-      "layer_5": "Entry at OTE within OB/FVG. DOL target >= 2R."
+    "description": "Score >= 80. Sweep gate passed. Every scoring component contributing.",
+    "component_checklist": {
+      "structure": "HTF CHoCH or BOS + bias aligned (~30 pts)",
+      "order_block": "Valid OB near price, ideally high quality (~20 pts)",
+      "fvg": "Active FVG in direction, price in or near FVG (~18 pts)",
+      "session": "Active kill zone or Silver Bullet (~12 pts)",
+      "ote": "Price in OTE zone (0.618-0.786 fib) (~12 pts)",
+      "smt": "SMT divergence confirmed (~8 pts)",
+      "synergy": "OB+FVG stacked and/or sweep+displacement (+2-5 pts)"
     },
     "expected_win_rate": "65-75%",
-    "risk": "Full (1%)"
+    "risk": "Full (1% per rules.json)"
   },
   "grade_b_criteria": {
-    "description": "Score 55-79. All required factors met. Missing 1-2 elements from layers 2-5.",
+    "description": "Score 65-79. Sweep gate passed. Missing 1-2 elements.",
     "common_gaps": [
-      "No SMT divergence (layer 3, -3 pts)",
-      "OTE not reached (layer 5, -5 pts)",
-      "Kill zone expired (layer 2, -5 pts)",
-      "FVG but no OB overlap (layer 4, -4 pts)"
+      "No SMT divergence (-8 pts)",
+      "OTE not reached, but correct P/D zone (-7.2 pts)",
+      "Kill zone expired (-7.2 pts)",
+      "FVG present but no OB overlap (-12 pts)"
     ],
     "expected_win_rate": "55-65%",
     "risk": "Reduced (0.5%)"
   },
   "grade_c_criteria": {
-    "description": "Score 35-54. Layer 1 satisfied but layers 3-5 incomplete, OR missing a required factor.",
+    "description": "Score 50-64. Sweep gate passed but multiple components weak.",
     "expected_win_rate": "45-55%",
     "risk": "Minimal (0.25%). Paper trade recommended."
   },
   "grade_d_skip": {
-    "description": "Score < 35. Layer 1 NOT satisfied OR no liquidity event AND no entry zone.",
+    "description": "Score 35-49. Insufficient confluence for live trading.",
     "action": "Do not trade."
   },
 
   "bridge_integration": {
-    "ict_score_field": "TradeDecision.ict_score maps to this confluence scoring total",
-    "grade_field": "TradeDecision.grade set by Claude based on scoring table",
-    "risk_pct_field": "TradeDecision.risk_pct derived from grade_risk_table in risk_management.json",
-    "minimum_live_score": 55,
-    "paper_always": "All grades recorded in paper shadow for audit trail"
+    "ict_score_field": "TradeDecision.ict_score = total from weighted scorer + synergy",
+    "grade_field": "TradeDecision.grade set by bridge config grade_thresholds (A:80, B:65, C:50, D:35)",
+    "risk_pct_field": "TradeDecision.risk_pct derived from rules.json grade_risk_table → FTMO risk module",
+    "minimum_live_score": 45,
+    "paper_always": "All grades recorded in paper shadow for audit trail",
+    "tp_targeting": {
+      "bridge": "Uses draw_on_liquidity (DOL) — nearest unswept external liquidity",
+      "trading_ai_v2": "Uses HTF FVG/OB as TP targets",
+      "note": "Both are valid ICT approaches. DOL is the orthodox target; HTF FVG/OB is a conservative alternative."
+    }
   }
 }
