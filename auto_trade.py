@@ -10,7 +10,7 @@ Usage:
     python auto_trade.py --interval 0         # Single cycle (alias for --single)
 """
 
-from bridge.orchestrator import main
+from bridge.cli import main
 
 if __name__ == "__main__":
     main()

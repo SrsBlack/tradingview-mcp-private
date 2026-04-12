@@ -139,3 +139,27 @@ class ClosedPosition:
     close_reason: str  # "TP", "SL", "TRAILING_SL", "MANUAL"
     ict_grade: str = ""
     ict_score: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Shared mutable state containers for cross-module communication
+# ---------------------------------------------------------------------------
+
+@dataclass
+class KillSwitchState:
+    """Tracks whether the daily loss kill switch has been triggered."""
+    triggered: bool = False
+    date: str = ""
+
+
+@dataclass
+class CooldownState:
+    """Per-symbol decision cooldown to prevent repeated Claude API calls."""
+    decisions: dict[str, float] = field(default_factory=dict)
+    seconds: int = 1800  # 30 minutes
+
+
+@dataclass
+class SignalAnchorState:
+    """Tracks signal anchors for score decay calculation."""
+    anchors: dict[str, tuple[str, float]] = field(default_factory=dict)

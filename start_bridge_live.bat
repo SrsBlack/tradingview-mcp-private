@@ -42,6 +42,10 @@ echo  Starting LIVE bridge...
 echo  Trades will be executed in MT5 with magic number 99002.
 echo.
 
+:loop
 python auto_trade.py --mode live %*
-
-pause
+echo.
+echo  [BRIDGE] Process exited. Restarting in 10 seconds...
+echo  Press CTRL+C to stop.
+timeout /t 10 /nobreak
+goto loop
