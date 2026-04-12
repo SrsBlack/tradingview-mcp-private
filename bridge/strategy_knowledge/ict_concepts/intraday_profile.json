@@ -4,14 +4,14 @@
   "definition": "Classification of the day's trading behavior based on early session price action. Determines which trading model to apply.",
   "depends_on": [
     "CBDR (pre-market range reference)",
-    "sessions_kill_zones (session timing)",
+    "sessions_and_kill_zones (session timing)",
     "judas_swing (early session direction)"
   ],
   "feeds_into": [
-    "trade entry (profile type determines which strategy to use)"
+    "entry_models (profile type determines which strategy to use)"
   ],
   "related_to": [
-    "PO3_AMD (each profile corresponds to a PO3 pattern)",
+    "power_of_three_and_AMD (each profile corresponds to a PO3 pattern)",
     "daily_bias (profile confirms or contradicts bias)"
   ],
   "types": {

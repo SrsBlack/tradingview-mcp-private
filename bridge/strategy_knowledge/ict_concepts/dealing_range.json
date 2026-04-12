@@ -7,7 +7,7 @@
   ],
   "feeds_into": [
     "premium_discount (dealing range is divided into premium/discount at 50%)",
-    "CRT (each candle IS a micro dealing range)",
+    "CRT_candle_range_theory (each candle IS a micro dealing range)",
     "liquidity (range high/low ARE external liquidity)"
   ],
   "related_to": [

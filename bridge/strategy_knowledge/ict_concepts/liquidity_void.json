@@ -7,7 +7,7 @@
     "volume_profile (volume data reveals where voids exist)"
   ],
   "feeds_into": [
-    "trade entry (voids act as magnets — price tends to return to fill them)",
+    "entry_models (voids act as magnets — price tends to return to fill them)",
     "draw_on_liquidity (unfilled voids ARE draw targets)"
   ],
   "related_to": [

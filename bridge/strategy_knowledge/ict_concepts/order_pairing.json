@@ -8,11 +8,11 @@
   ],
   "feeds_into": [
     "draw_on_liquidity (swept side eliminates one target, pairing identifies the NEXT target)",
-    "trade execution (SL at swept side, TP at paired target)"
+    "risk_management (SL at swept side, TP at paired target)"
   ],
   "related_to": [
     "market_maker_model (MMM buy model sweeps SSL, targets BSL — that IS order pairing)",
-    "CRT (candle high/low are paired — sweep one, target the other)"
+    "CRT_candle_range_theory (candle high/low are paired — sweep one, target the other)"
   ],
   "core_principle": "Every liquidity level has a PAIR. PDH ↔ PDL. PWH ↔ PWL. Asian High ↔ Asian Low. Equal highs ↔ Equal lows. When price sweeps one side of the pair, the OTHER side becomes the new target.",
   "application": "After a confirmed liquidity_sweep of SSL (sell-side swept), the draw on liquidity is BSL (buy-side). Your TP = the paired BSL level. This is HOW you determine TP — not from arbitrary R:R multiples but from the paired liquidity target.",

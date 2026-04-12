@@ -7,11 +7,11 @@
     "market_structure (divergence is a structural disagreement)"
   ],
   "feeds_into": [
-    "trade confirmation — SMT CONFIRMS that a liquidity_sweep is manipulation, not genuine breakout"
+    "entry_models (SMT CONFIRMS that a liquidity_sweep is manipulation, not genuine breakout"
   ],
   "related_to": [
     "liquidity_sweep (SMT validates the sweep)",
-    "PO3_AMD (SMT confirms manipulation phase)"
+    "power_of_three_and_AMD (SMT confirms manipulation phase)"
   ],
   "how_it_works": "ES makes new low but NQ doesn't → smart money is not uniformly bearish → the low is likely manipulation.",
   "pairs": {

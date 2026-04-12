@@ -3,14 +3,14 @@
   "layer": 2,
   "definition": "Central Bank Dealers Range — the price range formed between 2:00 PM and 8:00 PM New York time. This is when institutional algorithms reset and set the next day's reference range.",
   "depends_on": [
-    "sessions_kill_zones (CBDR occurs between NY close and Asian open)"
+    "sessions_and_kill_zones (CBDR occurs between NY close and Asian open)"
   ],
   "feeds_into": [
     "daily_bias (CBDR range direction hints at next day bias)",
     "venom_model (Venom uses pre-market range which extends CBDR concept)"
   ],
   "related_to": [
-    "PO3_AMD (CBDR IS pre-accumulation — the reset before Asian accumulation)",
+    "power_of_three_and_AMD (CBDR IS pre-accumulation — the reset before Asian accumulation)",
     "asian_range (Asian range typically contains or extends CBDR)"
   ],
   "time_window": {

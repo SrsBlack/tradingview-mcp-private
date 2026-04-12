@@ -7,7 +7,7 @@
     "market_structure (OB forms at structure points)"
   ],
   "feeds_into": [
-    "trade entry (OB is an entry zone)",
+    "entry_models (OB is an entry zone)",
     "optimal_trade_entry (OTE applied within the OB zone)",
     "unicorn_model (broken OB becomes breaker → breaker + FVG = unicorn)",
     "PD_arrays (OBs are premium/discount arrays)"

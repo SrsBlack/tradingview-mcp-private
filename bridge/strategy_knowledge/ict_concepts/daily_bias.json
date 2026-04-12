@@ -7,14 +7,15 @@
     "IPDA (where price sits in macro range)",
     "session_levels (which session levels are unswept)",
     "quarterly_shifts (macro directional context)",
-    "seasonal_tendencies (calendar context)"
+    "seasonal_tendencies (calendar context)",
+    "opening_gaps (NWOG position above/below CE is a primary daily bias input)"
   ],
   "feeds_into": [
-    "trade entry (only take trades aligned with daily bias)",
-    "PO3_AMD (bias tells you WHICH direction distribution will go)"
+    "entry_models (only take trades aligned with daily bias)",
+    "power_of_three_and_AMD (bias tells you WHICH direction distribution will go)"
   ],
   "related_to": [
-    "CRT (previous daily candle's range predicts today's direction)",
+    "CRT_candle_range_theory (previous daily candle's range predicts today's direction)",
     "dealing_range (today's range expands from yesterday's levels)"
   ],
   "determination_methods": {

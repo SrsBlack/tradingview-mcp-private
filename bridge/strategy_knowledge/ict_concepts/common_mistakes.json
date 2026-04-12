@@ -1,8 +1,24 @@
 {
+  "id": "common_mistakes",
+  "layer": "section",
+  "definition": "Catalog of the most frequent ICT methodology errors and their fixes. Each mistake maps to the specific concept(s) violated and provides the corrective action.",
+  "depends_on": [
+    "power_of_three_and_AMD (mistake 1: chasing manipulation phase)",
+    "premium_discount (mistake 2: wrong zone)",
+    "market_structure (mistake 3: trading against HTF)",
+    "risk_management (mistake 4: tight stops)",
+    "draw_on_liquidity (mistake 5: no DOL = no TP)",
+    "displacement (mistake 6: unvalidated OB/FVG)"
+  ],
+  "feeds_into": [
+    "entry_models (gates: each mistake maps to a grade reduction or skip)",
+    "risk_management (SL buffering rules)"
+  ],
+
   "mistake_1_chasing": {
     "what": "Entering during manipulation instead of waiting for distribution retracement",
     "concepts_violated": [
-      "PO3_AMD",
+      "power_of_three_and_AMD",
       "displacement"
     ],
     "fix": "Wait for displacement AFTER sweep. Enter the retracement."

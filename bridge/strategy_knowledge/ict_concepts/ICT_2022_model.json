@@ -2,10 +2,25 @@
   "id": "ICT_2022_model",
   "layer": "composite",
   "definition": "ICT's simplified daily workflow — the Interbank Price Delivery Algorithm (IPDA) applied step by step with specific time filters. This is the master checklist that combines all ICT concepts into a single executable trading plan. Every trade should follow this sequence.",
+  "depends_on": [
+    "market_structure (HTF bias determination)",
+    "IPDA (20/40/60 day reference ranges)",
+    "sessions_and_kill_zones (time-based entry windows)",
+    "draw_on_liquidity (DOL targets for TP)",
+    "displacement (post-sweep confirmation)",
+    "fair_value_gaps (primary entry zones)",
+    "order_blocks (secondary entry zones)",
+    "silver_bullet (time-specific FVG entry windows)",
+    "consequent_encroachment (precision within zones)"
+  ],
+  "feeds_into": [
+    "entry_models (2022 model is the master checklist for daily trade workflow)",
+    "market_maker_model (2022 model implements market maker model with specific timing)"
+  ],
   "composes": [
     "market_structure",
     "draw_on_liquidity",
-    "sessions_kill_zones",
+    "sessions_and_kill_zones",
     "silver_bullet",
     "judas_swing",
     "displacement",

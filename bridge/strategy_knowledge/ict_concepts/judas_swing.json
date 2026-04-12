@@ -3,7 +3,7 @@
   "layer": 3,
   "definition": "The fake move at session open that goes OPPOSITE to the real direction. It IS a liquidity sweep timed to the session open.",
   "depends_on": [
-    "sessions_kill_zones (occurs at session opens)",
+    "sessions_and_kill_zones (occurs at session opens)",
     "liquidity (sweeps session liquidity — Asian high/low, PDH/PDL)"
   ],
   "feeds_into": [
@@ -11,7 +11,7 @@
     "displacement (after judas reversal, displacement confirms real direction)"
   ],
   "related_to": [
-    "PO3_AMD (judas swing IS the manipulation phase of PO3)",
+    "power_of_three_and_AMD (judas swing IS the manipulation phase of PO3)",
     "turtle_soup (turtle soup can be the judas swing's reversal pattern)"
   ],
   "pattern": "First 30-60 minutes of London or NY: price makes convincing move in one direction, sweeps key level, then reverses.",

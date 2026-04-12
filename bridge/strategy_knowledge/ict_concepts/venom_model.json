@@ -2,6 +2,18 @@
   "id": "venom_model",
   "layer": "composite",
   "definition": "A specific pre-market/open trading model for US equity index futures (and crypto during US hours). Uses the 90-minute pre-market range as the accumulation phase, then trades the sweep + reversal at market open. Venom is ICT's most structured intraday model — every step has exact timing.",
+  "depends_on": [
+    "power_of_three_and_AMD (pre-market = accumulation, open = manipulation)",
+    "liquidity_sweep (pre-market high/low get swept at open)",
+    "displacement (post-sweep displacement confirms direction)",
+    "fair_value_gaps (entry is the FVG created by displacement)",
+    "consequent_encroachment (CE of FVG = precision entry)",
+    "silver_bullet (overlaps with NY AM Silver Bullet window)"
+  ],
+  "feeds_into": [
+    "entry_models (Venom = structured intraday model for US equity futures)",
+    "ICT_2022_model (Venom is a specific implementation of the 2022 model for market open)"
+  ],
   "composes": [
     "power_of_three_and_AMD (pre-market = accumulation, 9:30 open = manipulation, 9:45+ = distribution)",
     "liquidity_sweep (pre-market high/low get swept at open)",

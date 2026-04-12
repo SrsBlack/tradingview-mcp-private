@@ -171,7 +171,8 @@ class AnalysisPipeline:
             f"{analysis.direction} | {len(analysis.confluence_factors)} confluence{ea_info} | "
             f"struct={analysis.structure_score:.0f} ob={analysis.ob_score:.0f} fvg={analysis.fvg_score:.0f} "
             f"sess={analysis.session_score:.0f} ote={analysis.ote_score:.0f} smt={analysis.smt_score:.0f} "
-            f"sweep={'Y' if analysis.sweep_detected else 'N'} kz={'Y' if analysis.is_kill_zone else 'N'}",
+            f"sweep={'Y' if analysis.sweep_detected else 'N'} disp={'Y' if analysis.displacement_confirmed else 'N'} "
+            f"pd={analysis.pd_zone or '?'}{'✓' if analysis.pd_aligned else '✗'} kz={'Y' if analysis.is_kill_zone else 'N'}",
             flush=True,
         )
 

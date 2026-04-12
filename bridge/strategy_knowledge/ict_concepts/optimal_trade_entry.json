@@ -8,7 +8,7 @@
     "order_blocks (OTE zone should overlap with OB)"
   ],
   "feeds_into": [
-    "trade entry (OTE defines the precise entry price within the FVG/OB zone)"
+    "entry_models (OTE defines the precise entry price within the FVG/OB zone)"
   ],
   "related_to": [
     "premium_discount (OTE zone should be in correct premium/discount area)",

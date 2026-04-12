@@ -37,7 +37,7 @@ from analysis.order_blocks import detect_order_blocks, get_active_obs, OrderBloc
 from analysis.liquidity import scan_sweeps, get_draw_on_liquidity, swing_to_liquidity, LiquidityLevel, LiquiditySweep
 from analysis.sessions import get_session_info, SessionInfo
 from analysis.smt import detect_smt_divergence, SMT_PAIRS
-from analysis.ict.scorer import score_ict_setup, ICTScoreBreakdown
+from analysis.ict.scorer import score_ict_setup, ICTScoreBreakdown, get_pd_zone, pd_aligned_with_bias
 from core.types import Direction, SignalGrade
 
 
@@ -95,8 +95,13 @@ class SymbolAnalysis:
     has_smt: bool = False
     smt_pair: str = ""
 
-    # Liquidity sweep
+    # Liquidity sweep + displacement
     sweep_detected: bool = False
+    displacement_confirmed: bool = False  # FVG created after sweep = displacement proof
+
+    # Premium/Discount zone
+    pd_zone: str = ""  # "premium", "discount", "equilibrium"
+    pd_aligned: bool = False  # True if zone is correct for direction
 
     # Risk level suggestion
     risk_level: str = "SKIP"
@@ -134,6 +139,9 @@ class SymbolAnalysis:
             },
             "has_smt": self.has_smt,
             "sweep_detected": self.sweep_detected,
+            "displacement_confirmed": self.displacement_confirmed,
+            "pd_zone": self.pd_zone,
+            "pd_aligned": self.pd_aligned,
             "risk_level": self.risk_level,
             "atr_m15": self.atr_m15,
         }
@@ -256,9 +264,25 @@ class ICTPipeline:
                 liq_swings = detect_swings(df_liq, lookback=5)
                 # Build liquidity levels from swing points
                 levels = swing_to_liquidity(liq_swings)
-                # Scan recent bars for sweeps
-                sweeps = scan_sweeps(levels, df_liq, lookback_bars=10)
+                # Scan recent bars for sweeps (20 bars = 5 hours on M15, sweeps stay valid)
+                sweeps = scan_sweeps(levels, df_liq, lookback_bars=20)
                 result.sweep_detected = len(sweeps) > 0
+
+                # Displacement confirmation: sweep + FVG in opposite direction = proven manipulation
+                # An SSL sweep (BEARISH) followed by bullish FVGs = bullish displacement confirmed
+                # A BSL sweep (BULLISH) followed by bearish FVGs = bearish displacement confirmed
+                if sweeps and fvgs:
+                    for sweep in sweeps:
+                        # FVG must exist after the sweep bar and in the reversal direction
+                        reversal_dir = Direction.BULLISH if sweep.sweep_direction == Direction.BEARISH else Direction.BEARISH
+                        displacement_fvgs = [
+                            f for f in fvgs
+                            if f.direction == reversal_dir and f.bar_index > sweep.bar_index
+                        ]
+                        if displacement_fvgs:
+                            result.displacement_confirmed = True
+                            break
+
                 # Find the draw on liquidity (need direction; defer if scoring both)
                 if not score_both_directions:
                     dol = get_draw_on_liquidity(levels, result.current_price, bias=direction)
@@ -287,9 +311,26 @@ class ICTPipeline:
 
             result.has_smt = has_smt
 
-            # -- Step 8: Determine range for OTE/premium-discount --
-            range_high = float(df_primary["high"].max())
-            range_low = float(df_primary["low"].min())
+            # -- Step 8: Determine dealing range for OTE/premium-discount --
+            # Use the most recent swing high/low pair from structure analysis
+            # (the dealing range), NOT the full dataset range which is too wide.
+            swing_highs = [s for s in swings if s.swing_type == "swing_high"]
+            swing_lows = [s for s in swings if s.swing_type == "swing_low"]
+            if swing_highs and swing_lows:
+                range_high = float(max(s.price for s in swing_highs[-3:]))  # Recent 3 swing highs
+                range_low = float(min(s.price for s in swing_lows[-3:]))    # Recent 3 swing lows
+            else:
+                # Fallback: use last 50 bars (12.5 hours on M15) instead of full dataset
+                recent = df_primary.iloc[-50:] if len(df_primary) >= 50 else df_primary
+                range_high = float(recent["high"].max())
+                range_low = float(recent["low"].min())
+
+            # -- Step 8b: Premium/Discount zone --
+            if range_high > range_low:
+                result.pd_zone = get_pd_zone(result.current_price, range_high, range_low)
+                result.pd_aligned = pd_aligned_with_bias(
+                    result.current_price, range_high, range_low, direction
+                )
 
             # -- Step 9: Score! --
             if score_both_directions:

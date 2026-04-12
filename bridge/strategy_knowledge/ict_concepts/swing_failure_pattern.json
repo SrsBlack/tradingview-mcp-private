@@ -7,7 +7,7 @@
     "liquidity (SFP IS a failed liquidity sweep — stops are triggered but the move can't sustain)"
   ],
   "feeds_into": [
-    "trade entry (SFP itself is an entry signal)",
+    "entry_models (SFP itself is an entry signal)",
     "market_structure (SFP at a key swing creates a potential CHoCH)"
   ],
   "related_to": [

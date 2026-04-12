@@ -2,6 +2,17 @@
   "id": "stop_raid_displacement_retracement",
   "layer": "composite",
   "definition": "The core 3-step ICT trade pattern that unifies layers 3-5 into a single executable flow. This is the ATOMIC UNIT of an ICT trade.",
+  "depends_on": [
+    "liquidity_sweep (step 1: the raid that triggers the pattern)",
+    "displacement (step 2: institutional commitment post-raid)",
+    "fair_value_gaps (step 3: entry zone created by displacement)",
+    "order_blocks (step 3: entry zone — last opposing candle)",
+    "optimal_trade_entry (step 3: precision within the FVG/OB)"
+  ],
+  "feeds_into": [
+    "market_maker_model (SRDR is the core 3-step atom inside the full model)",
+    "entry_models (SRDR completion = minimum viable ICT entry)"
+  ],
   "composes": [
     "liquidity_sweep (step 1: the raid)",
     "displacement (step 2: institutional commitment)",

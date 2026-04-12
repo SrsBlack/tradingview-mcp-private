@@ -506,7 +506,9 @@ SIGNAL:
 - Symbol: {a.symbol} @ ${a.current_price:,.2f}
 - Direction: {a.direction} | Grade: {a.grade} ({a.total_score:.0f}/100)
 - Confluence: {', '.join(a.confluence_factors) if a.confluence_factors else 'None'}
-- Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}{ea_line}{atr_line}
+- Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}
+- P/D Zone: {a.pd_zone or 'unknown'} | Aligned: {a.pd_aligned}
+- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}
 
 SCORE BREAKDOWN:
 - Structure: {a.structure_score:.0f}/30 | Liquidity sweep: REQUIRED GATE (not scored)
@@ -528,6 +530,7 @@ RULES:
 - If only one TP level is clear, set tp2_price = tp_price * 1.5 (for BUY) or * 0.667 (for SELL) as fallback
 - Max risk for this symbol/grade: {max_risk:.1%}
 - Trade type: {trade_type.upper()} → SL placement: {'beyond the swept high/low (give buffer beyond the wick)' if trade_type == 'swing' else 'behind the OB/FVG entry zone (at least 1.5x ATR from entry)'}
+- CRITICAL ZONE CHECK: BUY in premium or SELL in discount = WRONG ZONE. Auto-downgrade by 1 grade or SKIP unless strong confluence overrides.
 - EA ensemble confirmation adds conviction — treat as extra confluence factor
 - If in a kill zone that matches this symbol's best session: boost confidence
 - If mean reversion warning applies: reduce continuation confidence, prefer reversal setups

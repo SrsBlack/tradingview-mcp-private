@@ -9,7 +9,8 @@
   "feeds_into": [
     "draw_on_liquidity (NWOG/NDOG/NMOG are high-priority DOL targets)",
     "premium_discount (gap midpoint = equilibrium reference)",
-    "consequent_encroachment (CE of opening gaps is the precision entry level)"
+    "consequent_encroachment (CE of opening gaps is the precision entry level)",
+    "daily_bias (NWOG position relative to CE determines daily directional lean)"
   ],
 
   "nwog": {

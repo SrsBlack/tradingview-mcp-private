@@ -7,7 +7,7 @@
     "market_structure (determines which direction to trade)"
   ],
   "feeds_into": [
-    "trade entry decision (BUY only in discount, SELL only in premium)",
+    "entry_models (BUY only in discount, SELL only in premium)",
     "optimal_trade_entry (OTE zone should be in correct premium/discount area)"
   ],
   "related_to": [

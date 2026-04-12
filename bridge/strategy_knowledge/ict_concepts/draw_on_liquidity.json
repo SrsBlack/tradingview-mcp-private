@@ -26,9 +26,9 @@
 
   "dol_hierarchy": {
     "tier_1_highest_priority": [
-      "PDH/PDL — previous day high/low",
-      "PWH/PWL — previous week high/low",
-      "PMH/PML — previous month high/low",
+      "PDH/PDL (previous day high/low",
+      "PWH/PWL (previous week high/low",
+      "PMH/PML (previous month high/low",
       "Equal highs/lows — engineered liquidity magnets"
     ],
     "tier_2_high_priority": [

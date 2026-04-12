@@ -3,7 +3,11 @@
   "layer": 5,
   "definition": "Grade-based entry model with confluence scoring table. Each layer contributes points; total score determines trade grade and risk allocation.",
   "depends_on": [
-    "All layers 0-5 concepts feed into grading",
+    "market_structure (Layer 1: HTF bias and structure alignment)",
+    "displacement (Layer 3: event confirmation)",
+    "fair_value_gaps (Layer 4: primary entry zone)",
+    "order_blocks (Layer 4: secondary entry zone)",
+    "optimal_trade_entry (Layer 5: precision within zone)",
     "draw_on_liquidity (TP target viability)",
     "risk_management (grade → risk percentage)"
   ],

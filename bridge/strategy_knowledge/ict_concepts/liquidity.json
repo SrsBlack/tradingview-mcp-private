@@ -8,7 +8,7 @@
   "feeds_into": [
     "liquidity_sweep (sweeps TARGET these levels)",
     "draw_on_liquidity (the nearest unswept level is the DOL)",
-    "PO3_AMD (manipulation phase SWEEPS liquidity)",
+    "power_of_three_and_AMD (manipulation phase SWEEPS liquidity)",
     "turtle_soup (turtle soup IS a liquidity sweep + reversal)"
   ],
   "related_to": [
@@ -46,7 +46,7 @@
   "draw_on_liquidity": {
     "definition": "The nearest unswept external liquidity in the expected direction. This is WHERE price is going.",
     "depends_on": "market_structure (to identify unswept swing points) + liquidity (to know which levels are unswept)",
-    "feeds_into": "trade execution — draw_on_liquidity IS your TP target",
+    "feeds_into": "risk_management — draw_on_liquidity IS your TP target",
     "examples": [
       "PDH/PDL (previous day's dealing_range extremes)",
       "PWH/PWL (weekly dealing_range)",

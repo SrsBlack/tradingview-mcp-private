@@ -1,10 +1,10 @@
 {
-  "id": "PO3_AMD",
+  "id": "power_of_three_and_AMD",
   "layer": 2,
   "definition": "Every session/day/week follows: Accumulation → Manipulation → Distribution. This is the Market Maker's algorithm.",
   "depends_on": [
     "liquidity (accumulation BUILDS liquidity, manipulation SWEEPS it)",
-    "sessions_kill_zones (sessions determine WHEN each phase occurs)"
+    "sessions_and_kill_zones (sessions determine WHEN each phase occurs)"
   ],
   "feeds_into": [
     "liquidity_sweep (manipulation phase IS a liquidity sweep)",

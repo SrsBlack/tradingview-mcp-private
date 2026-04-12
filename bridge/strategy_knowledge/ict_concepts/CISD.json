@@ -8,12 +8,12 @@
   ],
   "feeds_into": [
     "order_blocks (the CISD candle IS an order block)",
-    "trade entry (CISD provides earlier entry than waiting for full CHoCH)"
+    "entry_models (CISD provides earlier entry than waiting for full CHoCH)"
   ],
   "related_to": [
     "market_structure.CHoCH (CISD precedes and anticipates CHoCH)",
     "order_blocks (CISD candle = OB)",
-    "PO3_AMD (CISD marks the transition from manipulation to distribution)"
+    "power_of_three_and_AMD (CISD marks the transition from manipulation to distribution)"
   ],
   "vs_CHoCH": "CHoCH requires a swing point to be broken. CISD fires BEFORE that — it detects the shift in candle delivery. CISD is the early warning; CHoCH is the confirmation.",
   "operational_trigger": {

@@ -31,7 +31,7 @@
       ],
       "feeds_into": [
         "premium_discount",
-        "PO3_AMD",
+        "power_of_three_and_AMD",
         "draw_on_liquidity",
         "order_pairing"
       ]
@@ -39,8 +39,8 @@
     "layer_2_context": {
       "concepts": [
         "premium_discount",
-        "sessions_kill_zones",
-        "PO3_AMD",
+        "sessions_and_kill_zones",
+        "power_of_three_and_AMD",
         "intraday_profile",
         "CBDR",
         "daily_bias",
@@ -56,8 +56,7 @@
       "feeds_into": [
         "displacement",
         "liquidity_sweep",
-        "judas_swing",
-        "venom_model"
+        "judas_swing"
       ]
     },
     "layer_3_events": {
@@ -76,13 +75,13 @@
       "role": "Event layer. Things that HAPPEN confirming manipulation is complete. Consequent encroachment (CE) provides precision entry at 50% of any zone. Inverse FVG signals structural shifts.",
       "depends_on": [
         "liquidity",
-        "PO3_AMD",
-        "sessions_kill_zones"
+        "power_of_three_and_AMD",
+        "sessions_and_kill_zones"
       ],
       "feeds_into": [
         "order_blocks",
         "fair_value_gaps",
-        "CRT",
+        "CRT_candle_range_theory",
         "liquidity_void"
       ]
     },
@@ -124,15 +123,14 @@
         "breaker_blocks"
       ],
       "feeds_into": [
-        "trade_execution"
+        "entry_models"
       ]
     },
     "layer_6_execution": {
       "concepts": [
         "draw_on_liquidity",
         "order_pairing",
-        "risk_management",
-        "trade_management"
+        "risk_management"
       ],
       "role": "Execution layer. Order pairing: when SSL is swept, BSL becomes the target (and vice versa). Set SL at sweep extreme, TP at paired liquidity.",
       "depends_on": [
@@ -144,7 +142,8 @@
       "concepts": [
         "market_maker_model",
         "ICT_2022_model",
-        "stop_raid_displacement_retracement"
+        "stop_raid_displacement_retracement",
+        "venom_model"
       ],
       "role": "COMPOSITE MODELS chaining concepts from ALL layers. stop_raid→displacement→retracement is the core 3-step trade pattern that unifies layers 3-5."
     }
@@ -194,8 +193,8 @@
         "step": 4,
         "name": "Identify Session Phase",
         "concepts_used": [
-          "sessions_kill_zones",
-          "PO3_AMD"
+          "sessions_and_kill_zones",
+          "power_of_three_and_AMD"
         ],
         "depends_on_step": "none (time-based)",
         "what_to_do": "What session is active? Which PO3 phase are we in (accumulation/manipulation/distribution)? Is a kill zone active?",

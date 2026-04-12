@@ -4,7 +4,7 @@
   "definition": "Price trades through a liquidity level, triggers resting orders, then reverses. This IS the manipulation in PO3.",
   "depends_on": [
     "liquidity (sweeps TARGET liquidity levels)",
-    "PO3_AMD (sweep IS the manipulation phase)"
+    "power_of_three_and_AMD (sweep IS the manipulation phase)"
   ],
   "feeds_into": [
     "displacement (displacement follows a confirmed sweep)",

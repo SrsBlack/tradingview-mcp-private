@@ -1,15 +1,15 @@
 {
-  "id": "sessions_kill_zones",
+  "id": "sessions_and_kill_zones",
   "layer": 2,
   "definition": "Time windows when institutional algorithms are most active.",
   "depends_on": [],
   "feeds_into": [
-    "PO3_AMD (sessions MAP TO PO3 phases)",
+    "power_of_three_and_AMD (sessions MAP TO PO3 phases)",
     "liquidity_sweep (kill zones are WHEN sweeps happen)",
     "silver_bullet (silver bullets are micro kill zones)"
   ],
   "related_to": [
-    "PO3_AMD (Asian=accumulation, London=manipulation, NY=distribution)"
+    "power_of_three_and_AMD (Asian=accumulation, London=manipulation, NY=distribution)"
   ],
   "kill_zones": {
     "asian": {

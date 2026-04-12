@@ -6,7 +6,7 @@
     "market_structure (expansion/contraction occur within the structure context)"
   ],
   "feeds_into": [
-    "PO3_AMD (contraction = accumulation, expansion = distribution)",
+    "power_of_three_and_AMD (contraction = accumulation, expansion = distribution)",
     "displacement (expansion candles often ARE displacement)"
   ],
   "related_to": [

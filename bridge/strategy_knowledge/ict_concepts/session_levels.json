@@ -11,8 +11,8 @@
     "liquidity_sweep (sweeps TARGET session levels)"
   ],
   "related_to": [
-    "CRT (previous day candle high/low = PDH/PDL = session levels)",
-    "PO3_AMD (manipulation phase sweeps these levels)",
+    "CRT_candle_range_theory (previous day candle high/low = PDH/PDL = session levels)",
+    "power_of_three_and_AMD (manipulation phase sweeps these levels)",
     "order_pairing (PDH and PDL are a PAIRED set — sweep one, target the other)"
   ],
   "levels": {

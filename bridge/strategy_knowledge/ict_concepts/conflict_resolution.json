@@ -1,4 +1,21 @@
 {
+  "id": "conflict_resolution",
+  "layer": "section",
+  "definition": "Priority rules for resolving contradictory signals between ICT concepts. Higher-layer concepts override lower-layer ones. Essential for the bridge scoring engine to handle ambiguous setups.",
+  "depends_on": [
+    "market_structure (HTF always overrides LTF)",
+    "premium_discount (gates FVG/OB entries)",
+    "displacement (gates OB validity)",
+    "sessions_and_kill_zones (gates session scoring)",
+    "power_of_three_and_AMD (gates intraday timing)",
+    "daily_bias (gates trade direction)",
+    "quarterly_shifts (overrides daily bias for swings)"
+  ],
+  "feeds_into": [
+    "entry_models (conflict rules determine grade reductions)",
+    "cross_correlations (synergies are the positive counterpart to conflicts)"
+  ],
+
   "_purpose": "When concepts give contradictory signals, use these rules to resolve. Higher-layer concepts OVERRIDE lower-layer ones.",
   "rules": [
     {
@@ -28,7 +45,7 @@
       "conflict": "Kill zone is active but no liquidity sweep occurred yet",
       "resolution": "Wait. Kill zone provides the WINDOW but liquidity_sweep provides the TRIGGER. Being in a kill zone without a sweep = no entry yet.",
       "concepts_involved": [
-        "sessions_kill_zones",
+        "sessions_and_kill_zones",
         "liquidity_sweep"
       ]
     },
@@ -53,7 +70,7 @@
       "conflict": "PO3 says accumulation (don't trade) but HTF structure is very clear",
       "resolution": "PO3 timing WINS for intraday. Clear HTF structure is for swing trades with wider stops. For intraday, wait for manipulation + distribution phases.",
       "concepts_involved": [
-        "PO3_AMD",
+        "power_of_three_and_AMD",
         "market_structure"
       ]
     },
@@ -94,7 +111,7 @@
       "resolution": "Wait. London Delayed means manipulation is pushed to NY. Don't force entries during London just because the kill zone window is open.",
       "concepts_involved": [
         "intraday_profile",
-        "sessions_kill_zones"
+        "sessions_and_kill_zones"
       ]
     },
     {

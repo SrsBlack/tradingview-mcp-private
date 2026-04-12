@@ -2,10 +2,25 @@
   "id": "market_maker_model",
   "layer": "composite",
   "definition": "The complete framework combining ALL concepts into a buy/sell model. This is NOT a separate concept — it IS the dependency graph applied as a workflow.",
+  "depends_on": [
+    "market_structure (step 1: HTF bias)",
+    "premium_discount (step 2: zone classification)",
+    "power_of_three_and_AMD (steps 3-4: session phase)",
+    "liquidity_sweep (step 4: manipulation event)",
+    "displacement (step 5: confirmation)",
+    "fair_value_gaps (step 5: entry zone)",
+    "order_blocks (step 5: entry zone)",
+    "optimal_trade_entry (step 6: precision entry)",
+    "draw_on_liquidity (step 7: TP targeting)"
+  ],
+  "feeds_into": [
+    "entry_models (market maker model IS the Grade A trade template)",
+    "ICT_2022_model (2022 model is a time-specific implementation of market maker model)"
+  ],
   "composes": [
     "market_structure (step 1)",
     "premium_discount (step 2)",
-    "PO3_AMD (step 3-4)",
+    "power_of_three_and_AMD (step 3-4)",
     "liquidity_sweep (step 4)",
     "displacement + fair_value_gaps + order_blocks (step 5)",
     "optimal_trade_entry (step 6)",

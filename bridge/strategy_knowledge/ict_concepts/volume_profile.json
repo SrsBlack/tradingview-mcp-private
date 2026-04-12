@@ -7,7 +7,7 @@
     "liquidity (volume profile reveals WHERE liquidity actually exists vs. theoretical)"
   ],
   "feeds_into": [
-    "trade entry (POC/VAH/VAL act as support/resistance)",
+    "entry_models (POC/VAH/VAL act as support/resistance)",
     "draw_on_liquidity (low volume nodes are magnets — price accelerates through them)"
   ],
   "related_to": [

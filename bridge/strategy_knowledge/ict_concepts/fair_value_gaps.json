@@ -6,11 +6,12 @@
     "displacement (FVGs are CREATED BY displacement — no displacement, no meaningful FVG)"
   ],
   "feeds_into": [
-    "trade entry (FVG is an entry zone)",
+    "entry_models (FVG is an entry zone)",
     "optimal_trade_entry (OTE applied within FVG zone)",
     "unicorn_model (FVG + breaker overlap = unicorn)",
     "PD_arrays (FVGs are premium/discount arrays)",
-    "silver_bullet (silver bullet = FVG formed in specific time window)"
+    "silver_bullet (silver bullet = FVG formed in specific time window)",
+    "consequent_encroachment (CE = 50% midpoint of FVG for precision entry)"
   ],
   "related_to": [
     "order_blocks (OB + FVG = strongest entry)",

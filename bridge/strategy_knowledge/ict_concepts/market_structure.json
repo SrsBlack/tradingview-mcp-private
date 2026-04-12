@@ -36,7 +36,7 @@
     "MSS": {
       "definition": "Market Structure Shift — LTF confirmation of a reversal. After a CHoCH on HTF, wait for MSS on LTF before entering.",
       "depends_on": "CHoCH (MSS confirms what CHoCH suggested)",
-      "feeds_into": "trade entry — MSS is the LTF trigger that makes it safe to enter"
+      "feeds_into": "entry_models — MSS is the LTF trigger that makes it safe to enter"
     },
     "CISD": {
       "definition": "Change In State of Delivery — when price shifts from delivering bearish candles to bullish (or vice versa). The last opposing candle becomes the entry zone.",

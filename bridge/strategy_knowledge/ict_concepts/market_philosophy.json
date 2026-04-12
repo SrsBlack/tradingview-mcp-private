@@ -6,7 +6,7 @@
   "feeds_into": [
     "liquidity (understanding WHERE pools are is the core skill)",
     "market_structure (structure exists to BUILD and DELIVER to liquidity pools)",
-    "sessions_kill_zones (institutions deliver price at specific scheduled times)",
+    "sessions_and_kill_zones (institutions deliver price at specific scheduled times)",
     "daily_bias (all bias work flows from understanding the institutional draw)"
   ],
   "related_to": [
