@@ -1,0 +1,70 @@
+{
+  "id": "inverse_fvg",
+  "layer": 3,
+  "definition": "An Inverse Fair Value Gap (IFVG) forms when price violates (trades completely through) an existing FVG, converting it from a continuation zone into a reversal zone with flipped polarity. A bullish FVG that gets broken to the downside becomes a bearish IFVG — the gap that was supposed to provide support now acts as resistance.",
+  "depends_on": [
+    "fair_value_gaps (IFVG is a violated FVG)",
+    "market_structure (CHoCH or BOS through the FVG triggers the inversion)",
+    "displacement (strong displacement through the FVG confirms the inversion)"
+  ],
+  "feeds_into": [
+    "entry_models (IFVG is a reversal entry zone — trade FROM the flipped zone)",
+    "breaker_blocks (IFVG often co-locates with breaker blocks — same reversal logic)"
+  ],
+  "related_to": [
+    "balanced_price_range (when opposing FVGs overlap, creating equilibrium)",
+    "consequent_encroachment (CE of IFVG = precision reversal entry)"
+  ],
+
+  "formation": {
+    "bullish_fvg_to_bearish_ifvg": {
+      "step_1": "Bullish FVG forms (gap between candle 1 high and candle 3 low in an up-move)",
+      "step_2": "Price later trades COMPLETELY through the bullish FVG to the downside",
+      "step_3": "The bullish FVG is now INVERTED — it becomes a BEARISH IFVG",
+      "step_4": "When price retraces back up to this zone, it acts as RESISTANCE",
+      "entry": "Sell at IFVG zone (preferably at CE), SL above IFVG high"
+    },
+    "bearish_fvg_to_bullish_ifvg": {
+      "step_1": "Bearish FVG forms (gap between candle 1 low and candle 3 high in a down-move)",
+      "step_2": "Price later trades COMPLETELY through the bearish FVG to the upside",
+      "step_3": "The bearish FVG is now INVERTED — it becomes a BULLISH IFVG",
+      "step_4": "When price retraces back down to this zone, it acts as SUPPORT",
+      "entry": "Buy at IFVG zone (preferably at CE), SL below IFVG low"
+    }
+  },
+
+  "vs_regular_fvg": {
+    "regular_fvg": "Holds — price fills into it and reverses. Continuation of the existing trend.",
+    "inverse_fvg": "Violated — price broke through it. Now acts from the OPPOSITE direction. Reversal signal.",
+    "detection_rule": "If price CLOSES beyond the far boundary of an FVG, mark it as inverted and flip the direction"
+  },
+
+  "quality_filters": {
+    "strong_ifvg": [
+      "Displacement candle broke through the original FVG (3+ ATR move)",
+      "CHoCH occurred simultaneously (structural shift confirmed)",
+      "First retest of the IFVG after inversion (virgin IFVG)",
+      "IFVG aligns with HTF bias direction"
+    ],
+    "weak_ifvg": [
+      "Slow grind through the FVG (no displacement)",
+      "Multiple retests already (IFVG losing potency)",
+      "Against HTF trend direction",
+      "Very small FVG to begin with (<0.1% of price)"
+    ]
+  },
+
+  "scoring": {
+    "virgin_ifvg_with_displacement": "+6 to ICT score",
+    "virgin_ifvg_no_displacement": "+3 to ICT score",
+    "retested_ifvg": "+1 to ICT score",
+    "ifvg_stacked_with_breaker": "+8 to ICT score (double confirmation of reversal)"
+  },
+
+  "bridge_integration": {
+    "detection": "When an active FVG is fully violated (price closes beyond far boundary), convert to IFVG with flipped direction",
+    "entry_zone": "Use IFVG CE as limit entry for reversal trades",
+    "score_impact": "Active IFVG at entry = +3 to +6 based on quality",
+    "cleanup": "Remove the original FVG from active zones when it becomes an IFVG"
+  }
+}

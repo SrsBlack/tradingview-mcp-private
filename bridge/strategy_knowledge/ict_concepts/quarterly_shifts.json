@@ -1,19 +1,78 @@
 {
   "id": "quarterly_shifts",
   "layer": 0,
-  "definition": "2-4 month directional changes in market delivery. Detected via weekly return analysis — when the trend of weekly closes reverses, a quarterly shift has occurred.",
+  "definition": "2-4 month directional changes in institutional price delivery. The market operates in quarterly cycles tied to fiscal reporting, option expiration, and institutional rebalancing. Quarterly shifts mark the transition from one macro trend to the next — they are the LARGEST-SCALE directional signal in ICT methodology.",
   "depends_on": [
-    "IPDA (quarterly shifts occur when IPDA 60-day range is exhausted)"
+    "IPDA (quarterly shifts occur when IPDA 60-day range is exhausted)",
+    "market_philosophy (institutional delivery operates on quarterly schedules)"
   ],
   "feeds_into": [
-    "market_structure (quarterly shift changes the HTF bias)",
-    "daily_bias (new quarterly direction overrides old)"
+    "market_structure (quarterly shift changes the HTF bias for weeks/months)",
+    "daily_bias (new quarterly direction overrides all shorter-term analysis)",
+    "seasonal_tendencies (quarterly shifts often align with seasonal patterns)"
   ],
   "related_to": [
-    "seasonal_tendencies (quarterly shifts align with seasonal patterns)",
-    "dealing_range (new quarterly range establishes new dealing range)"
+    "dealing_range (new quarterly range establishes new dealing range extremes)",
+    "opening_gaps (NMOG at quarter boundaries = highest significance)"
   ],
-  "detection": "Analyze 8-12 weekly closes. When 3+ consecutive weekly closes reverse the prior quarterly direction, a shift is underway.",
-  "trading_implication": "A quarterly shift changes the macro bias. Trades aligned with the new quarterly direction have significantly higher probability. Counter-quarterly trades should be avoided or sized down.",
-  "typical_timing": "Shifts often align with fiscal quarters: Jan, Apr, Jul, Oct. But can occur at any time when IPDA 60-day range extremes are tested."
+
+  "quarterly_calendar": {
+    "Q1_jan_mar": {
+      "typical_pattern": "January sets the annual high or low. February consolidates. March trends.",
+      "institutional_driver": "New year allocations, portfolio rebalancing, fiscal year start for many funds",
+      "watch_for": "January range often defines the year's extremes — mark Jan high/low as annual DOL"
+    },
+    "Q2_apr_jun": {
+      "typical_pattern": "April starts strong (tax season flows). May reversal common ('sell in May'). June sets up Q3.",
+      "institutional_driver": "Tax deadline (Apr 15), Q1 earnings, mid-year rebalancing",
+      "watch_for": "April NMOG is often significant — sets Q2 directional tone"
+    },
+    "Q3_jul_sep": {
+      "typical_pattern": "July continuation from Q2. August low liquidity. September volatile reversal.",
+      "institutional_driver": "Summer trading desks thin. September = back-to-school for institutions.",
+      "watch_for": "September is historically the worst month for equities — expect bearish shift"
+    },
+    "Q4_oct_dec": {
+      "typical_pattern": "October bottom (if bearish Q3). November-December rally ('Santa rally').",
+      "institutional_driver": "Fiscal year-end positioning, holiday flows, tax-loss harvesting",
+      "watch_for": "October reversal is the most reliable quarterly shift of the year"
+    }
+  },
+
+  "detection_methods": {
+    "weekly_close_analysis": {
+      "method": "Analyze 8-12 weekly closes. When 3+ consecutive weekly closes reverse the prior quarterly direction, a shift is confirmed.",
+      "confirmation": "New quarterly low/high established + weekly structure break (CHoCH on W1)",
+      "false_signal": "1-2 weeks of reversal may be a pullback, not a shift. Need 3+ weeks."
+    },
+    "ipda_range_test": {
+      "method": "When price reaches the IPDA 60-day range extreme and reverses with displacement",
+      "logic": "IPDA 60-day range represents the quarterly delivery range. Testing its extreme = potential shift."
+    },
+    "monthly_candle_pattern": {
+      "method": "Monthly candle that engulfs the previous month in the opposite direction",
+      "confirmation": "Monthly CHoCH = highest-confidence quarterly shift signal"
+    }
+  },
+
+  "trading_rules": {
+    "rule_1": "Trades aligned with the current quarterly direction have 15-20% higher win rate",
+    "rule_2": "Counter-quarterly trades should be sized at 50% or less (Grade B max)",
+    "rule_3": "During the first 2 weeks of a new quarter, wait for direction confirmation before trading",
+    "rule_4": "Quarterly shift + seasonal alignment = highest-confidence macro setup",
+    "rule_5": "Don't fight a confirmed quarterly shift — even if daily analysis says otherwise"
+  },
+
+  "crypto_application": {
+    "note": "Crypto doesn't follow fiscal quarters exactly, but institutional crypto (CME futures, ETFs) does",
+    "btc_quarterly": "BTC has historically made major moves in Q1 and Q4 (halving cycles, ETF flows)",
+    "watch": "CME BTC/ETH futures expiration dates align with quarterly boundaries"
+  },
+
+  "bridge_integration": {
+    "detection": "Analyze last 12 weekly closes for direction reversal. Flag quarterly shift when 3+ weeks confirm.",
+    "bias_override": "Quarterly direction overrides daily_bias when they conflict",
+    "score_impact": "Trade aligned with quarterly shift = +5 to macro score. Counter-quarterly = -5.",
+    "risk_adjustment": "Counter-quarterly trades get 50% risk reduction automatically"
+  }
 }

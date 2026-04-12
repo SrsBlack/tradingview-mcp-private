@@ -5,11 +5,12 @@
     "layer_0_macro": {
       "concepts": [
         "market_philosophy",
+        "time_price_theory",
         "IPDA",
         "quarterly_shifts",
         "seasonal_tendencies"
       ],
-      "role": "MACRO layer. Multi-week/month context. IPDA reference ranges (20/40/60 day), quarterly directional shifts, and seasonal patterns set the broadest bias before any daily analysis.",
+      "role": "MACRO layer. Multi-week/month context. Time-price theory (algorithmic delivery schedules), IPDA reference ranges (20/40/60 day), quarterly directional shifts, and seasonal patterns set the broadest bias before any daily analysis.",
       "feeds_into": [
         "market_structure",
         "dealing_range",
@@ -21,9 +22,10 @@
         "market_structure",
         "dealing_range",
         "liquidity",
-        "session_levels"
+        "session_levels",
+        "opening_gaps"
       ],
-      "role": "MUST be established first. These define direction, range, and where orders cluster. session_levels (PDH/PDL, PWH/PWL, PMH/PML, Asian range) are the key external liquidity references.",
+      "role": "MUST be established first. These define direction, range, and where orders cluster. session_levels (PDH/PDL, PWH/PWL, PMH/PML, Asian range) and opening_gaps (NWOG/NDOG CE) are the key external liquidity references.",
       "depends_on": [
         "IPDA (macro context)"
       ],
@@ -42,9 +44,10 @@
         "intraday_profile",
         "CBDR",
         "daily_bias",
-        "draw_on_liquidity"
+        "draw_on_liquidity",
+        "silver_bullet"
       ],
-      "role": "Context layer. WHERE in the range? WHEN in the session? WHICH PO3 phase? CBDR defines the pre-market reference. Intraday profile classifies the session type.",
+      "role": "Context layer. WHERE in the range? WHEN in the session? WHICH PO3 phase? CBDR defines the pre-market reference. Silver Bullet defines time-specific FVG entry windows.",
       "depends_on": [
         "market_structure",
         "dealing_range",
@@ -66,9 +69,11 @@
         "SMT_divergence",
         "CISD",
         "swing_failure_pattern",
-        "range_expansion_contraction"
+        "range_expansion_contraction",
+        "consequent_encroachment",
+        "inverse_fvg"
       ],
-      "role": "Event layer. Things that HAPPEN confirming manipulation is complete. CISD is pre-CHoCH signal. SFP detects failed swing attempts. Range expansion/contraction detects cycle rhythm.",
+      "role": "Event layer. Things that HAPPEN confirming manipulation is complete. Consequent encroachment (CE) provides precision entry at 50% of any zone. Inverse FVG signals structural shifts.",
       "depends_on": [
         "liquidity",
         "PO3_AMD",
@@ -86,13 +91,14 @@
         "order_blocks",
         "fair_value_gaps",
         "breaker_blocks",
+        "mitigation_blocks",
         "rejection_blocks",
         "propulsion_blocks",
         "PD_arrays",
         "liquidity_void",
         "balanced_price_range"
       ],
-      "role": "Entry zone layer. WHERE you place your order. Created BY events in layer 3. Includes advanced block types (rejection, propulsion) and volume-based zones (liquidity void, BPR).",
+      "role": "Entry zone layer. WHERE you place your order. Created BY events in layer 3. Mitigation blocks track first-touch of unmitigated zones. Includes advanced block types and volume-based zones.",
       "depends_on": [
         "displacement",
         "liquidity_sweep",
@@ -270,22 +276,41 @@
     ]
   },
   "concepts": [
+    "market_philosophy",
+    "time_price_theory",
     "market_structure",
     "dealing_range",
     "liquidity",
+    "opening_gaps",
     "premium_discount",
     "power_of_three_and_AMD",
     "sessions_and_kill_zones",
+    "silver_bullet",
     "liquidity_sweep",
     "displacement",
     "judas_swing",
     "SMT_divergence",
     "turtle_soup",
+    "CISD",
+    "consequent_encroachment",
+    "inverse_fvg",
+    "swing_failure_pattern",
+    "range_expansion_contraction",
     "order_blocks",
     "fair_value_gaps",
+    "breaker_blocks",
+    "mitigation_blocks",
     "PD_arrays",
+    "rejection_blocks",
+    "propulsion_blocks",
+    "liquidity_void",
+    "balanced_price_range",
     "optimal_trade_entry",
+    "fibonacci_extensions",
     "unicorn_model",
+    "volume_profile",
+    "draw_on_liquidity",
+    "order_pairing",
     "CRT_candle_range_theory",
     "IPDA",
     "quarterly_shifts",
@@ -294,16 +319,6 @@
     "daily_bias",
     "CBDR",
     "intraday_profile",
-    "CISD",
-    "swing_failure_pattern",
-    "range_expansion_contraction",
-    "rejection_blocks",
-    "propulsion_blocks",
-    "liquidity_void",
-    "balanced_price_range",
-    "fibonacci_extensions",
-    "volume_profile",
-    "order_pairing",
     "stop_raid_displacement_retracement",
     "venom_model",
     "market_maker_model",
@@ -314,7 +329,6 @@
     "cross_correlations",
     "entry_models",
     "risk_management",
-    "common_mistakes",
-    "market_philosophy"
+    "common_mistakes"
   ]
 }

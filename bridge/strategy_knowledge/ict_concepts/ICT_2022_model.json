@@ -1,25 +1,107 @@
 {
   "id": "ICT_2022_model",
   "layer": "composite",
-  "definition": "ICT's simplified daily workflow — market_maker_model applied step by step with specific time filters.",
+  "definition": "ICT's simplified daily workflow — the Interbank Price Delivery Algorithm (IPDA) applied step by step with specific time filters. This is the master checklist that combines all ICT concepts into a single executable trading plan. Every trade should follow this sequence.",
   "composes": [
     "market_structure",
     "draw_on_liquidity",
     "sessions_kill_zones",
+    "silver_bullet",
     "judas_swing",
     "displacement",
     "fair_value_gaps",
     "order_blocks",
+    "breaker_blocks",
+    "consequent_encroachment",
     "optimal_trade_entry"
   ],
-  "daily_workflow": {
-    "step_1_bias": "market_structure: Read D1/H4 for direction + dealing_range.",
-    "step_2_DOL": "draw_on_liquidity: Identify WHERE price needs to go (PDH/PDL, equal H/L, HTF OBs/FVGs).",
-    "step_3_timing": "sessions_kill_zones: Wait for kill zone.",
-    "step_4_manipulation": "judas_swing / liquidity_sweep: Identify the fake move.",
-    "step_5_confirmation": "displacement: Wait for FVG + BOS/CHoCH confirming real direction.",
-    "step_6_entry": "optimal_trade_entry: Enter retracement into FVG/OB from step 5.",
-    "step_7_management": "SL beyond step 4's sweep. TP at step 2's DOL. Partial at TP1, trail to TP2."
+
+  "pre_session_preparation": {
+    "the_night_before": {
+      "task_1": "Mark NWOG/NDOG levels and their CE (50%) — these are the week/day's primary reference levels",
+      "task_2": "Identify HTF bias on D1/H4 using market_structure and IPDA 20/40/60 day ranges",
+      "task_3": "Map all unswept external liquidity (PDH/PDL, PWH/PWL, equal highs/lows) = DOL targets",
+      "task_4": "Identify HTF PD arrays (OBs, FVGs, breakers) that price is approaching",
+      "task_5": "Check seasonal_tendencies and quarterly_shifts for macro context",
+      "task_6": "Note scheduled news events (NFP, CPI, FOMC) — avoid trading 30 min before/after"
+    },
+    "morning_of": {
+      "task_1": "Mark Asian session high/low — these will be swept during London/NY manipulation",
+      "task_2": "Confirm or update daily bias based on overnight price action",
+      "task_3": "Check SMT divergence with correlated pairs"
+    }
   },
-  "key_principle": "This model works because it WAITS for all pieces across all layers. Most losses come from skipping a layer."
+
+  "daily_workflow": {
+    "step_1_bias": {
+      "action": "Determine daily directional bias",
+      "tools": "market_structure (D1/H4), daily_bias checklist, NWOG position, IPDA range",
+      "output": "BULLISH, BEARISH, or NO TRADE (if conflicting)",
+      "rule": "If D1 bias conflicts with H4 bias, default to D1. If both conflict with NWOG position, NO TRADE."
+    },
+    "step_2_DOL": {
+      "action": "Identify WHERE price needs to go",
+      "tools": "draw_on_liquidity, session_levels, opening_gaps",
+      "output": "TP1 (nearest DOL), TP2 (secondary DOL)",
+      "rule": "DOL must be >= 2R from expected entry zone, otherwise insufficient reward"
+    },
+    "step_3_timing": {
+      "action": "Wait for the appropriate time window",
+      "tools": "sessions_and_kill_zones, silver_bullet, time_price_theory",
+      "output": "Active kill zone or Silver Bullet window confirmed",
+      "rule": "DO NOT TRADE outside kill zones. London: 02:00-05:00 ET. NY AM: 09:30-11:00 ET. NY PM: 14:00-15:00 ET."
+    },
+    "step_4_manipulation": {
+      "action": "Identify the fake move (Judas swing / liquidity sweep)",
+      "tools": "judas_swing, liquidity_sweep, turtle_soup",
+      "output": "Liquidity sweep confirmed — the trap has been set",
+      "rule": "The sweep must take out a SIGNIFICANT level (PDH/PDL, Asian high/low, equal H/L). Minor sweeps don't count."
+    },
+    "step_5_confirmation": {
+      "action": "Wait for structural confirmation",
+      "tools": "displacement, CISD, market_structure (CHoCH/BOS)",
+      "output": "Displacement candle + FVG + CHoCH or BOS in bias direction",
+      "rule": "All three must be present. Displacement alone is not enough — need structural shift."
+    },
+    "step_6_entry": {
+      "action": "Enter at the optimal price within the confirmed zone",
+      "tools": "optimal_trade_entry, consequent_encroachment, order_blocks, fair_value_gaps",
+      "output": "Limit order at FVG CE or OB within OTE zone (0.618-0.786 fib)",
+      "rule": "Prefer CE of FVG within OB zone. If no OB, use FVG CE alone. Never market order."
+    },
+    "step_7_management": {
+      "action": "Set SL, TP, and manage the trade",
+      "tools": "risk_management, draw_on_liquidity",
+      "output": "SL beyond step 4's sweep extreme. TP1 at nearest DOL. TP2 at secondary DOL.",
+      "rule": "Partial 50% at TP1 → move SL to breakeven → trail remaining 50% toward TP2."
+    }
+  },
+
+  "model_variants": {
+    "silver_bullet_variant": {
+      "difference": "Steps 3-6 are compressed into a single Silver Bullet window (60 min)",
+      "advantage": "Faster execution, tighter SL, higher R:R",
+      "when_to_use": "When you have clear daily bias and the Silver Bullet window is active"
+    },
+    "swing_variant": {
+      "difference": "Steps 1-2 use Weekly/Monthly timeframes. Entry on H4/Daily instead of M15.",
+      "advantage": "Larger moves, fewer trades, less screen time",
+      "when_to_use": "When quarterly_shifts or seasonal patterns provide strong macro bias"
+    }
+  },
+
+  "failure_modes": {
+    "most_common_failure": "Skipping step 4 (entering without confirmed liquidity sweep)",
+    "second_most_common": "Wrong daily bias — counter-trend trading because HTF analysis was rushed",
+    "third_most_common": "Entering at wrong time — outside kill zones or during news events",
+    "recovery": "If a trade fails, DO NOT revenge trade. Wait for next valid kill zone with full sequence."
+  },
+
+  "key_principle": "This model works because it WAITS for all pieces across all layers. Every step filters out 30-50% of setups. By step 6, only 1-3% of all price action qualifies. That's the edge — extreme selectivity.",
+
+  "bridge_integration": {
+    "checklist_mapping": "Each step maps to a scoring component in the ICT pipeline",
+    "grade_requirement": "Full 7-step sequence completed = Grade A. Missing 1-2 steps = Grade B. Missing 3+ = Grade C/D.",
+    "automation_note": "Steps 1-3 are fully automated. Steps 4-5 are partially automated (sweep/displacement detection). Step 6 uses Claude for final decision."
+  }
 }

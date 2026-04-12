@@ -1,23 +1,101 @@
 {
   "id": "venom_model",
   "layer": "composite",
-  "definition": "A specific pre-market trading model for US equity index futures. Uses the 90-minute pre-market range (8:00-9:30 AM NY) as the accumulation phase, then trades the sweep + reversal at market open.",
+  "definition": "A specific pre-market/open trading model for US equity index futures (and crypto during US hours). Uses the 90-minute pre-market range as the accumulation phase, then trades the sweep + reversal at market open. Venom is ICT's most structured intraday model — every step has exact timing.",
   "composes": [
-    "PO3_AMD (pre-market = accumulation, 9:30 open = manipulation, 9:45+ = distribution)",
+    "power_of_three_and_AMD (pre-market = accumulation, 9:30 open = manipulation, 9:45+ = distribution)",
     "liquidity_sweep (pre-market high/low get swept at open)",
-    "displacement (post-sweep displacement confirms direction)"
+    "displacement (post-sweep displacement confirms direction)",
+    "fair_value_gaps (entry is the FVG created by post-sweep displacement)",
+    "consequent_encroachment (CE of the FVG = precision entry)",
+    "silver_bullet (Venom overlaps with NY AM Silver Bullet window)"
   ],
-  "setup": {
-    "step_1": "Mark 90-min pre-market range high/low (8:00-9:30 AM NY)",
-    "step_2": "At 9:30 open, watch for sweep of pre-market high OR low",
-    "step_3": "After sweep, wait for displacement + FVG in opposite direction",
-    "step_4": "Enter retracement into FVG. SL beyond pre-market sweep extreme."
+
+  "pre_session_prep": {
+    "before_8am": {
+      "task_1": "Determine daily bias from overnight/HTF analysis",
+      "task_2": "Mark NDOG (previous day close to current open) and NWOG if Monday",
+      "task_3": "Note any pending news events (8:30 ET releases: CPI, NFP, retail sales)",
+      "task_4": "If high-impact news at 8:30, WAIT until after news before marking pre-market range"
+    }
   },
+
+  "setup": {
+    "step_1_accumulation": {
+      "time": "8:00 - 9:30 AM ET",
+      "action": "Mark the 90-minute pre-market range high and low",
+      "detail": "This range represents where overnight orders have accumulated. The high and low are liquidity targets.",
+      "note": "If news at 8:30, the 'real' range may be 8:35-9:30 (post-news)"
+    },
+    "step_2_manipulation": {
+      "time": "9:30 - 9:45 AM ET",
+      "action": "Watch for sweep of pre-market HIGH or LOW at market open",
+      "bullish_signal": "Pre-market LOW is swept (SSL taken) → expect bullish reversal",
+      "bearish_signal": "Pre-market HIGH is swept (BSL taken) → expect bearish reversal",
+      "no_signal": "If neither is swept by 9:45, Venom is invalid for the day — wait for Silver Bullet"
+    },
+    "step_3_confirmation": {
+      "time": "9:45 - 10:00 AM ET",
+      "action": "Wait for displacement + FVG in the OPPOSITE direction of the sweep",
+      "requirement": "Displacement candle must be 3+ ATR. FVG must be visible on M5/M15.",
+      "bonus": "CHoCH on M5 = highest confidence. BOS on M15 = secondary confirmation."
+    },
+    "step_4_entry": {
+      "time": "10:00 - 10:30 AM ET",
+      "action": "Enter on FVG fill or CE of the FVG",
+      "sl": "Beyond the pre-market sweep extreme (the manipulation wick)",
+      "tp1": "NDOG CE or opposite pre-market range extreme",
+      "tp2": "PDH/PDL or next significant DOL"
+    },
+    "step_5_management": {
+      "time": "10:30 AM - 12:00 PM ET",
+      "action": "Partial close 50% at TP1 → move SL to breakeven → trail to TP2",
+      "exit_deadline": "Close any remaining position by 12:00 PM ET (lunch = low liquidity)"
+    }
+  },
+
   "applicable_to": [
-    "US30",
-    "US100",
-    "US500"
+    { "symbol": "ES1!/US500", "note": "Primary — Venom was designed for S&P 500 futures" },
+    { "symbol": "NQ1!/US100", "note": "Excellent — Nasdaq is more volatile, wider SLs needed" },
+    { "symbol": "YM1!/US30", "note": "Good — Dow follows same pattern but lower volume" },
+    { "symbol": "BTCUSD", "note": "Works during US hours — CME BTC futures create the same pattern" },
+    { "symbol": "ETHUSD", "note": "Works but less reliable — ETH has more random overnight moves" }
   ],
-  "time_filter": "9:30-10:30 AM NY only",
-  "connection_to_PO3": "Venom IS PO3 applied to the specific 8:00-10:30 AM window with pre-market as the accumulation range."
+
+  "venom_variants": {
+    "classic_venom": {
+      "range": "8:00-9:30 ET pre-market",
+      "best_for": "Standard market open days (no 8:30 news)"
+    },
+    "news_venom": {
+      "range": "8:35-9:30 ET (post-news pre-market)",
+      "best_for": "CPI/NFP/retail sales days — news creates the initial spike, then Venom plays the reversal",
+      "warning": "Wider SL needed — news creates deeper sweeps"
+    },
+    "crypto_venom": {
+      "range": "8:00-9:30 ET (same timing, using CME reference)",
+      "best_for": "BTC/ETH during weekdays when CME is active",
+      "note": "Use CME BTC price for range boundaries, trade on spot exchange"
+    }
+  },
+
+  "failure_conditions": [
+    "No sweep by 9:45 ET → Venom is invalid, wait for Silver Bullet at 10:00",
+    "Both pre-market high AND low swept → confused market, skip the day",
+    "Sweep + displacement in SAME direction (not reversal) → this is a breakout, not Venom",
+    "Low-liquidity day (holiday, half-day) → Venom is unreliable"
+  ],
+
+  "scoring": {
+    "classic_venom_setup": "+10 to ICT score (complete pattern with all steps)",
+    "venom_in_silver_bullet": "+12 to ICT score (Venom overlaps with 10:00-11:00 window)",
+    "partial_venom": "+5 to ICT score (sweep occurred but weak displacement)"
+  },
+
+  "bridge_integration": {
+    "auto_detection": "Mark pre-market range at 9:30 ET. Watch for sweep of high/low until 9:45.",
+    "time_gate": "Only active 9:30-10:30 ET on weekdays. Disabled on weekends and holidays.",
+    "symbols": "Apply to US500, US100, US30, BTCUSD, ETHUSD only",
+    "connection_to_silver_bullet": "If Venom triggers at 9:30-9:45, the FVG entry at 10:00-10:30 is ALSO a Silver Bullet entry"
+  }
 }

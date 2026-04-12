@@ -1,17 +1,66 @@
 {
   "id": "balanced_price_range",
   "layer": 4,
-  "definition": "When two opposing FVGs overlap — a bullish FVG and bearish FVG at the same price level. This creates a 'balanced' zone where both buyers and sellers have filled gaps.",
+  "definition": "When two opposing FVGs overlap — a bullish FVG and bearish FVG at the same price level. This creates a 'balanced' zone where both buyers and sellers have filled gaps. BPR is institutional equilibrium — the market has agreed on fair value within this zone.",
   "depends_on": [
-    "fair_value_gaps (BPR IS two overlapping FVGs)"
+    "fair_value_gaps (BPR IS two overlapping FVGs)",
+    "inverse_fvg (IFVG formation often creates BPR with the original FVG)"
   ],
   "feeds_into": [
-    "trade entry (BPR = equilibrium zone, expect price to use it as support/resistance)"
+    "entry_models (BPR = equilibrium zone, high-probability S/R)",
+    "market_structure (BPR break confirms genuine structural change)"
   ],
   "related_to": [
-    "dealing_range.equilibrium (BPR represents localized equilibrium)",
-    "premium_discount (BPR often forms near the 50% level of a dealing range)"
+    "dealing_range (BPR represents localized equilibrium within the dealing range)",
+    "premium_discount (BPR often forms near the 50% level)",
+    "consequent_encroachment (CE of BPR = strongest reaction point)"
   ],
-  "significance": "BPRs are strong support/resistance zones because both sides have expressed interest. Price that breaks through a BPR is likely in genuine breakout, not manipulation.",
-  "how_to_trade": "Look for entries at BPR zones when price retests them. If price respects BPR → continuation trade. If price smashes through BPR → the breakout is likely real (not a sweep)."
+
+  "formation": {
+    "step_1": "Bullish FVG forms during an up-move (gap between candle 1 high and candle 3 low)",
+    "step_2": "Later, a bearish FVG forms during a down-move that overlaps with the bullish FVG",
+    "step_3": "The overlap zone = Balanced Price Range",
+    "calculation": {
+      "bpr_high": "min(bullish_fvg_high, bearish_fvg_high)",
+      "bpr_low": "max(bullish_fvg_low, bearish_fvg_low)",
+      "bpr_ce": "(bpr_high + bpr_low) / 2"
+    }
+  },
+
+  "trading_rules": {
+    "as_support_resistance": {
+      "bullish_context": "In a bullish trend, BPR acts as SUPPORT — buy when price retests the BPR from above",
+      "bearish_context": "In a bearish trend, BPR acts as RESISTANCE — sell when price retests the BPR from below",
+      "entry": "Enter at BPR CE for precision. SL beyond the far BPR edge."
+    },
+    "as_breakout_filter": {
+      "rule": "Price that BREAKS through a BPR with displacement is likely in a genuine breakout",
+      "why": "Both sides have already expressed interest at this level — breaking it means overwhelming force",
+      "vs_manipulation": "Normal liquidity sweeps wick through levels. Breaking through a BPR is NOT a sweep — it's real."
+    },
+    "as_range_reference": {
+      "rule": "BPR often marks the equilibrium of a dealing range",
+      "implication": "Price above BPR = premium (sell). Price below BPR = discount (buy).",
+      "connection": "BPR CE serves the same function as the dealing_range 50% level"
+    }
+  },
+
+  "bpr_vs_single_fvg": {
+    "single_fvg": "One-sided imbalance — price tends to fill it then continue. Moderate S/R.",
+    "bpr": "Two-sided agreement — both bulls and bears have expressed interest. Strong S/R.",
+    "ifvg_connection": "When a bullish FVG is violated (creating bearish IFVG), and the IFVG overlaps the original → BPR forms automatically"
+  },
+
+  "scoring": {
+    "entry_at_bpr": "+4 to ICT score (equilibrium zone = strong reaction)",
+    "bpr_ce_entry": "+6 to ICT score (precision entry at CE of equilibrium)",
+    "bpr_break_confirmation": "+3 to ICT score (confirms genuine breakout, not sweep)"
+  },
+
+  "bridge_integration": {
+    "detection": "Check all active FVGs for opposing-direction overlaps. If bullish FVG overlaps with bearish FVG, create a BPR zone.",
+    "level_injection": "Add BPR CE to session levels as equilibrium reference",
+    "breakout_filter": "If price breaks through a BPR with displacement, increase confidence in the breakout direction",
+    "score_impact": "Entry at BPR = +4 to +6 in ICT score"
+  }
 }

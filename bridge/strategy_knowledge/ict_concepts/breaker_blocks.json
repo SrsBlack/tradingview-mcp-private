@@ -1,0 +1,79 @@
+{
+  "id": "breaker_blocks",
+  "layer": 4,
+  "definition": "An order block that has been violated (price traded through it) and now acts as support/resistance from the OPPOSITE direction. A bullish OB becomes a bearish breaker when broken below, and vice versa. Breakers signal institutional order flow reversal — the smart money that created the OB has been stopped out, and the opposite side now controls.",
+  "depends_on": [
+    "order_blocks (breaker IS a failed/violated order block)",
+    "market_structure (CHoCH creates breakers — the violated OB becomes the breaker)",
+    "liquidity_sweep (the sweep that broke the OB confirms the reversal)"
+  ],
+  "feeds_into": [
+    "entry_models (breaker block is a high-quality entry zone for reversals)",
+    "draw_on_liquidity (breaker provides a DOL reference for re-entry)",
+    "risk_management (SL placed beyond breaker extreme)"
+  ],
+  "related_to": [
+    "mitigation_blocks (first touch of breaker = mitigation)",
+    "rejection_blocks (rejection at breaker confirms it's holding)"
+  ],
+
+  "formation_sequence": {
+    "bullish_breaker": {
+      "step_1": "Bearish order block forms (last up-candle before a down-move)",
+      "step_2": "Price trades THROUGH the bearish OB, violating it (higher high made)",
+      "step_3": "The violated bearish OB now becomes a BULLISH breaker",
+      "step_4": "When price retraces back to this zone, it acts as SUPPORT",
+      "entry": "Buy at the breaker block zone (old bearish OB), SL below breaker low"
+    },
+    "bearish_breaker": {
+      "step_1": "Bullish order block forms (last down-candle before an up-move)",
+      "step_2": "Price trades THROUGH the bullish OB, violating it (lower low made)",
+      "step_3": "The violated bullish OB now becomes a BEARISH breaker",
+      "step_4": "When price retraces back to this zone, it acts as RESISTANCE",
+      "entry": "Sell at the breaker block zone (old bullish OB), SL above breaker high"
+    }
+  },
+
+  "vs_order_blocks": {
+    "order_block": "Holds — price respects it and reverses at the zone. Continuation signal.",
+    "breaker_block": "Failed OB — price broke through it. Now acts from opposite direction. Reversal signal.",
+    "key_difference": "OBs confirm trend continuation. Breakers confirm trend REVERSAL.",
+    "detection": "If an OB is violated (price closes beyond it), mark it as a breaker with flipped polarity"
+  },
+
+  "quality_filters": {
+    "high_quality_breaker": [
+      "Formed by a CHoCH event (not just a wick through)",
+      "Displacement candle broke through the OB (3+ ATR move)",
+      "FVG created when the OB was broken (confirms institutional force)",
+      "First test of the breaker after formation (virgin breaker)"
+    ],
+    "low_quality_breaker": [
+      "OB broken by a slow grind (no displacement)",
+      "Multiple tests already (breaker is losing potency)",
+      "No FVG associated with the break",
+      "Against the HTF trend direction"
+    ]
+  },
+
+  "scoring": {
+    "virgin_breaker_with_fvg": "+8 to ICT score (highest quality reversal zone)",
+    "virgin_breaker_no_fvg": "+5 to ICT score",
+    "retested_breaker": "+3 to ICT score (still valid but weaker)",
+    "multi_tested_breaker": "+0 (exhausted — don't trade it)"
+  },
+
+  "common_mistakes": [
+    "Confusing a breaker with a regular OB — the polarity is FLIPPED",
+    "Trading breakers against HTF trend — breakers work best WITH the HTF direction",
+    "Not waiting for the retest — entering immediately after formation is premature",
+    "Ignoring that breakers expire — after 2-3 tests, the zone is consumed"
+  ],
+
+  "bridge_integration": {
+    "detection": "When an OB is violated (price closes beyond OB high/low), convert it to a breaker with flipped direction",
+    "entry_zone": "Use breaker zone (CE of breaker preferred) as limit entry",
+    "score_impact": "Active breaker at entry = +5 to +8 based on quality",
+    "replaces": "Breaker supersedes the original OB — remove the old OB from active zones"
+  }
+}

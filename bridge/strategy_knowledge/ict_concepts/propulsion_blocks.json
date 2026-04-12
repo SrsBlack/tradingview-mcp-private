@@ -1,18 +1,69 @@
 {
   "id": "propulsion_blocks",
   "layer": 4,
-  "definition": "Order blocks created by extreme displacement candles — the displacement is so strong that the OB becomes a 'propulsion zone' with exceptionally high institutional interest.",
+  "definition": "Order blocks created by extreme displacement candles — the displacement is so strong that the OB becomes a 'propulsion zone' with exceptionally high institutional interest. Propulsion blocks are the STRONGEST type of OB and represent maximum institutional commitment to a direction.",
   "depends_on": [
     "order_blocks (propulsion blocks ARE OBs with extreme displacement)",
-    "displacement (propulsion requires extreme, not just normal displacement)"
+    "displacement (propulsion requires extreme, not just normal displacement)",
+    "fair_value_gaps (propulsion always creates a large FVG alongside the OB)"
   ],
   "feeds_into": [
-    "trade entry (propulsion blocks are highest-confidence OB entries)"
+    "entry_models (propulsion blocks are the highest-confidence OB entries — top of PD array hierarchy)",
+    "PD_arrays (propulsion = strongest array in the stack)"
   ],
   "related_to": [
-    "order_blocks (propulsion is the STRONGEST grade of OB)",
-    "fair_value_gaps (propulsion blocks always leave large FVGs)"
+    "unicorn_model (propulsion block that becomes a breaker + FVG = enhanced unicorn)"
   ],
-  "criteria": "The displacement candle must be >2x the average candle range, with body >80% of range (almost no wick). These are institutional aggression candles.",
-  "significance": "Propulsion blocks are the strongest OBs. First touch has near-90% reaction probability. If a propulsion block is mitigated without reaction, the trend thesis is WRONG."
+
+  "identification_criteria": {
+    "displacement_size": "Candle body must be > 2x the 14-period ATR",
+    "body_ratio": "Candle body must be > 80% of the total range (minimal wicks)",
+    "volume": "Volume on the displacement candle should be > 1.5x average (if available)",
+    "fvg_creation": "The displacement MUST create a visible FVG — no FVG = not a propulsion block",
+    "structural_context": "Propulsion should occur during CHoCH or BOS event, not random volatility"
+  },
+
+  "vs_regular_ob": {
+    "regular_ob": "Normal displacement (1-2x ATR). FVG may or may not be present. ~65% first-touch reaction.",
+    "propulsion_block": "Extreme displacement (2x+ ATR). FVG always present. ~85-90% first-touch reaction.",
+    "key_difference": "Propulsion blocks represent MAXIMUM institutional aggression — the algo is sending a clear signal"
+  },
+
+  "trading_rules": {
+    "entry": "ALWAYS use limit order at propulsion block zone (preferably CE within the OB)",
+    "sl": "Beyond the propulsion block extreme (the wick of the displacement candle)",
+    "tp": "Draw on liquidity target — propulsion blocks often mark the START of a major move",
+    "confidence": "If propulsion block forms during kill zone with HTF alignment = Grade A automatically",
+    "failure_signal": "If price breaks through a propulsion block without reacting = the trend thesis is INVALIDATED. Close all positions in that direction."
+  },
+
+  "formation_types": {
+    "trend_initiation": {
+      "context": "Propulsion at the start of a new trend (after liquidity sweep + CHoCH)",
+      "significance": "Highest quality — marks the birth of a new institutional move",
+      "hold_time": "Valid for days/weeks as price builds away from it"
+    },
+    "trend_continuation": {
+      "context": "Propulsion in the middle of an existing trend (after pullback + BOS)",
+      "significance": "Strong continuation signal — the trend is accelerating",
+      "hold_time": "Valid for hours/days"
+    },
+    "exhaustion_warning": {
+      "context": "Propulsion at an obvious target level (PDH/PDL, PWH/PWL)",
+      "significance": "WARNING — this may be the final push. Don't chase it.",
+      "action": "Use as TP zone, not entry zone"
+    }
+  },
+
+  "scoring": {
+    "propulsion_at_entry": "+10 to ICT score (highest possible OB score)",
+    "propulsion_with_fvg_ce": "+12 to ICT score (propulsion + CE alignment)",
+    "propulsion_violation": "-15 to ICT score (thesis invalidated — close positions)"
+  },
+
+  "bridge_integration": {
+    "detection": "Flag OBs where the displacement candle body > 2x ATR(14) and body_ratio > 0.8",
+    "priority": "Propulsion blocks get highest priority in PD array stacking",
+    "invalidation": "If price closes beyond propulsion block, trigger immediate re-evaluation of all positions in that direction"
+  }
 }

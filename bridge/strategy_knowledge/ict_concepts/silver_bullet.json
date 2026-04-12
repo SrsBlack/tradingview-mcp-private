@@ -1,0 +1,94 @@
+{
+  "id": "silver_bullet",
+  "layer": 2,
+  "definition": "Time-specific FVG entry model during three daily algorithmic macro windows. ICT's most precise intraday entry — the algorithm delivers a displacement + FVG within a specific 60-minute window, and you enter on the FVG fill.",
+  "depends_on": [
+    "fair_value_gaps (entry is an FVG fill within the macro window)",
+    "displacement (requires a 3+ ATR candle to create the FVG)",
+    "sessions_and_kill_zones (macro windows are sub-divisions of kill zones)",
+    "daily_bias (must align with HTF directional bias)"
+  ],
+  "feeds_into": [
+    "entry_models (Silver Bullet is a Grade A+ entry when all criteria align)",
+    "risk_management (tight SL = smaller risk per trade, higher R:R)"
+  ],
+
+  "three_windows": {
+    "london_silver_bullet": {
+      "time_et": "03:00 - 04:00 ET",
+      "time_utc": "08:00 - 09:00 UTC (winter) / 07:00 - 08:00 UTC (summer)",
+      "context": "London open manipulation — price sweeps Asian session liquidity then reverses",
+      "best_for": ["EURUSD", "GBPUSD", "XAUUSD", "EURGBP"],
+      "typical_setup": "Asian range high/low swept → displacement → FVG forms → enter on FVG fill"
+    },
+    "ny_am_silver_bullet": {
+      "time_et": "10:00 - 11:00 ET",
+      "time_utc": "15:00 - 16:00 UTC (winter) / 14:00 - 15:00 UTC (summer)",
+      "context": "NY AM session continuation or reversal of London move",
+      "best_for": ["ES/US500", "NQ/US100", "BTCUSD", "ETHUSD", "XAUUSD"],
+      "typical_setup": "London high/low swept → displacement → FVG → entry"
+    },
+    "ny_pm_silver_bullet": {
+      "time_et": "14:00 - 15:00 ET",
+      "time_utc": "19:00 - 20:00 UTC (winter) / 18:00 - 19:00 UTC (summer)",
+      "context": "Final institutional move before London close — often a reversal or continuation to EOD target",
+      "best_for": ["ES/US500", "NQ/US100", "BTCUSD"],
+      "typical_setup": "Afternoon consolidation breaks → displacement → FVG → entry for EOD move"
+    }
+  },
+
+  "execution_rules": {
+    "step_1": "Identify daily bias BEFORE the macro window opens (use HTF structure + daily bias checklist)",
+    "step_2": "Wait for the macro window to open — do NOT enter before the window",
+    "step_3": "Watch for displacement: a single candle that moves 3+ ATR and creates an FVG",
+    "step_4": "The FVG must form IN THE DIRECTION of your daily bias",
+    "step_5": "Enter when price retraces to fill the FVG (limit order at FVG edge or CE)",
+    "step_6": "SL below/above the displacement candle extreme (the liquidity sweep point)",
+    "step_7": "TP at the next draw on liquidity — session high/low or PDH/PDL"
+  },
+
+  "confirmation_criteria": {
+    "mandatory": [
+      "Active within one of the three 60-minute windows",
+      "Daily bias confirmed (HTF structure aligned)",
+      "Displacement candle present (3+ ATR move)",
+      "FVG created by the displacement",
+      "FVG direction matches daily bias"
+    ],
+    "enhancers": [
+      "Liquidity sweep occurred just before displacement (+5 pts)",
+      "SMT divergence confirmed with correlated pair (+3 pts)",
+      "FVG overlaps with HTF order block (+5 pts)",
+      "Price at OTE (0.618-0.786) within dealing range (+3 pts)"
+    ]
+  },
+
+  "risk_reward_profile": {
+    "typical_sl": "15-30 pips forex, 50-150 pts indices, 100-400 pts BTC",
+    "typical_rr": "3:1 to 5:1 (tight SL + session target)",
+    "win_rate_expectation": "60-70% when all criteria met",
+    "why_high_rr": "Time-specific entry compresses the SL (you know exactly where the algo displaced from)"
+  },
+
+  "common_mistakes": [
+    "Entering BEFORE the macro window opens (anticipating, not confirming)",
+    "Taking FVGs that form AGAINST the daily bias",
+    "Ignoring that the displacement must create the FVG (not just any old FVG)",
+    "Using Silver Bullet during news events (NFP, FOMC) — macro timing is disrupted",
+    "Trading all three windows — pick the one that aligns with your session focus"
+  ],
+
+  "crypto_adaptation": {
+    "note": "Crypto trades 24/7 but still respects institutional time windows",
+    "best_windows": ["NY AM (10:00-11:00 ET)", "NY PM (14:00-15:00 ET)"],
+    "why": "Institutional crypto desks operate during US business hours; CME BTC/ETH futures drive price discovery",
+    "weekend": "Silver Bullet is less reliable on weekends — no institutional flow"
+  },
+
+  "bridge_integration": {
+    "is_silver_bullet_field": "Already tracked in ICT analysis result",
+    "score_impact": "Silver Bullet window active + FVG formed = +8 to ICT score",
+    "auto_detection": "Check current UTC time against three windows; if active, flag FVGs formed in last 15 minutes as Silver Bullet candidates",
+    "grade_boost": "Grade B setup inside Silver Bullet window with all criteria = upgrade to Grade A"
+  }
+}

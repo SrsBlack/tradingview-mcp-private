@@ -1,33 +1,81 @@
 {
   "id": "PD_arrays",
   "layer": 4,
-  "definition": "Premium/Discount Arrays — the collective term for all institutional entry/exit zones (OBs, FVGs, breakers, etc.).",
+  "definition": "Premium/Discount Arrays — the collective term for all institutional entry/exit zones. PD arrays are the building blocks of the ICT framework: every entry zone is a PD array, and understanding which arrays are premium vs discount determines whether to buy or sell at that zone.",
   "depends_on": [
     "order_blocks",
     "fair_value_gaps",
     "breaker_blocks",
-    "premium_discount"
+    "mitigation_blocks",
+    "inverse_fvg",
+    "premium_discount",
+    "consequent_encroachment"
   ],
   "feeds_into": [
     "optimal_trade_entry (OTE is applied within PD arrays)",
-    "trade entry (PD arrays ARE the entry zones)"
+    "entry_models (PD arrays ARE the entry zones — grade depends on which arrays are present)"
   ],
-  "related_to": [
-    "All layer 4 concepts — PD arrays is the UMBRELLA term"
-  ],
-  "premium_arrays": [
-    "Bearish OBs",
-    "Bearish FVGs",
-    "Bearish Breakers",
-    "Liquidity Voids (sell side)",
-    "Old highs with BSL"
-  ],
-  "discount_arrays": [
-    "Bullish OBs",
-    "Bullish FVGs",
-    "Bullish Breakers",
-    "Liquidity Voids (buy side)",
-    "Old lows with SSL"
-  ],
-  "stacking": "When multiple PD arrays overlap at same price = 'stack' = highest-probability entry. OB + FVG + OTE at same level = Grade A setup. This is the convergence of order_blocks + fair_value_gaps + optimal_trade_entry."
+
+  "premium_arrays": {
+    "definition": "Zones in the PREMIUM half of the dealing range (above 50%) — these are SELLING zones",
+    "arrays": [
+      { "name": "Bearish Order Block", "strength": "HIGH", "description": "Last up-candle before a down-move in premium zone" },
+      { "name": "Bearish FVG", "strength": "HIGH", "description": "Downside gap in premium — price returns to fill then drops" },
+      { "name": "Bearish Breaker Block", "strength": "VERY HIGH", "description": "Former bullish OB violated — now resistance" },
+      { "name": "Bearish IFVG", "strength": "HIGH", "description": "Former bullish FVG violated and inverted" },
+      { "name": "Liquidity Void (sell side)", "strength": "MEDIUM", "description": "Empty space from a sharp drop — price returns to fill" },
+      { "name": "Old highs with BSL", "strength": "MEDIUM", "description": "Buy-side liquidity above old highs — sweep target" },
+      { "name": "Rejection Block", "strength": "MEDIUM", "description": "Long upper wick in premium — selling pressure" }
+    ],
+    "rule": "Only SELL at premium arrays. Buying in premium = buying expensive = low probability."
+  },
+
+  "discount_arrays": {
+    "definition": "Zones in the DISCOUNT half of the dealing range (below 50%) — these are BUYING zones",
+    "arrays": [
+      { "name": "Bullish Order Block", "strength": "HIGH", "description": "Last down-candle before an up-move in discount zone" },
+      { "name": "Bullish FVG", "strength": "HIGH", "description": "Upside gap in discount — price returns to fill then rises" },
+      { "name": "Bullish Breaker Block", "strength": "VERY HIGH", "description": "Former bearish OB violated — now support" },
+      { "name": "Bullish IFVG", "strength": "HIGH", "description": "Former bearish FVG violated and inverted" },
+      { "name": "Liquidity Void (buy side)", "strength": "MEDIUM", "description": "Empty space from a sharp rally — price returns to fill" },
+      { "name": "Old lows with SSL", "strength": "MEDIUM", "description": "Sell-side liquidity below old lows — sweep target" },
+      { "name": "Rejection Block", "strength": "MEDIUM", "description": "Long lower wick in discount — buying pressure" }
+    ],
+    "rule": "Only BUY at discount arrays. Selling in discount = selling cheap = low probability."
+  },
+
+  "stacking_rules": {
+    "definition": "When multiple PD arrays overlap at the same price level — creates a 'stack'",
+    "single_array": { "score_bonus": "+3 to ICT score", "grade_max": "B" },
+    "double_stack": { "score_bonus": "+6 to ICT score", "grade_max": "A", "example": "OB + FVG overlap" },
+    "triple_stack": { "score_bonus": "+10 to ICT score", "grade_max": "A+", "example": "Breaker + FVG + OTE zone = unicorn_model" },
+    "stacking_principle": "More arrays at the same price = more institutional orders = higher probability of reaction"
+  },
+
+  "pd_array_hierarchy": {
+    "strongest_to_weakest": [
+      "Propulsion Block (extreme displacement OB — near 90% first-touch reaction)",
+      "Breaker Block + FVG stack (Unicorn Model — reversal with double confirmation)",
+      "Unmitigated HTF OB + FVG (first touch of stacked PD arrays)",
+      "IFVG (inverted gap — confirms structural reversal)",
+      "Single OB (standard, no FVG overlap)",
+      "Single FVG (moderate, but needs OB or CE for precision)",
+      "Rejection Block (weakest — just a wick, no structural basis)",
+      "Liquidity Void (fill target, not entry zone)"
+    ]
+  },
+
+  "ce_within_pd_arrays": {
+    "rule": "Always calculate the CE (50% midpoint) of every PD array",
+    "why": "CE is where institutional order density is highest within the zone",
+    "entry_preference": "Enter at CE of the strongest PD array in the stack, not at the zone edge",
+    "sl_placement": "SL beyond the FAR edge of the array (not CE)"
+  },
+
+  "bridge_integration": {
+    "array_detection": "Pipeline detects OBs, FVGs, breakers independently — PD arrays is the umbrella classification",
+    "stacking_detection": "Check for price overlap between detected OBs and FVGs — flag stacks for higher scoring",
+    "premium_discount_gate": "Only trade premium arrays for SELL setups, discount arrays for BUY setups",
+    "score_mapping": "Number and quality of PD arrays at entry directly maps to ob_score + fvg_score in ICT pipeline"
+  }
 }

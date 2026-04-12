@@ -1,17 +1,86 @@
 {
   "id": "unicorn_model",
   "layer": 5,
-  "definition": "Breaker block + FVG overlap — one of the highest-probability entry patterns.",
+  "definition": "Breaker block + FVG overlap — one of the highest-probability entry patterns in ICT methodology. The unicorn model combines a violated order block (now acting as a breaker) with the fair value gap created during the violation. This double confluence zone is where institutional re-entry occurs.",
   "depends_on": [
-    "order_blocks (specifically breaker_blocks — a failed OB)",
-    "fair_value_gaps (FVG created when OB was broken through)"
+    "order_blocks (the original OB that gets violated)",
+    "breaker_blocks (the OB becomes a breaker when violated)",
+    "fair_value_gaps (FVG created by the displacement that broke the OB)",
+    "displacement (the force that breaks through the OB must be displacement-grade)"
   ],
   "feeds_into": [
-    "trade entry (unicorn zone IS the entry)"
+    "entry_models (unicorn = Grade A entry zone automatically)",
+    "PD_arrays (unicorn = triple-stacked PD arrays — breaker + FVG + former OB)"
   ],
   "related_to": [
-    "PD_arrays (unicorn = stacked PD arrays)",
-    "displacement (the move through the OB that creates the breaker IS displacement)"
+    "consequent_encroachment (CE of unicorn zone = ultimate precision entry)",
+    "mitigation_blocks (first touch of unicorn zone = mitigation event)"
   ],
-  "formation_chain": "OB forms → price returns and breaks THROUGH OB → OB becomes breaker (from order_blocks) → the breakthrough move creates FVG (from fair_value_gaps) → overlap of breaker + FVG = unicorn entry zone. This chains order_blocks → breaker_blocks → fair_value_gaps → unicorn."
+
+  "formation_chain": {
+    "step_1": "Order Block forms — the last opposing candle before a move",
+    "step_2": "Price returns to the OB zone (expected to hold)",
+    "step_3": "Price breaks THROUGH the OB with displacement (3+ ATR candle)",
+    "step_4": "The violated OB becomes a Breaker Block (polarity flipped)",
+    "step_5": "The displacement that broke the OB creates a Fair Value Gap",
+    "step_6": "The overlap zone of Breaker + FVG = UNICORN ENTRY ZONE",
+    "summary": "OB → violation → breaker (flipped) + FVG (from violation) → overlap = unicorn"
+  },
+
+  "bullish_unicorn": {
+    "formation": "Bearish OB violated to the upside → becomes bullish breaker. Upside displacement creates bullish FVG. Overlap = bullish unicorn.",
+    "entry": "Buy at unicorn zone (breaker + FVG overlap). Limit order at CE of the overlap.",
+    "sl": "Below the unicorn zone low (the breaker block extreme)",
+    "tp": "Next BSL (draw on liquidity above)"
+  },
+
+  "bearish_unicorn": {
+    "formation": "Bullish OB violated to the downside → becomes bearish breaker. Downside displacement creates bearish FVG. Overlap = bearish unicorn.",
+    "entry": "Sell at unicorn zone (breaker + FVG overlap). Limit order at CE of the overlap.",
+    "sl": "Above the unicorn zone high (the breaker block extreme)",
+    "tp": "Next SSL (draw on liquidity below)"
+  },
+
+  "why_unicorn_works": {
+    "reason_1": "Double confluence — two independent institutional signals (breaker + FVG) at the same price",
+    "reason_2": "The violation of the OB confirms structural change — this is a REVERSAL zone",
+    "reason_3": "FVG ensures there's a genuine imbalance (unfilled orders) at the zone",
+    "reason_4": "Breaker ensures the opposing side has been stopped out — less resistance to the new direction",
+    "combined": "Breaker removes opposing pressure + FVG adds supporting orders = highest-probability entry"
+  },
+
+  "quality_filters": {
+    "perfect_unicorn": [
+      "Displacement through OB was 3+ ATR (strong institutional force)",
+      "FVG is clean (no partial fills — gap is fully intact)",
+      "First touch of the unicorn zone (virgin — unmitigated)",
+      "Occurs during kill zone with HTF bias alignment",
+      "Silver Bullet window active = bonus"
+    ],
+    "imperfect_unicorn": [
+      "Displacement was weak (1-2 ATR) — still valid but lower confidence",
+      "FVG partially filled before price returns — zone is weakened",
+      "Second touch — still tradeable but reduce size"
+    ]
+  },
+
+  "time_windows": {
+    "best_in": "Silver Bullet windows (10:00-11:00 ET, 14:00-15:00 ET) — unicorn formed during Silver Bullet = A+",
+    "avoid_in": "Lunch hour (12:00-13:30 ET) — low liquidity unicorns have lower reaction probability",
+    "hold_time": "Unicorn zones on M15 valid for current session. On H4/Daily valid for days."
+  },
+
+  "scoring": {
+    "virgin_unicorn_in_kill_zone": "+12 to ICT score (auto Grade A)",
+    "virgin_unicorn_outside_kill_zone": "+8 to ICT score",
+    "retested_unicorn": "+5 to ICT score (still strong but weaker)",
+    "unicorn_at_ce": "+3 additional bonus (precision entry)"
+  },
+
+  "bridge_integration": {
+    "detection": "When an OB is violated (breaker created) AND a FVG exists within the breaker zone → flag as unicorn",
+    "auto_grade": "Unicorn with kill zone + HTF alignment = automatic Grade A regardless of other scores",
+    "entry_method": "Limit order at CE of the overlap zone",
+    "priority": "Unicorn zones get highest priority in the entry queue — trade these before standard setups"
+  }
 }

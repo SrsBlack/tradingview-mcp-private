@@ -1,0 +1,88 @@
+{
+  "id": "consequent_encroachment",
+  "layer": 3,
+  "definition": "The 50% midpoint of any price inefficiency — FVG, opening gap (NWOG/NDOG), liquidity void, or breaker block. CE is the mathematical equilibrium of the imbalance where institutional orders cluster most densely. It is the precision entry point within any ICT zone.",
+  "depends_on": [
+    "fair_value_gaps (CE of FVG = 50% of the gap)",
+    "opening_gaps (CE of NWOG/NDOG = highest probability weekly/daily level)",
+    "liquidity_void (CE of void = fill target)",
+    "breaker_blocks (CE of breaker = optimal re-entry)"
+  ],
+  "feeds_into": [
+    "optimal_trade_entry (CE refines OTE — enter at CE within OTE zone)",
+    "entry_models (CE provides sub-pip precision for limit orders)",
+    "draw_on_liquidity (CE of unfilled gap = precision DOL target)"
+  ],
+
+  "calculation": {
+    "formula": "CE = (zone_high + zone_low) / 2",
+    "examples": {
+      "fvg_ce": "FVG high=100.50, low=100.20 → CE = 100.35",
+      "nwog_ce": "Friday close=4520, Sunday open=4535 → CE = 4527.50",
+      "void_ce": "Void high=72000, low=71500 → CE = 71750"
+    }
+  },
+
+  "why_ce_works": {
+    "institutional_logic": "Large orders can't fill at a single price — they need range. CE is where the order book is thickest within the imbalance.",
+    "statistical_basis": "Price reacts at CE ~65-70% of the time when approaching an unfilled inefficiency",
+    "market_maker_perspective": "Market makers use CE to balance their book — it's the fair price within the imbalance"
+  },
+
+  "ce_hierarchy": {
+    "tier_1_highest": {
+      "type": "NWOG CE",
+      "description": "50% of New Week Opening Gap — strongest weekly level",
+      "reliability": "70-75% reaction rate",
+      "hold_time": "Level remains valid all week until filled"
+    },
+    "tier_2_high": {
+      "type": "HTF FVG CE (4H/Daily)",
+      "description": "50% of higher-timeframe FVG",
+      "reliability": "65-70% reaction rate",
+      "hold_time": "Valid until FVG is fully filled"
+    },
+    "tier_3_medium": {
+      "type": "NDOG CE",
+      "description": "50% of New Day Opening Gap",
+      "reliability": "60-65% reaction rate",
+      "hold_time": "Valid for the current trading day"
+    },
+    "tier_4_entry": {
+      "type": "LTF FVG CE (M15/H1)",
+      "description": "50% of trigger-timeframe FVG — precision entry",
+      "reliability": "55-60% reaction rate",
+      "hold_time": "Valid for current session only"
+    }
+  },
+
+  "trading_application": {
+    "as_entry": {
+      "method": "Place limit order at CE of the FVG/gap in the direction of bias",
+      "sl": "Beyond the far edge of the FVG/gap (not CE — the full zone boundary)",
+      "advantage": "Tighter SL than entering at zone edge = better R:R"
+    },
+    "as_target": {
+      "method": "Use CE of unfilled gaps/voids as TP targets",
+      "logic": "Price fills to CE ~70% of the time even when it doesn't fill the full gap"
+    },
+    "as_bias_filter": {
+      "method": "Price above NWOG CE = bullish week. Below = bearish week.",
+      "logic": "CE acts as the equilibrium — being on one side implies directional pressure to rebalance"
+    }
+  },
+
+  "stacking_ce": {
+    "definition": "When CE of multiple zones aligns at the same price level",
+    "example": "NWOG CE at 4527 + HTF FVG CE at 4528 + OB midpoint at 4526 = triple-stacked CE",
+    "significance": "Stacked CE = highest confluence entry. Grade A+ guaranteed if other layers align.",
+    "score_bonus": "+8 to ICT score for double-stacked CE, +12 for triple-stacked"
+  },
+
+  "bridge_integration": {
+    "auto_calculation": "For every detected FVG, compute CE = (high + low) / 2 and store as entry candidate",
+    "entry_precision": "When placing limit orders, prefer CE over zone edge for tighter SL",
+    "score_impact": "Entry at CE of active zone = +3 to ICT score. Stacked CE = +8.",
+    "level_type": "Add CE levels to session_levels alongside PDH/PDL/PWH/PWL"
+  }
+}

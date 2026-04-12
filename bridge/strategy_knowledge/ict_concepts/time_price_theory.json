@@ -1,0 +1,78 @@
+{
+  "id": "time_price_theory",
+  "layer": 0,
+  "definition": "ICT's foundational principle that price delivery is algorithmically timed — specific clock times correlate with specific types of price movement (accumulation, manipulation, distribution). Understanding TIME is as important as understanding PRICE. The algorithm delivers price in 20-minute macro cycles, and institutional activity clusters at predictable session times.",
+  "depends_on": [
+    "market_philosophy (time-price is a core ICT belief: markets are algorithmic, not random)"
+  ],
+  "feeds_into": [
+    "sessions_and_kill_zones (kill zones are time-based trading windows)",
+    "silver_bullet (Silver Bullet is a time-specific entry model)",
+    "power_of_three_and_AMD (PO3 phases map to time-of-day)",
+    "daily_bias (time of day confirms or invalidates the daily bias)"
+  ],
+
+  "core_principles": {
+    "principle_1": {
+      "name": "Algorithmic Price Delivery",
+      "explanation": "Prices are delivered by algorithms, not by supply/demand in the retail sense. These algorithms operate on schedules tied to institutional settlement times, option expiry, and market open/close.",
+      "implication": "Price movements at specific times are NOT random — they are scheduled deliveries"
+    },
+    "principle_2": {
+      "name": "Time is More Important Than Price",
+      "explanation": "Knowing WHEN a move will happen is more valuable than knowing WHERE it will go. A perfect price level at the wrong time produces a losing trade.",
+      "implication": "Always check TIME context before entering — is this the right session, kill zone, and macro window?"
+    },
+    "principle_3": {
+      "name": "20-Minute Macros",
+      "explanation": "The algorithm operates in 20-minute micro-cycles. Within each 20-min block, there is accumulation, manipulation, and distribution — a fractal PO3.",
+      "implication": "Entries and exits should be timed to the 20-minute mark boundaries"
+    }
+  },
+
+  "macro_timing": {
+    "definition": "20-minute algorithmic delivery windows within each session",
+    "london_macros": [
+      { "window": "02:33 - 03:00 ET", "type": "Pre-London accumulation" },
+      { "window": "03:00 - 03:20 ET", "type": "London open manipulation (Judas swing)" },
+      { "window": "03:20 - 04:00 ET", "type": "London displacement + distribution" },
+      { "window": "04:03 - 04:30 ET", "type": "London continuation or reversal" }
+    ],
+    "ny_macros": [
+      { "window": "09:30 - 09:50 ET", "type": "NY open manipulation (equities)" },
+      { "window": "09:50 - 10:10 ET", "type": "NY AM displacement" },
+      { "window": "10:00 - 10:20 ET", "type": "Silver Bullet AM window opens" },
+      { "window": "10:20 - 11:00 ET", "type": "NY AM distribution" },
+      { "window": "13:30 - 14:00 ET", "type": "Afternoon accumulation" },
+      { "window": "14:00 - 14:20 ET", "type": "PM Silver Bullet manipulation" },
+      { "window": "14:20 - 15:00 ET", "type": "PM distribution / EOD positioning" }
+    ],
+    "how_to_use": "Identify which macro you're in. Don't enter during accumulation (choppy). Wait for manipulation (sweep) then enter on distribution (displacement + FVG)."
+  },
+
+  "time_of_day_expectations": {
+    "midnight_to_0200_et": "Asian session — range building, accumulation. Mark the high and low as liquidity targets.",
+    "0200_to_0500_et": "London open — manipulation of Asian range, then trending move. Most volatile forex window.",
+    "0500_to_0830_et": "London session — trend continuation. Decreasing volatility as NY approaches.",
+    "0830_to_0930_et": "Pre-NY — news releases (NFP, CPI). High volatility, DO NOT TRADE unless experienced.",
+    "0930_to_1200_et": "NY AM — highest liquidity. Best window for all instruments. Silver Bullet at 10:00-11:00.",
+    "1200_to_1330_et": "Lunch hour — low liquidity, choppy price action. AVOID TRADING.",
+    "1330_to_1600_et": "NY PM — second wind. Silver Bullet PM at 14:00-15:00. EOD positioning.",
+    "1600_to_1800_et": "After-hours — low liquidity. Only crypto remains active."
+  },
+
+  "day_of_week_expectations": {
+    "monday": "NWOG fill, range building. Often sets the week's high or low. Wait for direction confirmation.",
+    "tuesday": "Trend day — often the strongest directional move of the week. Best day for entries.",
+    "wednesday": "Midweek reversal. If Mon-Tue were bullish, Wednesday often prints the high then reverses.",
+    "thursday": "Continuation of Wednesday's reversal or second leg. High-impact news common (ECB, etc).",
+    "friday": "Profit-taking, reduced position sizing. Close intraday positions by 15:00 ET. Mark the close for NWOG."
+  },
+
+  "bridge_integration": {
+    "macro_window_detection": "Track current UTC time and map to macro windows above",
+    "avoid_trading_flag": "Flag lunch hour (12:00-13:30 ET) and pre-news windows as no-trade zones",
+    "day_of_week_modifier": "Tuesday/Wednesday entries get +3 score bonus. Friday entries get -3 penalty.",
+    "20_min_alignment": "Prefer entries on 20-minute boundaries (:00, :20, :40) for algorithmic alignment"
+  }
+}

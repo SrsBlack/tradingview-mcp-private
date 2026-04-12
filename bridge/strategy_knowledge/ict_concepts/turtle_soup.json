@@ -1,19 +1,85 @@
 {
   "id": "turtle_soup",
   "layer": 3,
-  "definition": "Failed breakout / liquidity sweep where price breaks a significant level then immediately reverses back. A specific pattern of liquidity_sweep.",
+  "definition": "Failed breakout / liquidity sweep where price breaks a significant level then immediately reverses back into the range. Named after the 'Turtle Traders' whose breakout entries become the liquidity that smart money sweeps. Turtle soup is the ICT version of a stop hunt — it IS the manipulation phase of PO3.",
   "depends_on": [
-    "liquidity (the level that gets swept)",
-    "market_structure (the swing high/low that defines the level)"
+    "liquidity (the level that gets swept — BSL above highs or SSL below lows)",
+    "market_structure (the swing high/low that defines the level)",
+    "sessions_and_kill_zones (turtle soup is most reliable during kill zones)"
   ],
   "feeds_into": [
-    "trade entry — turtle soup itself IS an entry signal when confirmed"
+    "entry_models (turtle soup IS the Layer 3 trigger event for trade entry)",
+    "displacement (displacement candle after turtle soup confirms the reversal)",
+    "breaker_blocks (the OB that was protecting the level becomes a breaker after the soup)"
   ],
   "related_to": [
-    "liquidity_sweep (turtle soup IS a type of sweep)",
-    "judas_swing (a judas swing can manifest AS a turtle soup pattern)"
+    "liquidity_sweep (turtle soup IS a specific type of sweep)",
+    "judas_swing (Judas swing can manifest AS a turtle soup pattern)",
+    "stop_raid_displacement_retracement (turtle soup is step 1 of the SRDR sequence)"
   ],
-  "buy_pattern": "Price breaks below significant low (takes SSL), closes back above → the low was a trap.",
-  "sell_pattern": "Price breaks above significant high (takes BSL), closes back below → the high was a trap.",
-  "confirmation": "Reversal candle must CLOSE back inside prior range. Wick-through + close-back = turtle soup. Close-beyond = real breakout."
+
+  "buy_setup": {
+    "name": "Turtle Soup Long (SSL sweep)",
+    "step_1": "Identify significant swing low with SSL below it (equal lows = even better)",
+    "step_2": "Price breaks below the low — retail shorts trigger, buy-stops hit",
+    "step_3": "Within 1-3 candles, price CLOSES back above the swept level",
+    "step_4": "This close-back IS the turtle soup confirmation",
+    "step_5": "Wait for displacement + FVG in bullish direction",
+    "entry": "Buy on FVG fill or OB retest after the reversal. SL below the sweep extreme.",
+    "tp": "Next BSL level above (draw on liquidity)"
+  },
+
+  "sell_setup": {
+    "name": "Turtle Soup Short (BSL sweep)",
+    "step_1": "Identify significant swing high with BSL above it (equal highs = even better)",
+    "step_2": "Price breaks above the high — retail longs trigger, sell-stops hit",
+    "step_3": "Within 1-3 candles, price CLOSES back below the swept level",
+    "step_4": "This close-back IS the turtle soup confirmation",
+    "step_5": "Wait for displacement + FVG in bearish direction",
+    "entry": "Sell on FVG fill or OB retest after the reversal. SL above the sweep extreme.",
+    "tp": "Next SSL level below (draw on liquidity)"
+  },
+
+  "quality_filters": {
+    "high_quality": [
+      "Swept level is a major reference (PDH/PDL, PWH/PWL, equal highs/lows)",
+      "Occurs during a kill zone (London open, NY open)",
+      "Displacement candle follows immediately (3+ ATR)",
+      "CHoCH or BOS confirms the reversal on LTF",
+      "Volume spike on the sweep candle (if visible)"
+    ],
+    "low_quality": [
+      "Swept level is a minor intraday swing (not significant)",
+      "Occurs during lunch hour or low-liquidity periods",
+      "No displacement after the sweep — just a slow grind back",
+      "Sweep was too deep (5%+ beyond level — may be a real breakout)"
+    ]
+  },
+
+  "turtle_soup_vs_real_breakout": {
+    "turtle_soup": "Wick beyond level + close back inside. Quick reversal (1-3 candles). Volume spike then drop.",
+    "real_breakout": "Body close beyond level. Sustained move with follow-through. Volume increases on continuation.",
+    "decision_rule": "If candle CLOSES beyond the level AND the next candle continues — it's NOT turtle soup. Exit immediately."
+  },
+
+  "depth_of_sweep": {
+    "shallow_sweep": "1-5 pips/points beyond the level — standard turtle soup",
+    "deep_sweep": "10-30 pips/points beyond — still valid if closes back within 1-3 candles",
+    "too_deep": ">50 pips or >0.5% of price beyond — likely real breakout, not manipulation",
+    "rule": "The deeper the sweep that still reverses, the STRONGER the signal (more stops were collected)"
+  },
+
+  "scoring": {
+    "turtle_soup_at_major_level": "+8 to ICT score",
+    "turtle_soup_at_minor_level": "+4 to ICT score",
+    "turtle_soup_in_kill_zone": "+3 additional bonus",
+    "turtle_soup_with_displacement": "+5 additional (this is the confirmation)"
+  },
+
+  "bridge_integration": {
+    "detection": "Scan for price that breaks swing high/low then closes back within 1-3 bars",
+    "auto_flag": "Mark as turtle_soup_confirmed when close-back is detected",
+    "score_impact": "Turtle soup replaces liquidity_sweep score when confirmed (higher quality signal)",
+    "connection_to_pipeline": "Turtle soup IS the Layer 3 event — it satisfies the 'sweep confirmed' requirement"
+  }
 }

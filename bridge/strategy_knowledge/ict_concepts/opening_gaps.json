@@ -1,0 +1,83 @@
+{
+  "id": "opening_gaps",
+  "layer": 1,
+  "definition": "New Week Opening Gap (NWOG), New Day Opening Gap (NDOG), and New Month Opening Gap (NMOG) — price voids between session closes and opens that act as liquidity magnets and institutional reference levels. The 50% midpoint (Consequent Encroachment) is the highest-probability reaction level.",
+  "depends_on": [
+    "liquidity_void (opening gaps ARE liquidity voids — specific time-based instances)",
+    "session_levels (gaps form between session boundaries)"
+  ],
+  "feeds_into": [
+    "draw_on_liquidity (NWOG/NDOG/NMOG are high-priority DOL targets)",
+    "premium_discount (gap midpoint = equilibrium reference)",
+    "consequent_encroachment (CE of opening gaps is the precision entry level)"
+  ],
+
+  "nwog": {
+    "definition": "Gap between Friday 16:00 ET close and Sunday 18:00 ET open",
+    "calculation": {
+      "high": "max(friday_close, sunday_open)",
+      "low": "min(friday_close, sunday_open)",
+      "ce_midpoint": "(high + low) / 2"
+    },
+    "behavior": {
+      "first_half_of_week": "Price is drawn to fill the NWOG — expect Monday/Tuesday to trade into the gap",
+      "ce_reaction": "NWOG CE (50%) is the most reliable reaction level of the entire week",
+      "full_fill": "~70% of NWOGs fill completely within the first 3 days",
+      "direction_clue": "If price opens above NWOG and fills down to CE → bullish bias for rest of week (and vice versa)"
+    },
+    "significance": "HIGHEST priority opening gap — sets the tone for the entire week",
+    "crypto_note": "Crypto has no true weekend close, but CME BTC/ETH futures DO close Friday 17:00 ET and open Sunday 18:00 ET — use CME gap"
+  },
+
+  "ndog": {
+    "definition": "Gap between previous day 17:00 ET close and current day 18:00 ET open (forex). For equities: previous close to current open.",
+    "calculation": {
+      "high": "max(prev_close, current_open)",
+      "low": "min(prev_close, current_open)",
+      "ce_midpoint": "(high + low) / 2"
+    },
+    "behavior": {
+      "morning_magnet": "Price is drawn to NDOG CE during London/NY AM sessions",
+      "fill_rate": "~80% of NDOGs fill within the same trading day",
+      "smaller_gaps": "NDOGs are smaller than NWOGs — less significance but higher fill probability"
+    },
+    "significance": "Daily reference level — useful for intraday bias confirmation"
+  },
+
+  "nmog": {
+    "definition": "Gap between previous month's last trading day close and new month's first trading day open",
+    "calculation": {
+      "high": "max(prev_month_close, new_month_open)",
+      "low": "min(prev_month_close, new_month_open)",
+      "ce_midpoint": "(high + low) / 2"
+    },
+    "behavior": {
+      "monthly_magnet": "NMOG CE acts as a macro reference for the entire month",
+      "quarterly_alignment": "NMOGs at quarter boundaries (Jan, Apr, Jul, Oct) are especially significant",
+      "fill_timeline": "May take 1-3 weeks to fill — use for swing trade bias"
+    },
+    "significance": "Macro-level reference — less actionable for intraday but critical for swing bias"
+  },
+
+  "trading_rules": {
+    "rule_1": "Always calculate the CE (50%) of every opening gap — this is your primary reaction level",
+    "rule_2": "NWOG CE is the strongest level of the week — plan trades around it",
+    "rule_3": "If price is above NWOG, bias is bullish (buying dips to CE). Below = bearish.",
+    "rule_4": "Opening gaps that align with HTF FVGs or order blocks = highest confluence",
+    "rule_5": "Don't trade against an unfilled opening gap — it acts as a magnet until filled",
+    "rule_6": "Multiple unfilled gaps stacking = strong directional pressure toward gap zone"
+  },
+
+  "event_horizon": {
+    "definition": "The 50% distance between two consecutive NWOGs — acts as macro premium/discount reference",
+    "usage": "Price above Event Horizon = premium (look for shorts). Below = discount (look for longs).",
+    "calculation": "midpoint between NWOG_1_CE and NWOG_2_CE"
+  },
+
+  "bridge_integration": {
+    "auto_calculation": "Compute NWOG from Friday close / Sunday open prices; NDOG from daily session boundaries",
+    "level_injection": "Add NWOG CE, NDOG CE as session_levels for DOL targeting",
+    "score_impact": "Price at NWOG/NDOG CE = +5 to ICT score (high-probability reaction zone)",
+    "bias_filter": "Price position relative to NWOG CE informs daily_bias direction"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "id": "mitigation_blocks",
+  "layer": 4,
+  "definition": "The candle or zone where price first returns to an unmitigated point of interest (FVG, OB, or breaker block) on a higher timeframe. Mitigation is the process of institutional orders being filled at a previously identified level. The mitigation block marks WHERE this filling occurs — it's the first touch of an unfilled imbalance.",
+  "depends_on": [
+    "order_blocks (mitigation occurs at unmitigated OBs)",
+    "fair_value_gaps (mitigation fills FVGs)",
+    "breaker_blocks (first touch of breaker = mitigation event)"
+  ],
+  "feeds_into": [
+    "entry_models (mitigation block = continuation entry after first retest)",
+    "risk_management (SL beyond the mitigation candle extreme)"
+  ],
+
+  "concept": {
+    "unmitigated": "A zone (OB, FVG, breaker) that has NOT been revisited since formation — fresh, untested",
+    "mitigated": "A zone that has been touched/tested — orders at that level have been partially or fully filled",
+    "mitigation_block": "The specific candle/zone where the first touch of an unmitigated level occurs",
+    "why_it_matters": "First touch of an unmitigated zone has the highest probability of reaction because all pending orders are still there"
+  },
+
+  "formation_rules": {
+    "step_1": "HTF creates a point of interest (OB, FVG, breaker) that price moves away from",
+    "step_2": "Price returns to the POI for the FIRST time — this is the mitigation event",
+    "step_3": "The candle that touches the POI becomes the mitigation block",
+    "step_4": "If price reacts (reverses from the POI), the mitigation block is confirmed",
+    "step_5": "The mitigation block itself can be used as a LTF entry zone on subsequent pullbacks"
+  },
+
+  "types": {
+    "ob_mitigation": {
+      "trigger": "Price returns to an unmitigated OB for the first time",
+      "reaction": "Strong — full pending orders at OB level",
+      "entry": "Enter at the OB zone on the first touch, SL beyond OB"
+    },
+    "fvg_mitigation": {
+      "trigger": "Price fills back into an unmitigated FVG",
+      "reaction": "Moderate — depends on FVG quality and timeframe",
+      "entry": "Enter at FVG CE on the fill, SL beyond far edge of FVG"
+    },
+    "breaker_mitigation": {
+      "trigger": "Price returns to a breaker block for the first time",
+      "reaction": "Strong — flipped polarity means strong opposing orders",
+      "entry": "Enter at breaker CE, SL beyond breaker"
+    }
+  },
+
+  "first_touch_principle": {
+    "rule": "The FIRST touch of any unmitigated zone is the highest-probability trade",
+    "statistics": "First touch reaction rate: ~70%. Second touch: ~50%. Third: ~35%.",
+    "implication": "Always prioritize virgin/unmitigated zones over retested ones",
+    "tracking": "Mark zones as 'mitigated' after first touch — reduce score weight on subsequent visits"
+  },
+
+  "htf_ltf_alignment": {
+    "process": "Identify POI on HTF (4H/Daily) → drop to LTF (M15/M5) for precise entry at mitigation",
+    "advantage": "HTF gives the level, LTF gives the timing — tight SL + high R:R",
+    "example": "Daily OB at 72,500. Drop to M15 → watch for displacement + FVG at 72,500 → enter on M15 FVG CE"
+  },
+
+  "scoring": {
+    "first_touch_of_htf_ob": "+6 to ICT score",
+    "first_touch_of_htf_fvg": "+4 to ICT score",
+    "first_touch_of_breaker": "+5 to ICT score",
+    "second_touch_of_any": "+2 to ICT score (reduced)",
+    "third_touch_plus": "+0 (zone is spent)"
+  },
+
+  "bridge_integration": {
+    "tracking": "Maintain a touch_count for each detected OB/FVG/breaker zone",
+    "first_touch_flag": "When price enters an unmitigated zone for the first time, set mitigation_event = True",
+    "score_boost": "First-touch zones get higher ICT score than retested zones",
+    "zone_expiry": "After 3 touches, remove zone from active consideration"
+  }
+}
