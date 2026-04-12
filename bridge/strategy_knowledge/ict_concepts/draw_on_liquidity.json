@@ -1,0 +1,74 @@
+{
+  "id": "draw_on_liquidity",
+  "layer": 2,
+  "definition": "The nearest unswept external liquidity level in the direction of current bias. This is WHERE price is heading — your TP target.",
+  "depends_on": [
+    "market_structure (swing points create the liquidity levels)",
+    "liquidity (BSL/SSL classification)",
+    "daily_bias (directional filter for which DOL to target)"
+  ],
+  "feeds_into": [
+    "risk_management (TP1/TP2 are DOL levels)",
+    "entry_models (DOL distance determines R:R viability)"
+  ],
+  "related_to": [
+    "dealing_range (range extremes are primary DOL)",
+    "session_levels (PDH/PDL/PWH/PWL are high-priority DOL)",
+    "IPDA (20/40/60-day levels are macro DOL)"
+  ],
+
+  "identification_rules": {
+    "step_1_determine_bias": "Use daily_bias to determine bullish or bearish direction",
+    "step_2_map_unswept_levels": "Identify all unswept external liquidity in the bias direction",
+    "step_3_rank_by_proximity": "Nearest unswept level = primary DOL (TP1). Next = secondary DOL (TP2).",
+    "step_4_check_confluence": "DOL at session level (PDH/PDL/PWH/PWL) or IPDA level = higher confidence"
+  },
+
+  "dol_hierarchy": {
+    "tier_1_highest_priority": [
+      "PDH/PDL — previous day high/low",
+      "PWH/PWL — previous week high/low",
+      "PMH/PML — previous month high/low",
+      "Equal highs/lows — engineered liquidity magnets"
+    ],
+    "tier_2_high_priority": [
+      "Session highs/lows (London, NY open, Asian)",
+      "Unmitigated HTF order blocks",
+      "Unfilled HTF FVGs (4H+)"
+    ],
+    "tier_3_moderate": [
+      "Swing highs/lows from current dealing range",
+      "IPDA 20/40/60-day reference levels"
+    ]
+  },
+
+  "dol_as_tp_mapping": {
+    "tp1_primary": {
+      "target": "Nearest unswept DOL",
+      "action": "Partial close 50% of position",
+      "typical_distance": "1-2R from entry"
+    },
+    "tp2_secondary": {
+      "target": "Next unswept DOL beyond TP1",
+      "action": "Trail remaining 50% with structure-based stop",
+      "typical_distance": "2-4R from entry"
+    },
+    "tp3_extended": {
+      "target": "Major DOL (weekly/monthly level)",
+      "action": "Only for swing trades held overnight",
+      "typical_distance": "4-8R from entry"
+    }
+  },
+
+  "viability_check": {
+    "minimum_rr": "DOL must be at least 2R from entry to justify the trade",
+    "obstruction_check": "No major opposing DOL between entry and target (e.g., don't go long if PWH sits between entry and DOL)",
+    "freshness": "DOL that has been tested 2+ times without sweep loses potency — prefer untested levels"
+  },
+
+  "bridge_integration": {
+    "score_impact": "Valid DOL alignment adds +5 to ICT score",
+    "tp_setting": "TP1 = nearest DOL, TP2 = secondary DOL when available",
+    "skip_condition": "No identifiable DOL within 3R = SKIP trade (no clear target)"
+  }
+}

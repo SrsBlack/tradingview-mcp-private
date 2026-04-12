@@ -1,35 +1,125 @@
 {
+  "id": "entry_models",
+  "layer": 5,
+  "definition": "Grade-based entry model with confluence scoring table. Each layer contributes points; total score determines trade grade and risk allocation.",
+  "depends_on": [
+    "All layers 0-5 concepts feed into grading",
+    "draw_on_liquidity (TP target viability)",
+    "risk_management (grade → risk percentage)"
+  ],
+
+  "confluence_scoring_table": {
+    "_description": "Each factor adds points. Total determines grade. Minimum score for live trade: 55.",
+    "layer_0_macro": {
+      "max_points": 15,
+      "factors": [
+        { "factor": "IPDA context aligned", "points": 5, "required": false },
+        { "factor": "Quarterly shift direction confirmed", "points": 5, "required": false },
+        { "factor": "No adverse seasonal pattern", "points": 5, "required": false }
+      ]
+    },
+    "layer_1_foundation": {
+      "max_points": 25,
+      "factors": [
+        { "factor": "HTF market structure aligned (4H/Daily)", "points": 10, "required": true },
+        { "factor": "Dealing range identified", "points": 5, "required": true },
+        { "factor": "Key liquidity levels mapped", "points": 5, "required": true },
+        { "factor": "Session levels clear (PDH/PDL/PWH/PWL)", "points": 5, "required": false }
+      ]
+    },
+    "layer_2_context": {
+      "max_points": 20,
+      "factors": [
+        { "factor": "In premium/discount zone (correct side)", "points": 5, "required": false },
+        { "factor": "Active kill zone", "points": 5, "required": false },
+        { "factor": "PO3/AMD phase aligned", "points": 5, "required": false },
+        { "factor": "Daily bias confirmed", "points": 5, "required": false }
+      ]
+    },
+    "layer_3_trigger": {
+      "max_points": 20,
+      "factors": [
+        { "factor": "Liquidity sweep confirmed", "points": 8, "required": true },
+        { "factor": "Displacement present (3+ ATR candle)", "points": 4, "required": false },
+        { "factor": "CISD or CHoCH on LTF", "points": 5, "required": false },
+        { "factor": "SMT divergence confirmed", "points": 3, "required": false }
+      ]
+    },
+    "layer_4_entry_zone": {
+      "max_points": 10,
+      "factors": [
+        { "factor": "Order block at entry", "points": 4, "required": false },
+        { "factor": "FVG at entry", "points": 3, "required": false },
+        { "factor": "OB + FVG stacked (propulsion)", "points": 3, "required": false }
+      ]
+    },
+    "layer_5_precision": {
+      "max_points": 10,
+      "factors": [
+        { "factor": "Entry at OTE (0.618-0.786 fib)", "points": 5, "required": false },
+        { "factor": "DOL target >= 2R from entry", "points": 5, "required": true }
+      ]
+    }
+  },
+
+  "score_to_grade_mapping": {
+    "grade_A": { "min_score": 80, "max_score": 100, "risk_pct": 1.0, "expected_win_rate": "65-75%", "description": "All layers aligned — full conviction" },
+    "grade_B": { "min_score": 55, "max_score": 79, "risk_pct": 0.5, "expected_win_rate": "55-65%", "description": "Strong setup, missing 1-2 non-critical elements" },
+    "grade_C": { "min_score": 35, "max_score": 54, "risk_pct": 0.25, "expected_win_rate": "45-55%", "description": "Paper trade only unless exceptional context" },
+    "grade_D": { "min_score": 0, "max_score": 34, "risk_pct": 0, "expected_win_rate": "<45%", "description": "Do not trade — insufficient confluence" }
+  },
+
+  "required_factors_gate": {
+    "_rule": "Even if total score is high, trade is BLOCKED if any required factor is missing",
+    "required_factors": [
+      "HTF market structure aligned (Layer 1)",
+      "Dealing range identified (Layer 1)",
+      "Key liquidity levels mapped (Layer 1)",
+      "Liquidity sweep confirmed (Layer 3)",
+      "DOL target >= 2R from entry (Layer 5)"
+    ],
+    "missing_required_action": "Downgrade to max Grade C regardless of score"
+  },
+
   "grade_a_criteria": {
-    "description": "ALL layers satisfied. Every concept aligned.",
+    "description": "Score >= 80. ALL required factors met. Every layer contributing.",
     "layer_checklist": {
       "layer_0": "IPDA context known + quarterly shift direction aligned + no adverse seasonal pattern",
-      "layer_1": "HTF structure + dealing range + liquidity levels + session levels (PDH/PDL/PWH/PWL) all clear",
-      "layer_2": "Correct premium/discount zone + active kill zone + PO3 in distribution phase + daily bias aligned + intraday profile identified",
-      "layer_3": "Confirmed liquidity sweep + displacement + CISD or CHoCH + optional SMT divergence",
-      "layer_4": "Valid OB + FVG at entry zone, preferably stacked. Propulsion block = best. Volume profile confirms HVN at zone.",
-      "layer_5": "Entry at OTE (0.618-0.786) within OB/FVG. Fibonacci extensions set TP2/TP3. Volume profile validates level."
+      "layer_1": "HTF structure + dealing range + liquidity levels + session levels all clear",
+      "layer_2": "Correct premium/discount zone + active kill zone + PO3 aligned + daily bias confirmed",
+      "layer_3": "Confirmed liquidity sweep + displacement + CISD or CHoCH + optional SMT",
+      "layer_4": "Valid OB + FVG at entry zone, preferably stacked",
+      "layer_5": "Entry at OTE within OB/FVG. DOL target >= 2R."
     },
     "expected_win_rate": "65-75%",
     "risk": "Full (1%)"
   },
   "grade_b_criteria": {
-    "description": "Missing 1-2 elements from layers 2-5. Layer 1 MUST be satisfied.",
+    "description": "Score 55-79. All required factors met. Missing 1-2 elements from layers 2-5.",
     "common_gaps": [
-      "No SMT (layer 3)",
-      "OTE not reached (layer 5)",
-      "Kill zone expired (layer 2)",
-      "FVG but no OB overlap (layer 4)"
+      "No SMT divergence (layer 3, -3 pts)",
+      "OTE not reached (layer 5, -5 pts)",
+      "Kill zone expired (layer 2, -5 pts)",
+      "FVG but no OB overlap (layer 4, -4 pts)"
     ],
     "expected_win_rate": "55-65%",
-    "risk": "Reduced (0.5-0.6%)"
+    "risk": "Reduced (0.5%)"
   },
   "grade_c_criteria": {
-    "description": "Multiple gaps. Layer 1 satisfied but layers 3-5 incomplete.",
+    "description": "Score 35-54. Layer 1 satisfied but layers 3-5 incomplete, OR missing a required factor.",
     "expected_win_rate": "45-55%",
-    "risk": "Minimal (0.25-0.3%)"
+    "risk": "Minimal (0.25%). Paper trade recommended."
   },
   "grade_d_skip": {
-    "description": "Layer 1 NOT satisfied (HTF against direction) OR no liquidity event AND no FVG/OB.",
+    "description": "Score < 35. Layer 1 NOT satisfied OR no liquidity event AND no entry zone.",
     "action": "Do not trade."
+  },
+
+  "bridge_integration": {
+    "ict_score_field": "TradeDecision.ict_score maps to this confluence scoring total",
+    "grade_field": "TradeDecision.grade set by Claude based on scoring table",
+    "risk_pct_field": "TradeDecision.risk_pct derived from grade_risk_table in risk_management.json",
+    "minimum_live_score": 55,
+    "paper_always": "All grades recorded in paper shadow for audit trail"
   }
 }

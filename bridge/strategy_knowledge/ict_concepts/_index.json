@@ -41,7 +41,8 @@
         "PO3_AMD",
         "intraday_profile",
         "CBDR",
-        "daily_bias"
+        "daily_bias",
+        "draw_on_liquidity"
       ],
       "role": "Context layer. WHERE in the range? WHEN in the session? WHICH PO3 phase? CBDR defines the pre-market reference. Intraday profile classifies the session type.",
       "depends_on": [
