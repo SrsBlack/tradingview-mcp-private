@@ -148,7 +148,7 @@ class LiveExecutorAdapter:
     def check_positions(self, current_prices: dict[str, float]) -> list[dict]:
         """
         Check MT5 positions against current prices.
-        MT5 manages SL/TP natively — this just syncs our local state.
+        Handles TP1 partial close, trailing SL sync to MT5, and SL/TP detection.
         """
         events = []
         to_remove = []
@@ -164,17 +164,52 @@ class LiveExecutorAdapter:
             else:
                 pos.floating_pnl = (pos.entry_price - price) * pos.lot_size
 
+            # -- TP1 partial close (50% at TP1, move SL to breakeven) --
+            if not pos.tp1_hit and pos.tp2_price > 0:
+                tp1_hit = False
+                if pos.direction == "BUY" and price >= pos.tp_price:
+                    tp1_hit = True
+                elif pos.direction == "SELL" and price <= pos.tp_price:
+                    tp1_hit = True
+
+                if tp1_hit:
+                    pos.tp1_hit = True
+                    partial_pnl = abs(pos.tp_price - pos.entry_price) * (pos.lot_size * 0.5)
+                    if pos.direction == "SELL":
+                        partial_pnl = (pos.entry_price - pos.tp_price) * (pos.lot_size * 0.5)
+
+                    # Partial close 50% on MT5
+                    self._mt5_partial_close(ticket, pos, pos.lot_size * 0.5)
+                    self.balance += partial_pnl
+                    pos.lot_size = round(pos.lot_size * 0.5, 4)
+                    pos.trailing_sl = pos.entry_price  # breakeven
+
+                    # Update SL to breakeven on MT5
+                    self._mt5_modify_sl(ticket, pos.entry_price)
+
+                    print(
+                        f"  [LIVE TP1] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} "
+                        f"partial PnL={partial_pnl:+.2f} — SL moved to breakeven",
+                        flush=True,
+                    )
+
+            # -- Check TP2/final TP hit --
+            tp_final = pos.tp2_price if (pos.tp2_price > 0 and pos.tp1_hit) else pos.tp_price
             closed_reason = None
             if pos.direction == "BUY":
-                if price <= pos.sl_price:
+                if price <= pos.trailing_sl and pos.trailing_sl != pos.sl_price:
+                    closed_reason = "TRAILING_SL"
+                elif price <= pos.sl_price:
                     closed_reason = "SL"
-                elif price >= (pos.tp2_price if pos.tp2_price > 0 else pos.tp_price):
-                    closed_reason = "TP"
+                elif price >= tp_final:
+                    closed_reason = "TP2" if pos.tp1_hit else "TP"
             else:
-                if price >= pos.sl_price:
+                if price >= pos.trailing_sl and pos.trailing_sl != pos.sl_price:
+                    closed_reason = "TRAILING_SL"
+                elif price >= pos.sl_price:
                     closed_reason = "SL"
-                elif price <= (pos.tp2_price if pos.tp2_price > 0 else pos.tp_price):
-                    closed_reason = "TP"
+                elif price <= tp_final:
+                    closed_reason = "TP2" if pos.tp1_hit else "TP"
 
             if closed_reason:
                 pnl = pos.floating_pnl
@@ -182,7 +217,7 @@ class LiveExecutorAdapter:
                 r_mult = pnl / (risk * pos.lot_size) if risk > 0 and pos.lot_size > 0 else 0.0
                 closed_at = datetime.now(timezone.utc).isoformat()
                 exit_level = pos.sl_price if closed_reason == "SL" else (
-                    pos.tp2_price if pos.tp2_price > 0 else pos.tp_price)
+                    pos.trailing_sl if closed_reason == "TRAILING_SL" else tp_final)
                 to_remove.append(ticket)
                 self.balance += pnl
                 self.peak_balance = max(self.peak_balance, self.balance)
@@ -208,12 +243,83 @@ class LiveExecutorAdapter:
                     "sl_price": pos.sl_price, "tp_price": pos.tp_price,
                     "tp2_price": pos.tp2_price, "lot_size": pos.lot_size,
                     "ict_grade": pos.ict_grade, "ict_score": pos.ict_score,
+                    "trailing_sl": pos.trailing_sl, "tp1_hit": pos.tp1_hit,
                 })
+                continue
+
+            # -- Update trailing stop and sync to MT5 --
+            old_trailing = pos.trailing_sl
+            self._update_trailing_stop(pos)
+            if pos.trailing_sl != old_trailing:
+                self._mt5_modify_sl(ticket, pos.trailing_sl)
+                print(
+                    f"  [LIVE TRAIL] {pos.symbol} #{ticket} trailing SL "
+                    f"{old_trailing:.2f} → {pos.trailing_sl:.2f} (synced to MT5)",
+                    flush=True,
+                )
 
         for t in to_remove:
             self.open_positions.pop(t, None)
 
         return events
+
+    def _update_trailing_stop(self, pos: PaperPosition) -> None:
+        """Move trailing stop based on R-multiple progress (same logic as PaperExecutor)."""
+        r = pos.r_multiple
+        risk = abs(pos.entry_price - pos.sl_price)
+        if risk == 0 or r < 1.0:
+            return
+
+        new_sl = pos.entry_price  # breakeven at 1R
+        if pos.direction == "BUY":
+            trail_level = pos.entry_price + (r - 0.5) * risk
+            new_sl = max(new_sl, trail_level)
+            if new_sl > pos.trailing_sl:
+                pos.trailing_sl = round(new_sl, 5)
+        else:
+            trail_level = pos.entry_price - (r - 0.5) * risk
+            new_sl = min(new_sl, trail_level)
+            if new_sl < pos.trailing_sl or pos.trailing_sl == pos.sl_price:
+                pos.trailing_sl = round(new_sl, 5)
+
+    def _mt5_modify_sl(self, ticket: int, new_sl: float) -> None:
+        """Update SL on MT5 position. Fire-and-forget with logging."""
+        def _run():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(self._live.modify_sl(ticket, new_sl))
+                if not result:
+                    print(f"  [MT5_SL] Failed to modify SL for #{ticket} to {new_sl:.5f}", flush=True)
+            except Exception as e:
+                print(f"  [MT5_SL] Error modifying SL for #{ticket}: {e}", flush=True)
+            finally:
+                loop.close()
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        t.join(timeout=10)
+
+    def _mt5_partial_close(self, ticket: int, pos: PaperPosition, close_lots: float) -> None:
+        """Partial close on MT5 — close specified lot size."""
+        def _run():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                half_lots = round(close_lots, 2)
+                result = loop.run_until_complete(
+                    self._live.partial_close_tp1(ticket, pos.tp_price)
+                )
+                if not result:
+                    print(f"  [MT5_TP1] Failed partial close for #{ticket}", flush=True)
+            except Exception as e:
+                print(f"  [MT5_TP1] Error partial close for #{ticket}: {e}", flush=True)
+            finally:
+                loop.close()
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        t.join(timeout=15)
 
     def get_account_summary(self) -> dict:
         daily_pnl_pct = self.daily_pnl / self.initial_balance if self.initial_balance else 0

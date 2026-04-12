@@ -172,6 +172,10 @@ class LiveExecutor:
                 "opened_at": datetime.now(timezone.utc).isoformat(),
             }
             self.total_trades += 1
+
+            # Verify SL/TP are actually set on the MT5 position
+            await self._verify_sl_tp(result.ticket, decision, result.fill_price)
+
             return {
                 "success": True,
                 "ticket": result.ticket,
@@ -186,6 +190,66 @@ class LiveExecutor:
                 "message": f"MT5 rejected: {result.comment} (retcode={result.retcode})",
                 "fill_price": 0.0,
             }
+
+    # ------------------------------------------------------------------
+    # Post-trade verification
+    # ------------------------------------------------------------------
+
+    async def _verify_sl_tp(
+        self, ticket: int, decision: TradeDecision, fill_price: float
+    ) -> None:
+        """Verify MT5 actually has SL/TP set after order placement."""
+        try:
+            import MetaTrader5 as mt5
+            pos = mt5.positions_get(ticket=ticket)
+            if pos is None or len(pos) == 0:
+                print(f"[SL_VERIFY] WARNING: Cannot find MT5 position #{ticket} after fill!", flush=True)
+                return
+
+            mt5_pos = pos[0]
+            mt5_sl = mt5_pos.sl
+            mt5_tp = mt5_pos.tp
+
+            # Check SL is set
+            if mt5_sl == 0:
+                print(
+                    f"[SL_VERIFY] CRITICAL: #{ticket} has NO SL set on MT5! "
+                    f"Expected SL={decision.sl_price:.5f} — attempting to set now",
+                    flush=True,
+                )
+                await self.modify_sl(ticket, decision.sl_price)
+
+            elif abs(mt5_sl - decision.sl_price) > decision.sl_price * 0.001:
+                print(
+                    f"[SL_VERIFY] WARNING: #{ticket} SL mismatch — "
+                    f"MT5={mt5_sl:.5f} vs intended={decision.sl_price:.5f}",
+                    flush=True,
+                )
+
+            # Check SL distance isn't dangerously tight relative to spread
+            info = mt5.symbol_info(mt5_pos.symbol)
+            if info and info.spread > 0:
+                spread_price = info.spread * info.point
+                sl_distance = abs(fill_price - decision.sl_price)
+                if sl_distance < spread_price * 3:
+                    print(
+                        f"[SL_VERIFY] WARNING: #{ticket} SL distance ({sl_distance:.5f}) "
+                        f"is < 3x spread ({spread_price:.5f}) — high risk of immediate SL hit",
+                        flush=True,
+                    )
+
+            # Check TP is set
+            if mt5_tp == 0:
+                print(
+                    f"[SL_VERIFY] WARNING: #{ticket} has NO TP set on MT5! "
+                    f"Expected TP={decision.tp_price:.5f}",
+                    flush=True,
+                )
+
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[SL_VERIFY] Error verifying #{ticket}: {e}", flush=True)
 
     # ------------------------------------------------------------------
     # Close position

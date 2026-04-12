@@ -226,7 +226,9 @@ class ICTPipeline:
                 )
 
             # Use HTF bias as the directional context
-            direction = htf_bias if htf_bias != Direction.NEUTRAL else Direction.BULLISH
+            # When NEUTRAL, we'll score both directions and pick the stronger one
+            direction = htf_bias
+            score_both_directions = (htf_bias == Direction.NEUTRAL)
 
             # -- Step 3: FVG detection (on M15 for precision) --
             fvgs: list[FVGZone] = []
@@ -248,6 +250,7 @@ class ICTPipeline:
             # -- Step 5: Liquidity detection --
             sweeps: list[LiquiditySweep] = []
             dol: LiquidityLevel | None = None
+            levels: list = []
             df_liq = df_ltf if (df_ltf is not None and len(df_ltf) >= 20) else df_primary
             if df_liq is not None and len(df_liq) >= 20:
                 liq_swings = detect_swings(df_liq, lookback=5)
@@ -256,8 +259,9 @@ class ICTPipeline:
                 # Scan recent bars for sweeps
                 sweeps = scan_sweeps(levels, df_liq, lookback_bars=10)
                 result.sweep_detected = len(sweeps) > 0
-                # Find the draw on liquidity
-                dol = get_draw_on_liquidity(levels, result.current_price, bias=direction)
+                # Find the draw on liquidity (need direction; defer if scoring both)
+                if not score_both_directions:
+                    dol = get_draw_on_liquidity(levels, result.current_price, bias=direction)
 
             # -- Step 6: Session context --
             session_info = get_session_info(datetime.now(timezone.utc))
@@ -288,20 +292,45 @@ class ICTPipeline:
             range_low = float(df_primary["low"].min())
 
             # -- Step 9: Score! --
-            score = score_ict_setup(
-                current_price=result.current_price,
-                direction=direction,
-                session_info=session_info,
-                structure_events=structure_events,
-                swings=swings,
-                fvgs=fvgs,
-                obs=obs,
-                liquidity_sweeps=sweeps,
-                draw_on_liquidity=dol,
-                has_smt_divergence=has_smt,
-                range_high=range_high,
-                range_low=range_low,
-            )
+            if score_both_directions:
+                # HTF is NEUTRAL — score both directions, pick the stronger one
+                best_score = None
+                for try_dir in (Direction.BULLISH, Direction.BEARISH):
+                    try_dol = get_draw_on_liquidity(levels, result.current_price, bias=try_dir) if levels else None
+                    try_score = score_ict_setup(
+                        current_price=result.current_price,
+                        direction=try_dir,
+                        session_info=session_info,
+                        structure_events=structure_events,
+                        swings=swings,
+                        fvgs=fvgs,
+                        obs=obs,
+                        liquidity_sweeps=sweeps,
+                        draw_on_liquidity=try_dol,
+                        has_smt_divergence=has_smt,
+                        range_high=range_high,
+                        range_low=range_low,
+                    )
+                    if best_score is None or try_score.total > best_score.total:
+                        best_score = try_score
+                        dol = try_dol
+                        direction = try_dir
+                score = best_score
+            else:
+                score = score_ict_setup(
+                    current_price=result.current_price,
+                    direction=direction,
+                    session_info=session_info,
+                    structure_events=structure_events,
+                    swings=swings,
+                    fvgs=fvgs,
+                    obs=obs,
+                    liquidity_sweeps=sweeps,
+                    draw_on_liquidity=dol,
+                    has_smt_divergence=has_smt,
+                    range_high=range_high,
+                    range_low=range_low,
+                )
 
             # -- Step 10: Populate result --
             result.total_score = score.total
