@@ -68,7 +68,7 @@ class StateStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def save(self, executor: Any, mode: str) -> None:
-        """Snapshot executor state to disk."""
+        """Snapshot executor state to disk with atomic write."""
         positions = []
         for pos in executor.open_positions.values():
             positions.append(pos.to_dict())
@@ -87,10 +87,19 @@ class StateStore:
         }
         tmp_path = self._path.with_suffix(".tmp")
         backup_path = self._path.with_suffix(".backup.json")
-        tmp_path.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
-        if self._path.exists():
-            shutil.copy2(self._path, backup_path)
-        os.replace(tmp_path, self._path)
+        try:
+            tmp_path.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+            if self._path.exists():
+                shutil.copy2(self._path, backup_path)
+            os.replace(tmp_path, self._path)
+        except Exception as e:
+            print(f"[StateStore] WARNING: save failed: {e}", flush=True)
+            # Clean up partial tmp file
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
 
     def load(self) -> dict | None:
         """Load saved state. Returns None if no state file exists."""
@@ -138,12 +147,17 @@ class StateStore:
             executor.grade_a_wins = state.get("grade_a_wins", 0)
             executor.grade_a_losses = state.get("grade_a_losses", 0)
 
-        # Only restore positions from today — stale positions may have been closed
+        # Restore positions even across days — swing trades can span multiple days.
+        # The position manager will reconcile against MT5 on the next check cycle.
         saved_date = state.get("saved_at", "")[:10]
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        positions_to_restore = state.get("open_positions", [])
         if saved_date != today:
-            print(f"  [STATE] Balance restored from {saved_date}: ${executor.balance:,.2f} (positions cleared — new day)", flush=True)
-            return []
+            n_pos = len(positions_to_restore)
+            if n_pos > 0:
+                print(f"  [STATE] Balance restored from {saved_date}: ${executor.balance:,.2f} ({n_pos} positions carried over)", flush=True)
+            else:
+                print(f"  [STATE] Balance restored from {saved_date}: ${executor.balance:,.2f} (no open positions)", flush=True)
 
         # Restore open positions
         from bridge.decision_types import PaperPosition

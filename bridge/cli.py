@@ -13,7 +13,46 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import atexit
+import os
 import signal as _signal
+import sys
+from pathlib import Path
+
+LOCK_FILE = Path.home() / ".tradingview-mcp" / "bridge.lock"
+
+
+def _acquire_lock() -> None:
+    """Prevent multiple bridge instances from running simultaneously."""
+    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if LOCK_FILE.exists():
+        try:
+            old_pid = int(LOCK_FILE.read_text().strip())
+            # Check if that PID is still alive (Windows-compatible)
+            try:
+                os.kill(old_pid, 0)
+                print(f"[LOCK] Another bridge is already running (PID {old_pid}).", flush=True)
+                print(f"[LOCK] If this is stale, delete: {LOCK_FILE}", flush=True)
+                sys.exit(1)
+            except OSError:
+                # Process is dead — stale lock, safe to overwrite
+                print(f"[LOCK] Stale lock from PID {old_pid} — overwriting.", flush=True)
+        except (ValueError, OSError):
+            pass  # Corrupt lock file, overwrite
+    LOCK_FILE.write_text(str(os.getpid()))
+    atexit.register(_release_lock)
+    print(f"[LOCK] Acquired (PID {os.getpid()})", flush=True)
+
+
+def _release_lock() -> None:
+    """Release the process lock on exit."""
+    try:
+        if LOCK_FILE.exists():
+            stored_pid = int(LOCK_FILE.read_text().strip())
+            if stored_pid == os.getpid():
+                LOCK_FILE.unlink()
+    except Exception:
+        pass
 
 
 def main() -> None:
@@ -30,6 +69,33 @@ def main() -> None:
                         help="Run a single analysis cycle and exit")
 
     args = parser.parse_args()
+
+    # Load .env for API keys (ANTHROPIC_API_KEY, ALPACA, etc.)
+    # override=True so the on-disk .env always wins over any stale/corrupted
+    # value inherited from the parent shell (the bridge auto-restarts via
+    # start_bridge_live.bat's :loop, and a bad inherited env var was causing
+    # ~80% of Claude calls to fail with 401).
+    from dotenv import load_dotenv
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+        print(f"[ENV] Loaded {env_path} (override=True)", flush=True)
+    else:
+        print(f"[ENV] WARNING: No .env file at {env_path}", flush=True)
+
+    # Verify critical API key — fail fast rather than silently falling back.
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        print("[ENV] CRITICAL: ANTHROPIC_API_KEY not set! Claude decisions will be unavailable.", flush=True)
+        print("[ENV] Add it to .env or set as environment variable.", flush=True)
+        sys.exit(2)
+    if not key.startswith("sk-ant-"):
+        print(f"[ENV] CRITICAL: ANTHROPIC_API_KEY has unexpected prefix '{key[:10]}...' — refusing to start.", flush=True)
+        sys.exit(2)
+    print(f"[ENV] ANTHROPIC_API_KEY loaded (len={len(key)}, prefix={key[:12]}...)", flush=True)
+
+    # Acquire process lock BEFORE importing heavy modules
+    _acquire_lock()
 
     from bridge.orchestrator import Orchestrator
 

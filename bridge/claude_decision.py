@@ -335,12 +335,22 @@ def _classify_trade_type(a: "SymbolAnalysis") -> str:
 # ---------------------------------------------------------------------------
 
 def _get_anthropic_client():
-    """Lazy-load Anthropic client."""
+    """Lazy-load Anthropic client.
+
+    Reads ANTHROPIC_API_KEY from os.environ at call time and passes it
+    explicitly so the client never binds to a stale/empty value captured
+    during module import.
+    """
+    import os as _os
     try:
         from anthropic import Anthropic
-        return Anthropic()
     except ImportError:
         return None
+    key = _os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        return None
+    try:
+        return Anthropic(api_key=key)
     except Exception:
         return None
 
@@ -417,7 +427,25 @@ class ClaudeDecisionMaker:
                         decision.reasoning = f"Post-gate: {rejection}. Original: {decision.reasoning}"
                     return decision
                 except Exception as e:
-                    print(f"  [CLAUDE] API error for {analysis.symbol} (attempt {attempt+1}): {type(e).__name__}: {e}", flush=True)
+                    err_name = type(e).__name__
+                    err_msg = str(e)
+                    print(f"  [CLAUDE] API error for {analysis.symbol} (attempt {attempt+1}): {err_name}: {err_msg}", flush=True)
+                    # Auth errors (401) will never recover mid-process — abort
+                    # immediately so the :loop wrapper restarts us with a fresh
+                    # .env load rather than silently flooding with 401s.
+                    is_auth = (
+                        err_name in ("AuthenticationError", "PermissionDeniedError")
+                        or "401" in err_msg
+                        or "authentication" in err_msg.lower()
+                    )
+                    if is_auth:
+                        import sys as _sys
+                        print(
+                            "  [CLAUDE] Authentication failed — ANTHROPIC_API_KEY rejected. "
+                            "Exiting so the wrapper can restart with a fresh .env load.",
+                            flush=True,
+                        )
+                        _sys.exit(3)
                     if attempt == 0:
                         _time.sleep(2)  # brief pause before retry
                 # Fall through to rule-based after 2 attempts
@@ -668,54 +696,13 @@ If the setup is not convincing, use "SKIP" for action."""
     def _rule_based_decision(self, analysis: SymbolAnalysis) -> TradeDecision:
         """
         Fallback when Claude API is unavailable.
-        Only enters on Grade A + kill zone + clear direction.
+        NEVER auto-enters — always SKIPs. No trade without Claude's judgment.
         """
-        if analysis.grade != "A" or not analysis.is_kill_zone:
-            return TradeDecision(
-                action="SKIP",
-                symbol=analysis.symbol,
-                entry_price=analysis.current_price,
-                reasoning="Fallback mode: only Grade A + kill zone (API unavailable)",
-                grade=analysis.grade,
-                ict_score=analysis.total_score,
-                model_used="rule-based-fallback",
-            )
-
-        # SL/TP calculation: use real ATR if available, else 0.5% fallback
-        price = analysis.current_price
-        if analysis.atr_m15 > 0:
-            risk_dist = analysis.atr_m15 * 1.5  # 1.5x ATR for breathing room
-        else:
-            risk_dist = price * 0.005
-
-        if analysis.direction == "BULLISH":
-            action = "BUY"
-            sl = price - risk_dist
-            tp = price + risk_dist * 2  # 2R target
-        elif analysis.direction == "BEARISH":
-            action = "SELL"
-            sl = price + risk_dist
-            tp = price - risk_dist * 2
-        else:
-            return TradeDecision(
-                action="SKIP",
-                symbol=analysis.symbol,
-                entry_price=price,
-                reasoning="Fallback: neutral direction, no trade",
-                grade=analysis.grade,
-                ict_score=analysis.total_score,
-                model_used="rule-based-fallback",
-            )
-
         return TradeDecision(
-            action=action,
+            action="SKIP",
             symbol=analysis.symbol,
-            entry_price=price,
-            sl_price=round(sl, 5),
-            tp_price=round(tp, 5),
-            confidence=70,
-            risk_pct=0.01,
-            reasoning=f"Fallback: Grade A + {analysis.session_type} kill zone, {len(analysis.confluence_factors)} confluence factors",
+            entry_price=analysis.current_price,
+            reasoning=f"API unavailable — SKIP (Grade {analysis.grade}, {len(analysis.confluence_factors)} confluences). No trades without Claude.",
             grade=analysis.grade,
             ict_score=analysis.total_score,
             model_used="rule-based-fallback",

@@ -53,7 +53,7 @@ class PaperExecutor:
 
         self.open_positions: dict[int, PaperPosition] = {}
         self.closed_positions: list[ClosedPosition] = []
-        self._next_ticket = 100_001
+        self._next_ticket = self._load_ticket_counter()
 
         # Logging
         self.log_dir = log_dir or Path(__file__).resolve().parent.parent / "logs"
@@ -85,6 +85,32 @@ class PaperExecutor:
             "US100": 2.0,
             "US500": 1.5,
         }
+
+    # ------------------------------------------------------------------
+    # Ticket counter persistence (avoids collisions across restarts)
+    # ------------------------------------------------------------------
+
+    _TICKET_FILE = Path.home() / ".tradingview-mcp" / "paper_ticket_counter.txt"
+
+    @classmethod
+    def _load_ticket_counter(cls) -> int:
+        """Load the last ticket number from disk, or start at 100001."""
+        try:
+            if cls._TICKET_FILE.exists():
+                val = int(cls._TICKET_FILE.read_text().strip())
+                if val >= 100_001:
+                    return val
+        except (ValueError, OSError):
+            pass
+        return 100_001
+
+    def _save_ticket_counter(self) -> None:
+        """Persist the current ticket counter to disk."""
+        try:
+            self._TICKET_FILE.parent.mkdir(parents=True, exist_ok=True)
+            self._TICKET_FILE.write_text(str(self._next_ticket))
+        except OSError:
+            pass
 
     # ------------------------------------------------------------------
     # Open position
@@ -127,6 +153,7 @@ class PaperExecutor:
 
         ticket = self._next_ticket
         self._next_ticket += 1
+        self._save_ticket_counter()
 
         # Use pre-calculated lot size from RiskBridge if provided
         if lot_size is None:

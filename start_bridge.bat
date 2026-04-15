@@ -6,7 +6,7 @@ REM ============================================================
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 set TV_EXE=C:\Program Files\WindowsApps\TradingView.Desktop_3.0.0.7652_x64__n534cwy3pjxzj\TradingView.exe
-set ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY_HERE
+REM ANTHROPIC_API_KEY is loaded from .env by the bridge at startup
 
 REM Ensure node/npm are on PATH
 set PATH=C:\Program Files\nodejs;C:\Users\User\AppData\Roaming\npm;%PATH%

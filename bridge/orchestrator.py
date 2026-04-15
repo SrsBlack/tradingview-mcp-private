@@ -163,6 +163,7 @@ class Orchestrator:
             state_store=self.state_store,
             alerts=self.alerts,
             mode=self.mode,
+            paper_state_store=self.paper_state_store,
         )
 
     # ------------------------------------------------------------------

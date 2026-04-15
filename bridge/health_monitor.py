@@ -29,12 +29,14 @@ class HealthMonitor:
         state_store: StateStore,
         alerts: BridgeAlerts,
         mode: str,
+        paper_state_store: StateStore | None = None,
     ):
         self.executor = executor
         self.paper_shadow = paper_shadow
         self.tv_client = tv_client
         self.session = session
         self.state_store = state_store
+        self.paper_state_store = paper_state_store
         self.alerts = alerts
         self.mode = mode
 
@@ -78,6 +80,8 @@ class HealthMonitor:
         # Save periodic snapshot + persist state for restart recovery
         self.session.save_snapshot(summary)
         self.state_store.save(self.executor, self.mode)
+        if self.paper_state_store and self.paper_shadow is not self.executor:
+            self.paper_state_store.save(self.paper_shadow, "paper_shadow")
 
         # TradingView connectivity check
         self._check_tv_health()

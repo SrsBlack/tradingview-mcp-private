@@ -51,7 +51,7 @@ class PositionManager:
         prices: dict[str, float] = {}
 
         # Step 1: Check if MT5 already closed any live positions (broker-side SL/TP)
-        self._sync_mt5_closed_positions()
+        broker_closed_events = self._sync_mt5_closed_positions()
 
         for pos in self.executor.open_positions.values():
             try:
@@ -91,9 +91,10 @@ class PositionManager:
             except TVClientError as e:
                 print(f"[POSITIONS] TVClient error for {pos.symbol}: {e}", flush=True)
 
+        events: list[dict] = list(broker_closed_events)
         if prices:
-            return self.executor.check_positions(prices)
-        return []
+            events.extend(self.executor.check_positions(prices))
+        return events
 
     def check_paper_positions(self) -> list[dict]:
         """Check paper shadow positions — Alpaca-first for crypto, TV fallback."""
@@ -265,15 +266,22 @@ class PositionManager:
         elif self.executor.open_positions:
             print(f"  [RECONCILE] All {len(self.executor.open_positions)} position(s) still valid", flush=True)
 
-    def _sync_mt5_closed_positions(self) -> None:
-        """Check MT5 for positions closed broker-side (SL/TP hit on server)."""
+    def _sync_mt5_closed_positions(self) -> list[dict]:
+        """Check MT5 for positions closed broker-side (SL/TP hit on server).
+
+        Returns a list of close events so the caller can forward them to
+        alerts/ledger. Historically this logged to the session store only,
+        which bypassed the ledger DB and caused positions to remain "open"
+        forever in the dashboard.
+        """
+        events: list[dict] = []
         from bridge.live_executor_adapter import LiveExecutorAdapter
         if not isinstance(self.executor, LiveExecutorAdapter):
-            return
+            return events
         try:
             import MetaTrader5 as mt5
             if not mt5.terminal_info():
-                return
+                return events
 
             to_close = []
             for ticket, pos in self.executor.open_positions.items():
@@ -324,8 +332,7 @@ class PositionManager:
                     self.executor.losses += 1
                 del self.executor.open_positions[ticket]
 
-                self.session.log_trade({
-                    "event": "CLOSE",
+                events.append({
                     "ticket": ticket,
                     "symbol": pos.symbol,
                     "direction": pos.direction,
@@ -337,9 +344,11 @@ class PositionManager:
                     "balance": round(self.executor.balance, 2),
                     "mt5_pnl": round(mt5_pnl, 2) if mt5_pnl else None,
                 })
+            if events:
                 self.state_store.save(self.executor, self.mode)
 
         except ImportError:
             pass
         except Exception as e:
             print(f"[MT5_SYNC] Error checking MT5 positions: {e}", flush=True)
+        return events

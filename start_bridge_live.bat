@@ -7,7 +7,7 @@ REM ============================================================
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 set TV_EXE=C:\Program Files\WindowsApps\TradingView.Desktop_3.0.0.7652_x64__n534cwy3pjxzj\TradingView.exe
-set ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY_HERE
+REM ANTHROPIC_API_KEY is loaded from .env by the bridge at startup
 
 REM Ensure node/npm are on PATH
 set PATH=C:\Program Files\nodejs;C:\Users\User\AppData\Roaming\npm;%PATH%
@@ -44,8 +44,21 @@ echo.
 
 :loop
 python auto_trade.py --mode live %*
+set EXITCODE=%ERRORLEVEL%
 echo.
-echo  [BRIDGE] Process exited. Restarting in 10 seconds...
-echo  Press CTRL+C to stop.
+echo  [BRIDGE] Process exited with code %EXITCODE%.
+REM Exit code 2 = fatal config error (missing/invalid ANTHROPIC_API_KEY). Don't restart.
+if "%EXITCODE%"=="2" (
+    echo  [BRIDGE] Fatal config error — not restarting. Fix .env and relaunch.
+    pause
+    exit /b 2
+)
+REM Exit code 3 = transient auth failure. Sleep short and retry (fresh .env).
+if "%EXITCODE%"=="3" (
+    echo  [BRIDGE] Auth error — will retry in 5s with fresh .env load.
+    timeout /t 5 /nobreak
+    goto loop
+)
+echo  Restarting in 10 seconds... Press CTRL+C to stop.
 timeout /t 10 /nobreak
 goto loop

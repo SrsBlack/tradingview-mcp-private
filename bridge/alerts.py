@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from bridge.config import ensure_trading_ai_path
+from bridge.symbol_utils import normalize_symbol
 
 ensure_trading_ai_path()
 
@@ -114,7 +115,7 @@ class BridgeAlerts:
         if self.ledger_enabled and ticket > 0:
             self._ledger.record_entry(
                 ticket=ticket,
-                symbol=symbol,
+                symbol=normalize_symbol(symbol),
                 direction=direction,
                 engine="ICT",
                 strategy_name="ICT_Bridge",
