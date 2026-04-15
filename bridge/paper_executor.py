@@ -42,7 +42,7 @@ class PaperExecutor:
 
     def __init__(
         self,
-        initial_balance: float = 10_000.0,
+        initial_balance: float = 100_000.0,
         max_positions: int = 3,
         log_dir: Path | None = None,
     ):

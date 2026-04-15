@@ -25,7 +25,7 @@ class LiveExecutorAdapter:
     as PaperExecutor so the Orchestrator can use either without branching.
     """
 
-    def __init__(self, initial_balance: float = 10_000.0):
+    def __init__(self, initial_balance: float = 100_000.0):
         self._live = LiveExecutor(max_positions=3)
         self._live.confirm_session()  # auto-confirm for fully autonomous mode
         self._config = get_bridge_config()  # for TV→MT5 symbol name translation

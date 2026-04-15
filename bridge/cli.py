@@ -61,8 +61,8 @@ def main() -> None:
                         help="Execution mode (default: paper)")
     parser.add_argument("--symbols", nargs="+", default=None,
                         help="Override watchlist symbols")
-    parser.add_argument("--balance", type=float, default=10_000.0,
-                        help="Initial paper balance (default: 10000)")
+    parser.add_argument("--balance", type=float, default=100_000.0,
+                        help="Initial paper balance (default: 100000 — matches FTMO live)")
     parser.add_argument("--interval", type=int, default=60,
                         help="Analysis interval in seconds (default: 60, 0=single cycle)")
     parser.add_argument("--single", action="store_true",

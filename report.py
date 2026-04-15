@@ -121,9 +121,12 @@ def load_mt5_bridge_trades(days: int = 30) -> dict | None:
             if BRIDGE_COMMENT_TAG in (p.comment or "")
         ]
 
-        # Closed round-trips from deal history
-        now = datetime.now(timezone.utc)
-        deals = mt5.history_deals_get(now - timedelta(days=days), now) or []
+        # Closed round-trips from deal history.
+        # Pad the upper bound by 12h — MT5 broker server times can run ahead
+        # of UTC (common brokers: UTC+2/+3), and deals timestamped "in the future"
+        # relative to our local clock would otherwise be silently dropped.
+        now = datetime.now(timezone.utc) + timedelta(hours=12)
+        deals = mt5.history_deals_get(now - timedelta(days=days + 1), now) or []
 
         by_position: dict[int, list] = defaultdict(list)
         for d in deals:
@@ -263,12 +266,14 @@ def section_live_mt5(data: dict) -> None:
     if acct:
         print(f"  Account #{acct.get('login')}  Currency: {acct.get('currency')}")
         print(f"  Balance: ${acct.get('balance', 0):,.2f}   "
-              f"Equity: ${acct.get('equity', 0):,.2f}   "
-              f"Floating: ${acct.get('floating_pnl', 0):+,.2f}")
+              f"Equity: ${acct.get('equity', 0):,.2f}")
+        print(f"  (Account-wide floating ${acct.get('floating_pnl', 0):+,.2f} "
+              f"includes ALL EAs — see bridge-only floating below.)")
 
     opens = data.get("open", [])
     closed = data.get("closed", [])
-    print(f"\n  Bridge open positions:  {len(opens)}")
+    bridge_floating = sum(p["profit"] + p["swap"] for p in opens)
+    print(f"\n  Bridge open positions:  {len(opens)}  (bridge-only floating: ${bridge_floating:+,.2f})")
     print(f"  Bridge closed trades:   {len(closed)}")
 
     if closed:
@@ -453,6 +458,104 @@ def section_paper(paper_events: list[dict]) -> None:
             )
 
 
+def section_side_by_side(mt5_data: dict | None, paper_events: list[dict],
+                          session_trades: list[dict]) -> None:
+    """Compare LIVE vs PAPER trades in R-multiples (apples-to-apples).
+
+    R-multiple = pnl / planned_risk_at_entry. Normalizes for differing balances:
+    paper sims on $10k, live trades $98k FTMO — only R-multiples are comparable.
+    """
+    header("LIVE vs PAPER — R-MULTIPLE COMPARISON")
+    if not mt5_data:
+        print("  MT5 unavailable — skipping comparison")
+        return
+
+    # Build SL lookup keyed by (symbol, direction). Multiple OPENs per symbol
+    # over time → keep list and pick nearest by entry price.
+    sl_by_sym: dict[tuple, list[tuple[float, float]]] = defaultdict(list)
+    for t in session_trades:
+        if t.get("event") == "OPEN":
+            sym = normalize_symbol(t.get("symbol", ""))
+            sl_by_sym[(sym, t.get("direction"))].append(
+                (t.get("entry_price", 0), t.get("sl_price", 0))
+            )
+
+    def lookup_sl(sym: str, direction: str, entry: float) -> float:
+        candidates = sl_by_sym.get((sym, direction), [])
+        if not candidates:
+            return 0.0
+        # Pick the OPEN whose entry price is closest (handles slippage rounding)
+        best = min(candidates, key=lambda ep_sl: abs(ep_sl[0] - entry))
+        return best[1] if abs(best[0] - entry) < entry * 0.005 else 0.0
+
+    live_trades = []
+    for c in mt5_data.get("closed", []):
+        sl = lookup_sl(c["symbol"], c["direction"], c["entry_price"])
+        risk_per_unit = abs(c["entry_price"] - sl) if sl else 0
+        actual_per_unit = abs(c["exit_price"] - c["entry_price"])
+        if risk_per_unit > 0:
+            r = (actual_per_unit / risk_per_unit) * (1 if c["net_pnl"] > 0 else -1)
+        else:
+            r = 0.0
+        live_trades.append({
+            "sym": c["symbol"], "dir": c["direction"], "pnl": c["net_pnl"], "r": r,
+            "reason": c["reason"], "entry_t": c["entry_time"][:16],
+        })
+
+    # Paper R-multiples come straight from JSONL (already signed correctly)
+    paper_trades = []
+    opens: dict[int, dict] = {}
+    for ev in paper_events:
+        if ev.get("event") == "OPEN":
+            opens[ev.get("ticket")] = ev
+        elif ev.get("event") == "CLOSE":
+            o = opens.get(ev.get("ticket"), {})
+            r_raw = ev.get("r_multiple", 0)
+            # JSONL r_multiple is unsigned — re-sign from pnl
+            r_signed = abs(r_raw) * (1 if ev.get("pnl", 0) > 0 else -1)
+            paper_trades.append({
+                "sym": ev.get("symbol", "?"), "dir": ev.get("direction"),
+                "pnl": ev.get("pnl", 0), "r": r_signed,
+                "reason": ev.get("reason", "?"),
+                "entry_t": (o.get("opened_at") or ev.get("timestamp", ""))[:16],
+                "grade": o.get("ict_grade", "-"),
+            })
+
+    # Match live to paper by symbol+direction within 6h
+    used = set()
+    print(f"  {'STATUS':9} {'LIVE':<48} {'PAPER':<48}")
+    print(f"  {'-'*9} {'-'*47} {'-'*47}")
+    for l in live_trades:
+        cands = [
+            (i, p) for i, p in enumerate(paper_trades)
+            if i not in used and p["sym"] == l["sym"] and p["dir"] == l["dir"]
+            and abs((datetime.fromisoformat(p["entry_t"]) -
+                     datetime.fromisoformat(l["entry_t"])).total_seconds()) < 6 * 3600
+        ]
+        if cands:
+            i, p = min(cands, key=lambda ip: abs(
+                (datetime.fromisoformat(ip[1]["entry_t"]) -
+                 datetime.fromisoformat(l["entry_t"])).total_seconds()))
+            used.add(i)
+            agree = "MATCH" if (l["r"] > 0) == (p["r"] > 0) else "DIVERGE"
+            l_str = f"{l['sym']:8} {l['dir']:4} {l['r']:+5.2f}R ${l['pnl']:+8.2f} {l['reason']}"
+            p_str = f"{p['sym']:8} {p['dir']:4} {p['r']:+5.2f}R ${p['pnl']:+8.2f} {p['reason']}"
+            print(f"  {agree:9} {l_str:<48} {p_str:<48}")
+        else:
+            l_str = f"{l['sym']:8} {l['dir']:4} {l['r']:+5.2f}R ${l['pnl']:+8.2f} {l['reason']}"
+            print(f"  {'LIVE-ONLY':9} {l_str:<48} {'(no paper match)':<48}")
+
+    print()
+    live_avg_r = sum(t["r"] for t in live_trades) / max(len(live_trades), 1)
+    paper_avg_r = sum(t["r"] for t in paper_trades) / max(len(paper_trades), 1)
+    print(f"  LIVE  : {len(live_trades)} trades  Avg R: {live_avg_r:+.2f}  "
+          f"Total: {sum(t['r'] for t in live_trades):+.2f}R")
+    print(f"  PAPER : {len(paper_trades)} trades  Avg R: {paper_avg_r:+.2f}  "
+          f"Total: {sum(t['r'] for t in paper_trades):+.2f}R")
+    print(f"  Edge gap: {paper_avg_r - live_avg_r:+.2f}R per trade "
+          f"(positive = paper outperforms live on avg)")
+
+
 def section_health(mt5_data: dict | None) -> None:
     header("ACCOUNT HEALTH")
     if not mt5_data or not mt5_data.get("account"):
@@ -480,7 +583,7 @@ def main() -> int:
     if args.days > 0:
         since = datetime.now(timezone.utc) - timedelta(days=args.days)
 
-    analyses, decisions, _session_trades = load_sessions(since)
+    analyses, decisions, session_trades = load_sessions(since)
     mt5_data = load_mt5_bridge_trades(days=args.days or 30)
     paper = load_paper_trades(since)
 
@@ -501,6 +604,7 @@ def main() -> int:
         print("\n  [MT5 unavailable — falling back to ledger DB]")
         section_live(load_ledger())
     section_paper(paper)
+    section_side_by_side(mt5_data, paper, session_trades)
     section_health(mt5_data)
     print()
     return 0

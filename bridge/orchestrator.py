@@ -62,7 +62,7 @@ class Orchestrator:
         self,
         mode: str = "paper",
         symbols: list[str] | None = None,
-        initial_balance: float = 10_000.0,
+        initial_balance: float = 100_000.0,
         analysis_interval: int = 60,
         position_interval: int = 30,
         health_interval: int = 60,
