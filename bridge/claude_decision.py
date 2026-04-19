@@ -390,6 +390,10 @@ class ClaudeDecisionMaker:
     def __init__(self, min_rr: float = 1.5):
         self.min_rr = min_rr
         self._client = None
+        # Decision cache: avoid redundant API calls when signal hasn't changed
+        # Key: symbol, Value: (grade, direction, score_bucket, timestamp, decision)
+        self._decision_cache: dict[str, tuple[str, str, int, float, TradeDecision]] = {}
+        self._cache_ttl = 540  # 9 minutes — covers ~2 cycles at 300s interval
 
     @property
     def client(self):
@@ -424,12 +428,26 @@ class ClaudeDecisionMaker:
                 model_used="pre-gate",
             )
 
-        # Route to appropriate model
+        # Route: Sonnet for Grade A (deeper analysis), Haiku for Grade B (cost-efficient)
         model = self.SONNET if analysis.grade == "A" else self.HAIKU
+
+        # Decision cache: reuse last decision if signal hasn't materially changed
+        import time as _time
+        score_bucket = int(analysis.total_score // 5) * 5  # bucket by 5-pt bands
+        cache_key = analysis.symbol
+        cached = self._decision_cache.get(cache_key)
+        if cached:
+            c_grade, c_dir, c_bucket, c_ts, c_decision = cached
+            age = _time.time() - c_ts
+            if (age < self._cache_ttl
+                    and c_grade == analysis.grade
+                    and c_dir == analysis.direction
+                    and c_bucket == score_bucket):
+                print(f"  [{analysis.symbol}] Cache hit ({age:.0f}s old) — reusing last decision", flush=True)
+                return c_decision
 
         # Try Claude API (with one retry on transient errors)
         if self.client:
-            import time as _time
             for attempt in range(2):
                 try:
                     decision = self._call_claude(analysis, model)
@@ -438,6 +456,11 @@ class ClaudeDecisionMaker:
                     if rejection:
                         decision.action = "SKIP"
                         decision.reasoning = f"Post-gate: {rejection}. Original: {decision.reasoning}"
+                    # Cache the decision for reuse
+                    self._decision_cache[cache_key] = (
+                        analysis.grade, analysis.direction, score_bucket,
+                        _time.time(), decision,
+                    )
                     return decision
                 except Exception as e:
                     err_name = type(e).__name__
@@ -478,16 +501,8 @@ class ClaudeDecisionMaker:
         if analysis.error:
             return f"Analysis error: {analysis.error}"
 
-        if analysis.grade in ("D", "INVALID"):
-            return f"Grade {analysis.grade} ({analysis.total_score:.0f}/100) below minimum"
-
-        # Grade C outside kill zone: let Claude decide with low-conviction flag
-        # (previously hard-gated — Claude never saw these setups)
-        if analysis.grade == "C" and not analysis.is_kill_zone:
-            # Only auto-skip Grade C during truly dead sessions
-            session = getattr(analysis, "session_type", "").lower()
-            if session in ("asian", "ny_close"):
-                return f"Grade C in dead session ({session}) without kill zone"
+        if analysis.grade in ("C", "D", "INVALID"):
+            return f"Grade {analysis.grade} ({analysis.total_score:.0f}/100) below minimum for API call"
 
         if analysis.current_price <= 0:
             return "Invalid price data"

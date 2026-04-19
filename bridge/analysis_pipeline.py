@@ -399,7 +399,7 @@ class AnalysisPipeline:
         )
         if not corr_ok:
             print(f"  [{symbol}] BLOCKED (live): {corr_reason}", flush=True)
-            self.session.log_decision(decision)
+            self.session.log_decision(decision.to_dict())
             return
 
         # Risk gate: FTMO compliance + position sizing

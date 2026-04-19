@@ -103,8 +103,8 @@ def main() -> None:
                         help="Override watchlist symbols")
     parser.add_argument("--balance", type=float, default=100_000.0,
                         help="Initial paper balance (default: 100000 — matches FTMO live)")
-    parser.add_argument("--interval", type=int, default=60,
-                        help="Analysis interval in seconds (default: 60, 0=single cycle)")
+    parser.add_argument("--interval", type=int, default=900,
+                        help="Analysis interval in seconds (default: 900 = 15min, 0=single cycle)")
     parser.add_argument("--single", action="store_true",
                         help="Run a single analysis cycle and exit")
 
@@ -143,7 +143,7 @@ def main() -> None:
         mode=args.mode,
         symbols=args.symbols,
         initial_balance=args.balance,
-        analysis_interval=max(args.interval, 10) if args.interval > 0 else 60,
+        analysis_interval=max(args.interval, 10) if args.interval > 0 else 300,  # default 300s (5min) to conserve API credits
         single_cycle=args.single or args.interval == 0,
     )
 
