@@ -39,8 +39,12 @@ class TradeDecision:
         risk = abs(self.entry_price - self.sl_price)
         if risk == 0:
             return 0.0
-        reward = abs(self.tp_price - self.entry_price)
-        return round(reward / risk, 2)
+        r1 = abs(self.tp_price - self.entry_price) / risk
+        if self.tp2_price and self.tp2_price != 0:
+            r2 = abs(self.tp2_price - self.entry_price) / risk
+            pct = self.partial_close_pct
+            return round(pct * r1 + (1 - pct) * r2, 2)
+        return round(r1, 2)
 
     def to_dict(self) -> dict:
         return {
@@ -111,14 +115,43 @@ class PaperPosition:
             "tp_price": self.tp_price,
             "tp2_price": self.tp2_price,
             "lot_size": self.lot_size,
+            "risk_pct": self.risk_pct,
             "current_price": self.current_price,
             "floating_pnl": round(self.floating_pnl, 2),
             "r_multiple": round(self.r_multiple, 2),
             "trailing_sl": self.trailing_sl,
             "opened_at": self.opened_at,
             "ict_grade": self.ict_grade,
+            "ict_score": self.ict_score,
+            "reasoning": self.reasoning,
+            "trade_type": self.trade_type,
             "tp1_hit": self.tp1_hit,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PaperPosition":
+        """Restore a PaperPosition from a dict (e.g., from state store)."""
+        return cls(
+            ticket=data.get("ticket", 0),
+            symbol=data.get("symbol", ""),
+            direction=data.get("direction", "BUY"),
+            entry_price=data.get("entry_price", 0.0),
+            sl_price=data.get("sl_price", 0.0),
+            tp_price=data.get("tp_price", 0.0),
+            lot_size=data.get("lot_size", 0.0),
+            risk_pct=data.get("risk_pct", 0.0),
+            opened_at=data.get("opened_at", ""),
+            ict_grade=data.get("ict_grade", ""),
+            ict_score=data.get("ict_score", 0.0),
+            reasoning=data.get("reasoning", ""),
+            tp2_price=data.get("tp2_price", 0.0),
+            trade_type=data.get("trade_type", "intraday"),
+            current_price=data.get("current_price", 0.0),
+            floating_pnl=data.get("floating_pnl", 0.0),
+            trailing_sl=data.get("trailing_sl", 0.0),
+            partial_closed=data.get("partial_closed", False),
+            tp1_hit=data.get("tp1_hit", False),
+        )
 
 
 @dataclass

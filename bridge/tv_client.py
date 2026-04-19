@@ -16,13 +16,39 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 
 MCP_ROOT = Path(__file__).resolve().parent.parent
 _SWITCH_DELAY = 2.0  # seconds between symbol/timeframe switches
+
+# GLOBAL exclusive lock for ALL TV access across the process.
+# There is only one TradingView chart in the Electron app. Every TVClient
+# instance (analysis loop, position loop, strategy engine, etc.) must
+# serialize through this lock so one caller's set_symbol() can't race
+# another caller's get_ohlcv(). RLock so the same thread can nest calls
+# (e.g. switch_chart() → set_symbol() + set_timeframe()).
+_TV_LOCK: threading.RLock = threading.RLock()
+
+# SESSION lock — held for the entire switch+collect sequence.
+# The _TV_LOCK only serializes individual subprocess calls. But a pipeline
+# operation (switch symbol → sleep → switch TF → sleep → read OHLCV)
+# spans multiple _run() calls with sleeps in between. Without a session
+# lock, another thread grabs _TV_LOCK between calls and switches the chart
+# to a different symbol, causing cross-symbol contamination.
+#
+# Callers use `with client.chart_session():` to hold exclusive chart access
+# for their entire multi-step operation. Individual _run() calls inside
+# still acquire _TV_LOCK (harmless since it's an RLock), ensuring the
+# existing delay logic still works.
+_CHART_SESSION_LOCK: threading.Lock = threading.Lock()
+
+# Shared last-call timestamp, also protected by _TV_LOCK.
+_TV_LAST_CALL_TIME: float = 0.0
 
 
 class TVClientError(Exception):
@@ -30,11 +56,42 @@ class TVClientError(Exception):
 
 
 class TVClient:
-    """Subprocess-based client for the TradingView MCP CLI."""
+    """Subprocess-based client for the TradingView MCP CLI.
+
+    All instances share a process-wide lock and a process-wide
+    last-call timestamp, so concurrent code paths cannot race the
+    single TradingView chart.
+    """
 
     def __init__(self, mcp_root: Path | None = None):
         self.mcp_root = mcp_root or MCP_ROOT
+        # Kept as a property for API compat, but the real one is global.
         self._last_call_time: float = 0.0
+
+    @staticmethod
+    @contextmanager
+    def chart_session() -> Generator[None, None, None]:
+        """Hold exclusive chart access for a multi-step switch+collect sequence.
+
+        Usage::
+
+            with client.chart_session():
+                client.set_symbol("BTCUSD", require_ready=True)
+                time.sleep(5.0)
+                quote = client.get_quote()
+                client.set_timeframe("240")
+                time.sleep(2.5)
+                bars = client.get_ohlcv_verified("BTCUSD")
+
+        While this context manager is held, no other thread can begin a
+        chart session (they block on _CHART_SESSION_LOCK). This prevents
+        symbol switching between the set_symbol and get_ohlcv calls.
+        """
+        _CHART_SESSION_LOCK.acquire()
+        try:
+            yield
+        finally:
+            _CHART_SESSION_LOCK.release()
 
     # ------------------------------------------------------------------
     # Low-level runner
@@ -44,12 +101,22 @@ class TVClient:
         """
         Run `npm run tv -- <args>` and return parsed JSON.
 
-        Handles npm stderr noise and extracts JSON from stdout.
+        Serialized process-wide via _TV_LOCK to prevent chart contention
+        across the analysis loop, position loop, strategy engine, etc.
         """
-        # Rate limiting: ensure minimum delay between calls
-        elapsed = time.time() - self._last_call_time
-        if elapsed < _SWITCH_DELAY:
-            time.sleep(_SWITCH_DELAY - elapsed)
+        global _TV_LAST_CALL_TIME
+        with _TV_LOCK:
+            elapsed = time.time() - _TV_LAST_CALL_TIME
+            if elapsed < _SWITCH_DELAY:
+                time.sleep(_SWITCH_DELAY - elapsed)
+            try:
+                return self._run_locked(args, timeout)
+            finally:
+                _TV_LAST_CALL_TIME = time.time()
+                self._last_call_time = _TV_LAST_CALL_TIME
+
+    def _run_locked(self, args: list[str], timeout: int = 30) -> dict[str, Any]:
+        """Actual subprocess call — only invoked while holding _TV_LOCK."""
 
         cmd = ["npm", "run", "tv", "--"] + args
         try:
@@ -65,8 +132,6 @@ class TVClient:
             raise TVClientError(f"Timeout ({timeout}s) for: {' '.join(args)}")
         except FileNotFoundError:
             raise TVClientError("npm not found. Is Node.js installed?")
-
-        self._last_call_time = time.time()
 
         # Parse JSON from stdout (may contain npm lifecycle noise before the JSON)
         stdout = result.stdout.strip()
@@ -127,19 +192,25 @@ class TVClient:
         """
         result = self._run(["symbol", symbol])
         if require_ready and not result.get("chart_ready", False):
-            # CLI waited 10s and chart still not ready — retry up to 3 times
-            for attempt in range(3):
-                time.sleep(2.0)
-                # Re-read state to check if chart caught up
+            target_sym = symbol.split(":")[-1]
+            for attempt in range(5):
+                delay = 2.0 + attempt * 1.0
+                time.sleep(delay)
                 try:
                     q = self.get_quote()
                     chart_sym = q.get("symbol", "").split(":")[-1]
-                    target_sym = symbol.split(":")[-1]
                     if chart_sym == target_sym and float(q.get("last", 0)) > 0:
                         result["chart_ready"] = True
                         break
                 except TVClientError:
                     pass
+                if attempt == 2:
+                    try:
+                        result = self._run(["symbol", symbol])
+                        if result.get("chart_ready", False):
+                            break
+                    except TVClientError:
+                        pass
         return result
 
     def set_timeframe(self, tf: str) -> dict:
@@ -179,16 +250,16 @@ class TVClient:
     def get_ohlcv_verified(self, expected_symbol: str, count: int = 200) -> dict | None:
         """Get OHLCV and verify the chart is still on the expected symbol.
 
-        Reads OHLCV, then reads a quote to confirm the symbol hasn't drifted.
-        Returns None if the symbol doesn't match (contamination detected).
+        Verifies quote BEFORE reading OHLCV to ensure the chart has fully
+        loaded the expected symbol, then verifies again AFTER to catch drift.
+        Returns None if either check fails (contamination detected).
         """
-        bars = self._run(["ohlcv", "-n", str(min(count, 500))])
+        target_sym = expected_symbol.split(":")[-1]
 
-        # Verify symbol hasn't drifted during OHLCV read
+        # Pre-check: ensure chart is on the right symbol before reading bars
         try:
             q = self.get_quote()
             chart_sym = q.get("symbol", "").split(":")[-1]
-            target_sym = expected_symbol.split(":")[-1]
             if chart_sym != target_sym:
                 print(
                     f"  [TV] Symbol drift detected: expected {target_sym}, "
@@ -197,7 +268,23 @@ class TVClient:
                 )
                 return None
         except TVClientError:
-            pass  # Can't verify — proceed cautiously
+            pass
+
+        bars = self._run(["ohlcv", "-n", str(min(count, 500))])
+
+        # Post-check: verify symbol hasn't drifted during OHLCV read
+        try:
+            q = self.get_quote()
+            chart_sym = q.get("symbol", "").split(":")[-1]
+            if chart_sym != target_sym:
+                print(
+                    f"  [TV] Symbol drift detected: expected {target_sym}, "
+                    f"chart shows {chart_sym}. Discarding OHLCV data.",
+                    flush=True,
+                )
+                return None
+        except TVClientError:
+            pass
 
         return bars
 
@@ -409,15 +496,16 @@ class TVClient:
         counts = counts or {}
         results: dict[str, dict] = {}
 
-        self.set_symbol(symbol)
-        time.sleep(0.5)
+        with self.chart_session():
+            self.set_symbol(symbol)
+            time.sleep(0.5)
 
-        for tf in timeframes:
-            count = counts.get(tf, 200)
-            self.set_timeframe(tf)
-            time.sleep(0.7)  # Wait for chart to update
-            data = self._run(["ohlcv", "-n", str(min(count, 500))])
-            results[tf] = data
+            for tf in timeframes:
+                count = counts.get(tf, 200)
+                self.set_timeframe(tf)
+                time.sleep(0.7)  # Wait for chart to update
+                data = self._run(["ohlcv", "-n", str(min(count, 500))])
+                results[tf] = data
 
         return results
 

@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import math
 import sys
 from dataclasses import dataclass
 from typing import Any
@@ -31,22 +32,66 @@ from core.types import Direction
 # ---------------------------------------------------------------------------
 
 PAPER_SYMBOL_SPECS: dict[str, SymbolSpec] = {
-    # Crypto — FTMO actual specs
+    # Crypto — verified from FTMO MT5 on 2026-04-18
     "BTCUSD": SymbolSpec(name="BTCUSD", tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=5.0, volume_step=0.01),
     "ETHUSD": SymbolSpec(name="ETHUSD", tick_size=0.01, tick_value=0.1, volume_min=0.01, volume_max=5.0, volume_step=0.01),
     "SOLUSD": SymbolSpec(name="SOLUSD", tick_size=0.01, tick_value=1.0, volume_min=0.01, volume_max=5.0, volume_step=0.01),
     "DOGEUSD": SymbolSpec(name="DOGEUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=1.0, volume_step=0.01),
-    # Forex — correct
+    # Forex — verified from FTMO MT5
     "EURUSD": SymbolSpec(name="EURUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=50.0, volume_step=0.01),
     "GBPUSD": SymbolSpec(name="GBPUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=50.0, volume_step=0.01),
-    # Gold / Oil
+    "USDJPY": SymbolSpec(name="USDJPY", tick_size=0.001, tick_value=0.63, volume_min=0.01, volume_max=50.0, volume_step=0.01),
+    "AUDUSD": SymbolSpec(name="AUDUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=50.0, volume_step=0.01),
+    "NZDUSD": SymbolSpec(name="NZDUSD", tick_size=0.00001, tick_value=1.0, volume_min=0.01, volume_max=50.0, volume_step=0.01),
+    # Gold / Silver / Oil — verified from FTMO MT5
     "XAUUSD": SymbolSpec(name="XAUUSD", tick_size=0.01, tick_value=1.0, volume_min=0.01, volume_max=100.0, volume_step=0.01),
+    "XAGUSD": SymbolSpec(name="XAGUSD", tick_size=0.001, tick_value=5.0, volume_min=0.01, volume_max=100.0, volume_step=0.01),
     "UKOIL":  SymbolSpec(name="UKOIL",  tick_size=0.01, tick_value=0.01, volume_min=0.1,  volume_max=500.0, volume_step=0.1),
-    # Indices — FTMO naming
-    "US30":   SymbolSpec(name="US30",   tick_size=1.0,  tick_value=1.0,  volume_min=0.1,  volume_max=100.0, volume_step=0.1),
+    # Indices — verified from FTMO MT5 (.cash suffix)
+    "US30":   SymbolSpec(name="US30",   tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=1000.0, volume_step=0.01),
     "US100":  SymbolSpec(name="US100",  tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=1000.0, volume_step=0.01),
     "US500":  SymbolSpec(name="US500",  tick_size=0.01, tick_value=0.01, volume_min=0.01, volume_max=1000.0, volume_step=0.01),
+    "GER40":  SymbolSpec(name="GER40",  tick_size=0.01, tick_value=0.01176, volume_min=0.01, volume_max=1000.0, volume_step=0.01),
 }
+
+# Hard max lot size per symbol — absolute safety cap regardless of risk calculation
+HARD_MAX_LOTS: dict[str, float] = {
+    "ETHUSD": 1.0, "BTCUSD": 0.5, "SOLUSD": 5.0, "DOGEUSD": 50.0,
+    "EURUSD": 5.0, "GBPUSD": 5.0, "USDJPY": 5.0, "AUDUSD": 5.0, "NZDUSD": 5.0,
+    "XAUUSD": 2.0, "XAGUSD": 2.0,
+    "US30.cash": 2.0, "US100.cash": 2.0, "US500.cash": 5.0, "UKOIL.cash": 5.0,
+    "US30": 2.0, "US100": 2.0, "US500": 5.0, "UKOIL": 5.0,
+    "GER40.cash": 5.0, "GER40": 5.0,
+}
+
+
+def calculate_pnl(symbol: str, entry_price: float, exit_price: float, lot_size: float, direction: str) -> float:
+    """Calculate P&L using proper tick_value conversion."""
+    # Strip exchange prefix (e.g. "BITSTAMP:BTCUSD" -> "BTCUSD")
+    symbol = symbol.split(":")[-1] if ":" in symbol else symbol
+    spec = PAPER_SYMBOL_SPECS.get(symbol)
+    if not spec:
+        # fallback to raw calculation for unknown symbols — may be inaccurate
+        print(f"  [WARN] calculate_pnl: no SymbolSpec for {symbol}, using raw delta*lots", flush=True)
+        delta = exit_price - entry_price
+        if direction.upper() == "SELL":
+            delta = -delta
+        return delta * lot_size
+    delta = exit_price - entry_price
+    if direction.upper() == "SELL":
+        delta = -delta
+    ticks = delta / spec.tick_size
+    return ticks * spec.tick_value * lot_size
+
+
+def _clamp_to_hard_max(symbol: str, lot_size: float) -> float:
+    """Clamp lot size to HARD_MAX_LOTS if defined for this symbol."""
+    base = symbol.split(":")[-1] if ":" in symbol else symbol
+    hard_max = HARD_MAX_LOTS.get(base)
+    if hard_max is not None and lot_size > hard_max:
+        print(f"  [{base}] HARD_MAX clamp: {lot_size:.4f} -> {hard_max:.2f} lots", flush=True)
+        return hard_max
+    return lot_size
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +171,7 @@ class RiskBridge:
             return round(risk_amount / risk_dist, 4)
 
         dir_enum = Direction.BULLISH if direction == "BUY" else Direction.BEARISH
-        return calculate_lots(
+        lots = calculate_lots(
             account_balance=balance,
             risk_pct=risk_pct,
             entry_price=entry_price,
@@ -134,6 +179,7 @@ class RiskBridge:
             direction=dir_enum,
             spec=spec,
         )
+        return _clamp_to_hard_max(symbol, lots)
 
     def get_lot_size_live(
         self,
@@ -169,8 +215,8 @@ class RiskBridge:
                 )
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [WARN] MT5 spec lookup failed for {symbol}: {e}", flush=True)
         # Fallback to paper specs
         return self.get_lot_size(symbol, balance, risk_pct, entry_price, sl_price, direction)
 
@@ -239,6 +285,25 @@ class RiskBridge:
 
         if lot_size <= 0:
             return False, 0.0, "Invalid lot size (check SL distance)"
+
+        # Notional exposure cap: max 20% of balance per position
+        max_notional_pct = 0.20
+        notional = lot_size * entry_price
+        max_notional = balance * max_notional_pct
+        if notional > max_notional:
+            capped_lots = max_notional / entry_price
+            # Round down to volume_step
+            spec = PAPER_SYMBOL_SPECS.get(symbol)
+            step = spec.volume_step if spec else 0.01
+            capped_lots = math.floor(capped_lots / step) * step
+            capped_lots = max(step, capped_lots)
+            print(f"  [{symbol}] Notional cap: {lot_size:.2f} lots (${notional:,.0f}) "
+                  f"exceeds {max_notional_pct:.0%} of ${balance:,.0f} — "
+                  f"capped to {capped_lots:.2f} lots", flush=True)
+            lot_size = capped_lots
+
+        # Hard max lot safety clamp
+        lot_size = _clamp_to_hard_max(symbol, lot_size)
 
         return True, lot_size, f"Approved: {lot_size:.4f} lots (risk={adjusted_risk:.3%}, proximity={multiplier:.2f})"
 

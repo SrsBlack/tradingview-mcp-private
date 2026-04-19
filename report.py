@@ -24,6 +24,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# Force UTF-8 stdout on Windows so box-drawing chars don't crash cp1252.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+except (AttributeError, Exception):  # pragma: no cover
+    pass
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bridge.symbol_utils import normalize_symbol  # noqa: E402
 

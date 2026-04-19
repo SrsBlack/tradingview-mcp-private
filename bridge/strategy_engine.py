@@ -135,33 +135,43 @@ class StrategyEngine:
         counts = self.config.bar_counts
         result: dict[str, pd.DataFrame] = {}
 
-        try:
-            switch_result = self.tv_client.set_symbol(symbol, require_ready=True)
-            if not switch_result.get("chart_ready", False):
-                logger.warning(f"[ENGINE] Chart not ready for {symbol} — skipping")
-                return result
-
-            # Verify quote confirms the symbol
-            quote = self.tv_client.get_quote()
-            target_sym = symbol.split(":")[-1]
-            chart_sym = quote.get("symbol", "").split(":")[-1]
-            if chart_sym != target_sym:
-                logger.warning(f"[ENGINE] Quote mismatch: expected {target_sym}, got {chart_sym} — skipping")
-                return result
-        except TVClientError as e:
-            logger.warning(f"[ENGINE] Failed to switch to {symbol}: {e}")
-            return result
-
-        for tf in timeframes:
+        # Hold exclusive chart access for the entire switch+collect sequence
+        with self.tv_client.chart_session():
             try:
-                self.tv_client.set_timeframe(tf)
-                time.sleep(0.7)
-                raw = self.tv_client._run(["ohlcv", "-n", str(min(counts.get(tf, 200), 500))])
-                df = bars_to_dataframe(raw)
-                if df is not None and not df.empty:
-                    result[tf] = df
-            except (TVClientError, Exception) as e:
-                logger.warning(f"[ENGINE] {symbol} {tf}: {e}")
+                switch_result = self.tv_client.set_symbol(symbol, require_ready=True)
+                if not switch_result.get("chart_ready", False):
+                    logger.warning(f"[ENGINE] Chart not ready for {symbol} — skipping")
+                    return result
+
+                # Verify quote confirms the symbol
+                quote = self.tv_client.get_quote()
+                target_sym = symbol.split(":")[-1]
+                chart_sym = quote.get("symbol", "").split(":")[-1]
+                if chart_sym != target_sym:
+                    logger.warning(f"[ENGINE] Quote mismatch: expected {target_sym}, got {chart_sym} — skipping")
+                    return result
+            except TVClientError as e:
+                logger.warning(f"[ENGINE] Failed to switch to {symbol}: {e}")
+                return result
+
+            for tf in timeframes:
+                try:
+                    self.tv_client.set_timeframe(tf)
+                    time.sleep(2.5)
+                    raw = self.tv_client.get_ohlcv_verified(symbol, count=min(counts.get(tf, 200), 500))
+                    if raw is None:
+                        logger.warning(f"[ENGINE] {symbol} {tf}: symbol drift detected — skipping")
+                        continue
+                    df = bars_to_dataframe(raw)
+                    if df is not None and not df.empty:
+                        from bridge.config import price_in_range
+                        last_close = float(df["close"].iloc[-1])
+                        if not price_in_range(symbol, last_close):
+                            logger.warning(f"[ENGINE] {symbol} {tf}: price {last_close:.4f} fails range check — skipping")
+                            continue
+                        result[tf] = df
+                except (TVClientError, Exception) as e:
+                    logger.warning(f"[ENGINE] {symbol} {tf}: {e}")
 
         return result
 

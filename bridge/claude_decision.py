@@ -130,7 +130,11 @@ def _build_session_context(rules: dict) -> str:
         start_min = start_h * 60 + start_m
         end_min = end_h * 60 + end_m
         current_min = et_hour * 60 + et_min
-        if start_min <= current_min <= end_min:
+        if start_min > end_min:  # crosses midnight
+            in_window = current_min >= start_min or current_min <= end_min
+        else:
+            in_window = start_min <= current_min <= end_min
+        if in_window:
             active_kz.append(f"{kz['name']} ({kz.get('description', '')})")
 
     if active_kz:
@@ -146,7 +150,11 @@ def _build_session_context(rules: dict) -> str:
             start_min = start_h * 60 + start_m
             end_min = end_h * 60 + end_m
             current_min = et_hour * 60 + et_min
-            if start_min <= current_min <= end_min:
+            if start_min > end_min:  # crosses midnight
+                in_window = current_min >= start_min or current_min <= end_min
+            else:
+                in_window = start_min <= current_min <= end_min
+            if in_window:
                 lines.append(f"- WARNING: In no-trade window '{ntw['name']}': {ntw['reason']}")
 
     # Session confidence multiplier
@@ -191,9 +199,9 @@ def _build_ict_context(a: "SymbolAnalysis") -> str:
 
     # 1. Layer 1 — Foundation: Structure + Dealing Range + Liquidity
     if a.structure_score < 15:
-        lines.append("- LAYER 1 FAIL: HTF structure unclear. Without structure, dealing_range and premium_discount cannot be determined. Reduce to Grade C max.")
+        lines.append(f"- LAYER 1: Structure {a.structure_score:.0f}/30 (weak — use wider SL for uncertainty). Dealing range may be ambiguous.")
     else:
-        lines.append(f"- LAYER 1 OK: Structure {a.structure_score:.0f}/30. Dealing range and liquidity levels established.")
+        lines.append(f"- LAYER 1: Structure {a.structure_score:.0f}/30 (confirmed). Dealing range and liquidity levels established.")
 
     # 2. Layer 2 — Context: Premium/Discount + Session/PO3 phase
     pd = _get_concept("premium_discount")
@@ -223,27 +231,30 @@ def _build_ict_context(a: "SymbolAnalysis") -> str:
     confluence = a.confluence_factors or []
     confluence_str = " ".join(confluence).lower()
 
-    layer3_issues = []
     has_sweep = "sweep" in confluence_str or "liquidity" in confluence_str
     has_displacement = a.fvg_score >= 9  # FVG is evidence of displacement
     has_smt = a.smt_score > 0
 
-    if not has_sweep:
-        sweep_info = _get_concept("liquidity_sweep")
-        layer3_issues.append(f"NO SWEEP: {sweep_info.get('chain_after_sweep', 'Without sweep, manipulation may not be complete. Wait.')}")
-    if not has_displacement:
-        disp_info = _get_concept("displacement")
-        layer3_issues.append(f"NO DISPLACEMENT: {disp_info.get('critical_chain', 'Without displacement, FVG/OB/OTE are all unproven.')}")
-    if not has_smt:
-        smt_info = _get_concept("SMT_divergence")
-        layer3_issues.append(f"NO SMT: {smt_info.get('role_in_chain', 'Acceptable but reduces conviction.')}")
-
-    if layer3_issues:
-        lines.append("- LAYER 3 GAPS:")
-        for issue in layer3_issues:
-            lines.append(f"  * {issue}")
+    layer3_present = []
+    layer3_absent = []
+    if has_sweep:
+        layer3_present.append("Liquidity sweep confirmed")
     else:
-        lines.append("- LAYER 3 OK: Sweep + Displacement + SMT all confirmed.")
+        layer3_absent.append("Sweep not detected in window (reduces conviction but not disqualifying)")
+    if has_displacement:
+        layer3_present.append("Displacement confirmed via FVG")
+    else:
+        layer3_absent.append("Displacement unconfirmed (use structure + OB for entry instead)")
+    if has_smt:
+        layer3_present.append("SMT divergence confirmed")
+    else:
+        layer3_absent.append("SMT not detected (optional confluence — trade is still valid without it)")
+
+    lines.append(f"- LAYER 3 EVENTS: {len(layer3_present)}/3 confirmed")
+    for item in layer3_present:
+        lines.append(f"  + {item}")
+    for item in layer3_absent:
+        lines.append(f"  ~ {item}")
 
     # 4. Layer 4-5 — Entry precision: OB + FVG + OTE
     layer45_notes = []
@@ -255,11 +266,11 @@ def _build_ict_context(a: "SymbolAnalysis") -> str:
         layer45_notes.append("FVG present but weak OB — entry zone is less precise, widen SL")
 
     if a.ote_score >= 6:
-        layer45_notes.append("OTE reached — entry at 0.618-0.786 Fibonacci within zone")
+        layer45_notes.append("OTE reached — entry at 0.618-0.786 Fibonacci retracement (optimal)")
     elif a.ote_score > 0:
-        layer45_notes.append("Partial OTE — entry near but not optimal. Still acceptable.")
+        layer45_notes.append("Partial OTE — near retracement level (acceptable entry)")
     else:
-        layer45_notes.append("NOT AT OTE — entry not at retracement level. R:R suboptimal.")
+        layer45_notes.append("OTE not at retracement — use OB/FVG zone for entry instead (acceptable)")
 
     if layer45_notes:
         lines.append(f"- LAYER 4-5 ENTRY: {' | '.join(layer45_notes)}")
@@ -296,19 +307,9 @@ def _build_mean_reversion_warning(a: "SymbolAnalysis", rules: dict) -> str:
     mr = rules.get("mean_reversion_thresholds", {})
     if not mr:
         return ""
-
-    # We don't have actual SD data in SymbolAnalysis yet, but we can flag
-    # the concept for Claude to consider based on available signals
-    lines = []
-    lines.append("\nMEAN REVERSION CHECK:")
-    lines.append(f"- If price is >{mr.get('warning_sd', 2.0)} SD from {mr.get('ema_period', 20)} EMA "
-                  f"with {mr.get('consecutive_candles', 3)}+ same-direction candles:")
-    lines.append(f"  -> REDUCE continuation confidence by {abs(mr.get('effect_on_continuation', -10))} points")
-    lines.append(f"  -> BOOST reversal confidence by {mr.get('effect_on_reversal', 10)} points")
-    lines.append(f"- If price is >{mr.get('extreme_sd', 3.0)} SD: flag as 'extreme -- reversal setups only'")
-    lines.append("- Assess whether current price action shows signs of extended displacement from mean.")
-
-    return "\n".join(lines)
+    # TODO: Calculate actual SD from OHLCV data before enabling
+    # Currently returns speculative warnings without data — disabled
+    return ""
 
 
 def _classify_trade_type(a: "SymbolAnalysis") -> str:
@@ -468,14 +469,13 @@ class ClaudeDecisionMaker:
         if analysis.grade in ("D", "INVALID"):
             return f"Grade {analysis.grade} ({analysis.total_score:.0f}/100) below minimum"
 
+        # Grade C outside kill zone: let Claude decide with low-conviction flag
+        # (previously hard-gated — Claude never saw these setups)
         if analysis.grade == "C" and not analysis.is_kill_zone:
-            return f"Grade C outside kill zone (session: {analysis.session_type})"
-
-        # Grade B outside kill zone during low-conviction sessions
-        if analysis.grade == "B" and not analysis.is_kill_zone:
+            # Only auto-skip Grade C during truly dead sessions
             session = getattr(analysis, "session_type", "").lower()
-            if session in ("asian", "ny_close", "ny_afternoon"):
-                return f"Grade B in low-conviction session ({session}) without kill zone"
+            if session in ("asian", "ny_close"):
+                return f"Grade C in dead session ({session}) without kill zone"
 
         if analysis.current_price <= 0:
             return "Invalid price data"
@@ -486,6 +486,17 @@ class ClaudeDecisionMaker:
     # Claude API call
     # ------------------------------------------------------------------
 
+    SYSTEM_PROMPT = (
+        "You are a disciplined ICT trader. Evaluate this setup objectively. "
+        "Trade when the confluence of structure, displacement, and entry precision "
+        "justifies the risk. A signal that reached you has passed pre-gate filters, "
+        "but you should still exercise discretion on entry quality. "
+        "A Grade B signal missing key confirmations (no displacement, no sweep, "
+        "wrong premium/discount zone) should be SKIPPED. "
+        "Focus on entry precision: exact entry price, tight SL behind structure, "
+        "and realistic TP levels. Respond with JSON only."
+    )
+
     def _call_claude(self, analysis: SymbolAnalysis, model: str) -> TradeDecision:
         """Call Claude to evaluate the signal and return a trade decision."""
         prompt = self._build_prompt(analysis)
@@ -493,6 +504,7 @@ class ClaudeDecisionMaker:
         response = self.client.messages.create(
             model=model,
             max_tokens=512,
+            system=self.SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -538,10 +550,12 @@ SIGNAL:
 - P/D Zone: {a.pd_zone or 'unknown'} | Aligned: {a.pd_aligned}
 - Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}
 
-SCORE BREAKDOWN:
-- Structure: {a.structure_score:.0f}/30 | Liquidity sweep: REQUIRED GATE (not scored)
-- Order Block: {a.ob_score:.0f}/20 | FVG: {a.fvg_score:.0f}/18
-- Session: {a.session_score:.0f}/12 | OTE: {a.ote_score:.0f}/12 | SMT: {a.smt_score:.0f}/8
+SCORE BREAKDOWN (sub-scores are additive — 0 in one component does NOT disqualify):
+- Structure: {a.structure_score:.0f}/30{' (strong)' if a.structure_score >= 20 else ' (partial)' if a.structure_score >= 10 else ' (weak)'}
+- Order Block: {a.ob_score:.0f}/20{' (confirmed)' if a.ob_score >= 12 else ' (nearby)' if a.ob_score > 0 else ' (none detected — use FVG/structure for entry)'}
+- FVG: {a.fvg_score:.0f}/18{' (displacement confirmed)' if a.fvg_score >= 12 else ' (present)' if a.fvg_score > 0 else ' (none — use OB/structure)'}
+- Session: {a.session_score:.0f}/12 | OTE: {a.ote_score:.0f}/12{' (at optimal level)' if a.ote_score >= 8 else ' (partial retracement)' if a.ote_score > 0 else ' (not at retracement — acceptable)'}
+- SMT: {a.smt_score:.0f}/8{' (divergence confirmed)' if a.smt_score > 0 else ' (no divergence — optional confluence, not required)'}
 {strategy_ctx}
 {session_ctx}
 {ict_ctx}
@@ -568,6 +582,13 @@ Respond ONLY with this JSON (no markdown, no explanation):
 {{"action":"{direction_action}","entry_price":<float>,"sl_price":<float>,"tp_price":<float>,"tp2_price":<float>,"confidence":<0-100>,"risk_pct":<decimal e.g. 0.01 means 1%>,"reasoning":"<1 sentence>"}}
 
 risk_pct MUST be a decimal fraction: 0.01 = 1%, 0.005 = 0.5%, 0.0025 = 0.25%. Max allowed: {max_risk:.4f}
+
+Confidence calibration:
+- 90-100: Grade A, all 3 ICT layers confirmed, kill zone active, OB+FVG stacked
+- 75-89: Grade B, strong structure + good entry, 1-2 missing confluences
+- 60-74: Grade C, partial setup, pullback entry only
+- Below 60: SKIP
+
 If the setup is not convincing, use "SKIP" for action."""
 
     def _parse_response(self, text: str, analysis: SymbolAnalysis, model: str) -> TradeDecision:
@@ -662,6 +683,18 @@ If the setup is not convincing, use "SKIP" for action."""
         # Risk % sanity
         if decision.risk_pct > 0.02:
             return f"Risk {decision.risk_pct:.1%} exceeds 2% max"
+
+        # Clamp to per-symbol risk override
+        if analysis:
+            rules = _load_rules_json()
+            profiles = rules.get("symbol_profiles", {})
+            profile = profiles.get(analysis.symbol, {})
+            overrides = profile.get("risk_overrides", {})
+            grade_key = f"grade_{(analysis.grade or 'c').lower()}"
+            max_risk = overrides.get(grade_key, 0.01)  # default 1%
+            if decision.risk_pct > max_risk:
+                print(f"  [{analysis.symbol}] Risk clamped: {decision.risk_pct:.4f} → {max_risk:.4f} (per-symbol max for {grade_key})", flush=True)
+                decision.risk_pct = max_risk
 
         # Minimum SL distance: must be at least 2x ATR(14) on M15
         # AND at least 0.5% of price for crypto (sweeps go deep), 0.2% for metals

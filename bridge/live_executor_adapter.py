@@ -11,7 +11,7 @@ import asyncio
 import concurrent.futures
 import copy
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from bridge.config import get_bridge_config, BridgeConfig
@@ -31,6 +31,7 @@ class LiveExecutorAdapter:
         self._config = get_bridge_config()  # for TV→MT5 symbol name translation
         self._mt5_connector = None
         self._connect_mt5()  # initialize + login to MT5 before any trades
+        self._positions_lock = threading.Lock()
         self.open_positions: dict[int, Any] = {}  # mirrors PaperExecutor interface
         self.closed_positions: list = []
         self.wins = 0
@@ -38,10 +39,27 @@ class LiveExecutorAdapter:
         self.consecutive_losses = 0
         self.grade_a_wins = 0
         self.grade_a_losses = 0
-        # Balance pulled from MT5 on each check; use initial as fallback
-        self.balance = initial_balance
-        self.initial_balance = initial_balance
-        self.peak_balance = initial_balance
+        # Sync balance from MT5 at startup instead of using CLI default
+        mt5_balance = self._get_mt5_balance()
+        if mt5_balance is not None:
+            self.balance = mt5_balance
+            self.initial_balance = initial_balance
+            self.peak_balance = max(initial_balance, mt5_balance)
+            print(f"[LIVE] MT5 account balance: ${mt5_balance:,.2f}", flush=True)
+        else:
+            self.balance = initial_balance
+            self.initial_balance = initial_balance
+            self.peak_balance = initial_balance
+
+        # Daily P&L tracking — resets at midnight UTC.
+        # Uses current MT5 balance as day-start baseline so the kill switch
+        # reflects TODAY's P&L, not cumulative loss from initial_balance.
+        self._day_start_balance: float = self.balance
+        self._day_start_date: str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Per-symbol loss cooldown: symbol -> UTC ISO timestamp when cooldown expires
+        self._symbol_loss_cooldowns: dict[str, str] = {}
+        self._symbol_loss_cooldown_hours: int = 4
 
     def _connect_mt5(self) -> None:
         """Initialize and login to MT5. Must be called before any order submission."""
@@ -56,9 +74,101 @@ class LiveExecutorAdapter:
             print(f"[LIVE] WARNING: MT5 connection failed: {e}", flush=True)
             print("[LIVE] Make sure MT5 is running and credentials are correct in .env", flush=True)
 
+    def _get_mt5_balance(self) -> float | None:
+        """Read current account balance from MT5."""
+        try:
+            import MetaTrader5 as mt5
+            info = mt5.account_info()
+            if info and info.balance > 0:
+                self._mt5_login = info.login
+                return float(info.balance)
+        except Exception:
+            pass
+        return None
+
+    def get_bridge_floating_pnl(self) -> float:
+        """Floating P&L on bridge-only positions (comment contains ICT_Bridge).
+
+        Filters out EA positions that share the account so health/dashboard
+        can show a bridge-specific figure separate from the full-account
+        balance used for FTMO risk rules.
+        """
+        try:
+            import MetaTrader5 as mt5
+            positions = mt5.positions_get() or []
+            return float(sum(
+                p.profit for p in positions
+                if p.comment and "ICT_Bridge" in p.comment
+            ))
+        except Exception:
+            return 0.0
+
+    def get_bridge_open_count(self) -> int:
+        """Number of bridge-owned open positions on MT5."""
+        try:
+            import MetaTrader5 as mt5
+            positions = mt5.positions_get() or []
+            return sum(
+                1 for p in positions
+                if p.comment and "ICT_Bridge" in p.comment
+            )
+        except Exception:
+            return 0
+
+    def _check_daily_reset(self) -> None:
+        """Reset day-start balance at midnight UTC."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if today != self._day_start_date:
+            # Read fresh balance from MT5 for the new day
+            mt5_balance = self._get_mt5_balance()
+            if mt5_balance is not None:
+                self._day_start_balance = mt5_balance
+                self.balance = mt5_balance
+            else:
+                self._day_start_balance = self.balance
+            self._day_start_date = today
+            # Clear per-symbol loss cooldowns on new day
+            self._symbol_loss_cooldowns.clear()
+            print(f"[LIVE] Daily reset — day-start balance: ${self._day_start_balance:,.2f}", flush=True)
+
     @property
     def daily_pnl(self) -> float:
-        return round(self.balance - self.initial_balance, 2)
+        """Daily P&L *for FTMO risk rules* — uses full account balance delta.
+
+        Compares current balance to the balance at the start of today (UTC),
+        NOT to the initial $100k. This ensures the 2% daily loss kill switch
+        reflects today's actual loss, not cumulative drawdown.
+
+        This intentionally includes EA P&L because the 2%-daily / 10%-total
+        FTMO limits apply to the whole account, not just bridge slice.
+        """
+        self._check_daily_reset()
+        return round(self.balance - self._day_start_balance, 2)
+
+    def is_symbol_on_loss_cooldown(self, symbol: str) -> bool:
+        """Check if a symbol is in post-loss cooldown."""
+        base = symbol.split(":")[-1]
+        expiry_iso = self._symbol_loss_cooldowns.get(base)
+        if not expiry_iso:
+            return False
+        now = datetime.now(timezone.utc)
+        expiry = datetime.fromisoformat(expiry_iso)
+        if now >= expiry:
+            del self._symbol_loss_cooldowns[base]
+            return False
+        remaining = (expiry - now).total_seconds() / 60
+        return True
+
+    def set_symbol_loss_cooldown(self, symbol: str) -> None:
+        """Set a cooldown on a symbol after a loss."""
+        base = symbol.split(":")[-1]
+        expiry = datetime.now(timezone.utc) + timedelta(hours=self._symbol_loss_cooldown_hours)
+        self._symbol_loss_cooldowns[base] = expiry.isoformat()
+        print(
+            f"  [COOLDOWN] {base} on {self._symbol_loss_cooldown_hours}h loss cooldown "
+            f"until {expiry.strftime('%H:%M')} UTC",
+            flush=True,
+        )
 
     def open_position(self, decision: TradeDecision, lot_size: float | None = None) -> dict:
         """Submit trade to MT5 and mirror state.
@@ -72,23 +182,29 @@ class LiveExecutorAdapter:
             return {"success": False, "ticket": 0, "message": "Not a trade"}
 
         # Dedup check: same symbol+direction with similar entry price
-        for pos in self.open_positions.values():
-            if pos.symbol == decision.symbol and pos.direction == decision.action:
-                entry_diff = abs(pos.entry_price - decision.entry_price)
-                threshold = pos.entry_price * 0.005  # 0.5% tolerance
-                if entry_diff < threshold:
+        with self._positions_lock:
+            for pos in self.open_positions.values():
+                if pos.symbol == decision.symbol and pos.direction == decision.action:
+                    entry_diff = abs(pos.entry_price - decision.entry_price)
+                    threshold = pos.entry_price * 0.005  # 0.5% tolerance
+                    if entry_diff < threshold:
+                        return {"success": False, "ticket": 0,
+                                "message": f"Duplicate: already {pos.direction} {decision.symbol} "
+                                           f"@ {pos.entry_price:.4f}"}
+                elif pos.symbol == decision.symbol:
                     return {"success": False, "ticket": 0,
-                            "message": f"Duplicate: already {pos.direction} {decision.symbol} "
-                                       f"@ {pos.entry_price:.4f}"}
-            elif pos.symbol == decision.symbol:
-                return {"success": False, "ticket": 0,
-                        "message": f"Already have {pos.direction} position on {decision.symbol}"}
+                            "message": f"Already have {pos.direction} position on {decision.symbol}"}
 
         # Use pre-calculated lot size from RiskBridge if provided
         if lot_size is None:
-            risk_amount = self.balance * decision.risk_pct
-            risk_dist = abs(decision.entry_price - decision.sl_price)
-            lot_size = round(risk_amount / risk_dist, 4) if risk_dist > 0 else 0.01
+            from bridge.risk_bridge import RiskBridge
+            _rb = RiskBridge()
+            lot_size = _rb.get_lot_size_live(
+                decision.symbol, self.balance, decision.risk_pct,
+                decision.entry_price, decision.sl_price, decision.action,
+            )
+            if lot_size <= 0:
+                lot_size = 0.01
 
         # Translate TV symbol (e.g. "CBOT:YM1!") to MT5 symbol (e.g. "US30")
         mt5_decision = decision
@@ -96,6 +212,24 @@ class LiveExecutorAdapter:
         if mt5_symbol != decision.symbol:
             mt5_decision = copy.copy(decision)
             mt5_decision.symbol = mt5_symbol
+
+        # MT5-level dedup: check broker for existing positions on same symbol
+        try:
+            import MetaTrader5 as mt5
+            from bridge.config import tv_to_ftmo_symbol
+            ftmo_sym = tv_to_ftmo_symbol(mt5_symbol)
+            existing = mt5.positions_get(symbol=ftmo_sym)
+            if existing:
+                bridge_positions = [p for p in existing if p.comment and "ICT_Bridge" in p.comment]
+                for bp in bridge_positions:
+                    mt5_dir = "BUY" if bp.type == 0 else "SELL"
+                    if mt5_dir == decision.action:
+                        return {"success": False, "ticket": 0,
+                                "message": f"MT5 dedup: already have {mt5_dir} on {ftmo_sym} (#{bp.ticket})"}
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[LIVE] MT5 dedup check warning: {e}", flush=True)
 
         # Run async submit_trade in a dedicated thread with its own event loop
         result_holder: list[Any] = []
@@ -141,7 +275,8 @@ class LiveExecutorAdapter:
                 current_price=result["fill_price"] or decision.entry_price,
                 trailing_sl=decision.sl_price,
             )
-            self.open_positions[result["ticket"]] = pos
+            with self._positions_lock:
+                self.open_positions[result["ticket"]] = pos
 
         return result
 
@@ -153,113 +288,119 @@ class LiveExecutorAdapter:
         events = []
         to_remove = []
 
-        for ticket, pos in self.open_positions.items():
-            price = current_prices.get(pos.symbol)
-            if price is None:
-                continue
+        with self._positions_lock:
+            for ticket, pos in self.open_positions.items():
+                price = current_prices.get(pos.symbol)
+                if price is None:
+                    continue
 
-            pos.current_price = price
-            if pos.direction == "BUY":
-                pos.floating_pnl = (price - pos.entry_price) * pos.lot_size
-            else:
-                pos.floating_pnl = (pos.entry_price - price) * pos.lot_size
+                pos.current_price = price
+                from bridge.risk_bridge import calculate_pnl
+                pos.floating_pnl = calculate_pnl(
+                    pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction
+                )
 
-            # -- TP1 partial close (50% at TP1, move SL to breakeven) --
-            if not pos.tp1_hit and pos.tp2_price > 0:
-                tp1_hit = False
-                if pos.direction == "BUY" and price >= pos.tp_price:
-                    tp1_hit = True
-                elif pos.direction == "SELL" and price <= pos.tp_price:
-                    tp1_hit = True
+                # -- TP1 partial close (50% at TP1, move SL to breakeven) --
+                if not pos.tp1_hit and pos.tp2_price > 0:
+                    tp1_hit = False
+                    if pos.direction == "BUY" and price >= pos.tp_price:
+                        tp1_hit = True
+                    elif pos.direction == "SELL" and price <= pos.tp_price:
+                        tp1_hit = True
 
-                if tp1_hit:
-                    pos.tp1_hit = True
-                    partial_pnl = abs(pos.tp_price - pos.entry_price) * (pos.lot_size * 0.5)
-                    if pos.direction == "SELL":
-                        partial_pnl = (pos.entry_price - pos.tp_price) * (pos.lot_size * 0.5)
+                    if tp1_hit:
+                        pos.tp1_hit = True
+                        partial_pnl = calculate_pnl(
+                            pos.symbol.split(":")[-1], pos.entry_price, pos.tp_price,
+                            pos.lot_size * 0.5, pos.direction
+                        )
 
-                    # Partial close 50% on MT5
-                    self._mt5_partial_close(ticket, pos, pos.lot_size * 0.5)
-                    self.balance += partial_pnl
-                    pos.lot_size = round(pos.lot_size * 0.5, 4)
-                    pos.trailing_sl = pos.entry_price  # breakeven
+                        # Partial close 50% on MT5
+                        self._mt5_partial_close(ticket, pos, pos.lot_size * 0.5)
+                        self.balance += partial_pnl
+                        pos.lot_size = round(pos.lot_size * 0.5, 4)
+                        pos.trailing_sl = pos.entry_price  # breakeven
 
-                    # Update SL to breakeven on MT5
-                    self._mt5_modify_sl(ticket, pos.entry_price)
+                        # Update SL to breakeven on MT5
+                        self._mt5_modify_sl(ticket, pos.entry_price)
 
+                        print(
+                            f"  [LIVE TP1] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} "
+                            f"partial PnL={partial_pnl:+.2f} — SL moved to breakeven",
+                            flush=True,
+                        )
+
+                # -- Check TP2/final TP hit --
+                tp_final = pos.tp2_price if (pos.tp2_price > 0 and pos.tp1_hit) else pos.tp_price
+                closed_reason = None
+                if pos.direction == "BUY":
+                    if price <= pos.trailing_sl and pos.trailing_sl != pos.sl_price:
+                        closed_reason = "TRAILING_SL"
+                    elif price <= pos.sl_price:
+                        closed_reason = "SL"
+                    elif price >= tp_final:
+                        closed_reason = "TP2" if pos.tp1_hit else "TP"
+                else:
+                    if price >= pos.trailing_sl and pos.trailing_sl != pos.sl_price:
+                        closed_reason = "TRAILING_SL"
+                    elif price >= pos.sl_price:
+                        closed_reason = "SL"
+                    elif price <= tp_final:
+                        closed_reason = "TP2" if pos.tp1_hit else "TP"
+
+                if closed_reason:
+                    pnl = pos.floating_pnl
+                    risk_pnl = abs(calculate_pnl(
+                        pos.symbol, pos.entry_price, pos.sl_price, pos.lot_size, pos.direction
+                    ))
+                    r_mult = pnl / risk_pnl if risk_pnl > 0 else 0.0
+                    closed_at = datetime.now(timezone.utc).isoformat()
+                    exit_level = pos.sl_price if closed_reason == "SL" else (
+                        pos.trailing_sl if closed_reason == "TRAILING_SL" else tp_final)
+                    to_remove.append(ticket)
+                    self.balance += pnl
+                    self.peak_balance = max(self.peak_balance, self.balance)
+                    if pnl >= 0:
+                        self.wins += 1
+                        self.consecutive_losses = 0
+                        if pos.ict_grade == "A":
+                            self.grade_a_wins += 1
+                    else:
+                        self.losses += 1
+                        self.consecutive_losses += 1
+                        if pos.ict_grade == "A":
+                            self.grade_a_losses += 1
+                        # Set per-symbol loss cooldown
+                        self.set_symbol_loss_cooldown(pos.symbol)
+                    events.append({
+                        "ticket": ticket, "symbol": pos.symbol,
+                        "direction": pos.direction,
+                        "entry_price": pos.entry_price,
+                        "exit_price": exit_level,
+                        "actual_trigger_price": price,
+                        "pnl": round(pnl, 2), "r_multiple": round(r_mult, 2),
+                        "reason": closed_reason, "balance": round(self.balance, 2),
+                        "opened_at": pos.opened_at, "closed_at": closed_at,
+                        "sl_price": pos.sl_price, "tp_price": pos.tp_price,
+                        "tp2_price": pos.tp2_price, "lot_size": pos.lot_size,
+                        "ict_grade": pos.ict_grade, "ict_score": pos.ict_score,
+                        "trailing_sl": pos.trailing_sl, "tp1_hit": pos.tp1_hit,
+                    })
+                    continue
+
+                # -- Update trailing stop and sync to MT5 --
+                old_trailing = pos.trailing_sl
+                self._update_trailing_stop(pos)
+                if pos.trailing_sl != old_trailing:
+                    self._mt5_modify_sl(ticket, pos.trailing_sl)
                     print(
-                        f"  [LIVE TP1] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} "
-                        f"partial PnL={partial_pnl:+.2f} — SL moved to breakeven",
+                        f"  [LIVE TRAIL] {pos.symbol} #{ticket} trailing SL "
+                        f"{old_trailing:.2f} → {pos.trailing_sl:.2f} (synced to MT5)",
                         flush=True,
                     )
 
-            # -- Check TP2/final TP hit --
-            tp_final = pos.tp2_price if (pos.tp2_price > 0 and pos.tp1_hit) else pos.tp_price
-            closed_reason = None
-            if pos.direction == "BUY":
-                if price <= pos.trailing_sl and pos.trailing_sl != pos.sl_price:
-                    closed_reason = "TRAILING_SL"
-                elif price <= pos.sl_price:
-                    closed_reason = "SL"
-                elif price >= tp_final:
-                    closed_reason = "TP2" if pos.tp1_hit else "TP"
-            else:
-                if price >= pos.trailing_sl and pos.trailing_sl != pos.sl_price:
-                    closed_reason = "TRAILING_SL"
-                elif price >= pos.sl_price:
-                    closed_reason = "SL"
-                elif price <= tp_final:
-                    closed_reason = "TP2" if pos.tp1_hit else "TP"
-
-            if closed_reason:
-                pnl = pos.floating_pnl
-                risk = abs(pos.entry_price - pos.sl_price)
-                r_mult = pnl / (risk * pos.lot_size) if risk > 0 and pos.lot_size > 0 else 0.0
-                closed_at = datetime.now(timezone.utc).isoformat()
-                exit_level = pos.sl_price if closed_reason == "SL" else (
-                    pos.trailing_sl if closed_reason == "TRAILING_SL" else tp_final)
-                to_remove.append(ticket)
-                self.balance += pnl
-                self.peak_balance = max(self.peak_balance, self.balance)
-                if pnl >= 0:
-                    self.wins += 1
-                    self.consecutive_losses = 0
-                    if pos.ict_grade == "A":
-                        self.grade_a_wins += 1
-                else:
-                    self.losses += 1
-                    self.consecutive_losses += 1
-                    if pos.ict_grade == "A":
-                        self.grade_a_losses += 1
-                events.append({
-                    "ticket": ticket, "symbol": pos.symbol,
-                    "direction": pos.direction,
-                    "entry_price": pos.entry_price,
-                    "exit_price": exit_level,
-                    "actual_trigger_price": price,
-                    "pnl": round(pnl, 2), "r_multiple": round(r_mult, 2),
-                    "reason": closed_reason, "balance": round(self.balance, 2),
-                    "opened_at": pos.opened_at, "closed_at": closed_at,
-                    "sl_price": pos.sl_price, "tp_price": pos.tp_price,
-                    "tp2_price": pos.tp2_price, "lot_size": pos.lot_size,
-                    "ict_grade": pos.ict_grade, "ict_score": pos.ict_score,
-                    "trailing_sl": pos.trailing_sl, "tp1_hit": pos.tp1_hit,
-                })
-                continue
-
-            # -- Update trailing stop and sync to MT5 --
-            old_trailing = pos.trailing_sl
-            self._update_trailing_stop(pos)
-            if pos.trailing_sl != old_trailing:
-                self._mt5_modify_sl(ticket, pos.trailing_sl)
-                print(
-                    f"  [LIVE TRAIL] {pos.symbol} #{ticket} trailing SL "
-                    f"{old_trailing:.2f} → {pos.trailing_sl:.2f} (synced to MT5)",
-                    flush=True,
-                )
-
-        for t in to_remove:
-            self.open_positions.pop(t, None)
+            for t in to_remove:
+                self.open_positions.pop(t, None)
 
         return events
 
@@ -279,7 +420,7 @@ class LiveExecutorAdapter:
         else:
             trail_level = pos.entry_price - (r - 0.5) * risk
             new_sl = min(new_sl, trail_level)
-            if new_sl < pos.trailing_sl or pos.trailing_sl == pos.sl_price:
+            if new_sl < pos.trailing_sl:
                 pos.trailing_sl = round(new_sl, 5)
 
     def _mt5_modify_sl(self, ticket: int, new_sl: float) -> None:
@@ -322,7 +463,7 @@ class LiveExecutorAdapter:
         t.join(timeout=15)
 
     def get_account_summary(self) -> dict:
-        daily_pnl_pct = self.daily_pnl / self.initial_balance if self.initial_balance else 0
+        daily_pnl_pct = self.daily_pnl / self._day_start_balance if self._day_start_balance else 0
         total_dd = (self.peak_balance - self.balance) / self.peak_balance if self.peak_balance > 0 else 0
         grade_a_total = self.grade_a_wins + self.grade_a_losses
         return {

@@ -83,6 +83,8 @@ class StateStore:
             "losses": executor.losses,
             "grade_a_wins": getattr(executor, "grade_a_wins", 0),
             "grade_a_losses": getattr(executor, "grade_a_losses", 0),
+            "day_start_balance": getattr(executor, "_day_start_balance", executor.balance),
+            "day_start_date": getattr(executor, "_day_start_date", ""),
             "open_positions": positions,
         }
         tmp_path = self._path.with_suffix(".tmp")
@@ -137,15 +139,52 @@ class StateStore:
         if state.get("mode") != mode:
             return []
 
-        # Always restore balance and stats (persists across days)
-        executor.balance = state.get("balance", executor.balance)
-        executor.initial_balance = state.get("initial_balance", executor.initial_balance)
-        executor.peak_balance = state.get("peak_balance", executor.peak_balance)
+        # Restore balance and stats — but for live mode, prefer the MT5-synced
+        # balance already set on the executor over stale persisted values.
+        if mode == "live" and hasattr(executor, '_get_mt5_balance'):
+            mt5_bal = executor._get_mt5_balance()
+            if mt5_bal is not None:
+                executor.balance = mt5_bal
+                # Infer correct initial_balance from MT5 account size.
+                # FTMO accounts are 10k/25k/50k/100k/200k — pick the nearest.
+                stored_initial = state.get("initial_balance", executor.initial_balance)
+                if mt5_bal > stored_initial * 2:
+                    for tier in [200_000, 100_000, 50_000, 25_000, 10_000]:
+                        if mt5_bal >= tier * 0.85:
+                            stored_initial = float(tier)
+                            break
+                    print(f"  [STATE] Corrected initial_balance to ${stored_initial:,.0f} (was ${state.get('initial_balance', 0):,.0f})", flush=True)
+                executor.initial_balance = stored_initial
+                executor.peak_balance = max(state.get("peak_balance", mt5_bal), mt5_bal)
+                print(f"  [STATE] Live balance synced from MT5: ${mt5_bal:,.2f}", flush=True)
+            else:
+                executor.balance = state.get("balance", executor.balance)
+                executor.initial_balance = state.get("initial_balance", executor.initial_balance)
+                executor.peak_balance = state.get("peak_balance", executor.peak_balance)
+        else:
+            executor.balance = state.get("balance", executor.balance)
+            executor.initial_balance = state.get("initial_balance", executor.initial_balance)
+            executor.peak_balance = state.get("peak_balance", executor.peak_balance)
         executor.wins = state.get("wins", 0)
         executor.losses = state.get("losses", 0)
         if hasattr(executor, "grade_a_wins"):
             executor.grade_a_wins = state.get("grade_a_wins", 0)
             executor.grade_a_losses = state.get("grade_a_losses", 0)
+
+        # Restore day-start balance for daily P&L tracking.
+        # If the saved date is today, use the persisted day-start balance.
+        # If it's a new day, use the current MT5 balance as the new baseline.
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if hasattr(executor, "_day_start_balance"):
+            saved_day = state.get("day_start_date", "")
+            if saved_day == today:
+                executor._day_start_balance = state.get("day_start_balance", executor.balance)
+                executor._day_start_date = saved_day
+            else:
+                # New day — current balance IS the day-start baseline
+                executor._day_start_balance = executor.balance
+                executor._day_start_date = today
+                print(f"  [STATE] New day — day-start balance: ${executor._day_start_balance:,.2f}", flush=True)
 
         # Restore positions even across days — swing trades can span multiple days.
         # The position manager will reconcile against MT5 on the next check cycle.

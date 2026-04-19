@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -51,6 +52,7 @@ class PaperExecutor:
         self.peak_balance = initial_balance
         self.max_positions = max_positions
 
+        self._positions_lock = threading.Lock()
         self.open_positions: dict[int, PaperPosition] = {}
         self.closed_positions: list[ClosedPosition] = []
         self._next_ticket = self._load_ticket_counter()
@@ -131,25 +133,26 @@ class PaperExecutor:
         if not decision.is_trade:
             return {"success": False, "ticket": 0, "message": "Decision is not a trade"}
 
-        if len(self.open_positions) >= self.max_positions:
-            return {"success": False, "ticket": 0,
-                    "message": f"Max {self.max_positions} positions reached"}
-
-        # Check for duplicate: same symbol+direction with similar entry price
-        for pos in self.open_positions.values():
-            if pos.symbol == decision.symbol and pos.direction == decision.action:
-                entry_diff = abs(pos.entry_price - decision.entry_price)
-                threshold = pos.entry_price * 0.005  # 0.5% tolerance
-                if entry_diff < threshold:
-                    return {"success": False, "ticket": 0,
-                            "message": f"Duplicate: already {pos.direction} {decision.symbol} "
-                                       f"@ {pos.entry_price:.4f} (new entry {decision.entry_price:.4f} "
-                                       f"within 0.5%)"}
-            # Also block opposite direction on same symbol (already exposed)
-            elif pos.symbol == decision.symbol:
+        with self._positions_lock:
+            if len(self.open_positions) >= self.max_positions:
                 return {"success": False, "ticket": 0,
-                        "message": f"Already have {pos.direction} position on {decision.symbol} "
-                                   f"— close it before reversing"}
+                        "message": f"Max {self.max_positions} positions reached"}
+
+            # Check for duplicate: same symbol+direction with similar entry price
+            for pos in self.open_positions.values():
+                if pos.symbol == decision.symbol and pos.direction == decision.action:
+                    entry_diff = abs(pos.entry_price - decision.entry_price)
+                    threshold = pos.entry_price * 0.005  # 0.5% tolerance
+                    if entry_diff < threshold:
+                        return {"success": False, "ticket": 0,
+                                "message": f"Duplicate: already {pos.direction} {decision.symbol} "
+                                           f"@ {pos.entry_price:.4f} (new entry {decision.entry_price:.4f} "
+                                           f"within 0.5%)"}
+                # Also block opposite direction on same symbol (already exposed)
+                elif pos.symbol == decision.symbol:
+                    return {"success": False, "ticket": 0,
+                            "message": f"Already have {pos.direction} position on {decision.symbol} "
+                                       f"— close it before reversing"}
 
         ticket = self._next_ticket
         self._next_ticket += 1
@@ -193,7 +196,8 @@ class PaperExecutor:
             trailing_sl=decision.sl_price,
         )
 
-        self.open_positions[ticket] = position
+        with self._positions_lock:
+            self.open_positions[ticket] = position
         self._log_event("OPEN", {
             **position.to_dict(),
             "risk_pct": position.risk_pct,
@@ -229,76 +233,72 @@ class PaperExecutor:
         events: list[dict] = []
         to_close: list[tuple[int, str, float]] = []  # (ticket, reason, exit_price)
 
-        for ticket, pos in self.open_positions.items():
-            price = current_prices.get(pos.symbol)
-            if price is None:
-                continue
-
-            pos.current_price = price
-
-            # Calculate floating P&L
-            if pos.direction == "BUY":
-                pos.floating_pnl = (price - pos.entry_price) * pos.lot_size
-            else:
-                pos.floating_pnl = (pos.entry_price - price) * pos.lot_size
-
-            # Check TP1 hit (partial close at 50%)
-            if not pos.tp1_hit and pos.tp2_price > 0:
-                if pos.direction == "BUY" and price >= pos.tp_price:
-                    pos.tp1_hit = True
-                    partial_pnl = (pos.tp_price - pos.entry_price) * (pos.lot_size * 0.5)
-                    self.balance += partial_pnl
-                    pos.lot_size = round(pos.lot_size * 0.5, 4)
-                    pos.trailing_sl = pos.entry_price  # move to breakeven
-                    self._log_event("PARTIAL_CLOSE", {
-                        "ticket": ticket, "symbol": pos.symbol,
-                        "exit_price": pos.tp_price, "pnl": round(partial_pnl, 2),
-                        "reason": "TP1_PARTIAL", "remaining_lots": pos.lot_size,
-                    })
-                    print(f"  [PARTIAL] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} partial PnL={partial_pnl:+.2f}", flush=True)
-                elif pos.direction == "SELL" and price <= pos.tp_price:
-                    pos.tp1_hit = True
-                    partial_pnl = (pos.entry_price - pos.tp_price) * (pos.lot_size * 0.5)
-                    self.balance += partial_pnl
-                    pos.lot_size = round(pos.lot_size * 0.5, 4)
-                    pos.trailing_sl = pos.entry_price  # move to breakeven
-                    self._log_event("PARTIAL_CLOSE", {
-                        "ticket": ticket, "symbol": pos.symbol,
-                        "exit_price": pos.tp_price, "pnl": round(partial_pnl, 2),
-                        "reason": "TP1_PARTIAL", "remaining_lots": pos.lot_size,
-                    })
-                    print(f"  [PARTIAL] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} partial PnL={partial_pnl:+.2f}", flush=True)
-
-            # Check TP2 hit (full close of remaining)
-            tp_final = pos.tp2_price if (pos.tp2_price > 0 and pos.tp1_hit) else pos.tp_price
-            if pos.direction == "BUY" and price >= tp_final:
-                to_close.append((ticket, "TP2" if pos.tp1_hit else "TP", tp_final))
-                continue
-            elif pos.direction == "SELL" and price <= tp_final:
-                to_close.append((ticket, "TP2" if pos.tp1_hit else "TP", tp_final))
-                continue
-
-            # Check SL hit
-            if pos.direction == "BUY" and price <= pos.sl_price:
-                to_close.append((ticket, "SL", pos.sl_price))
-                continue
-            elif pos.direction == "SELL" and price >= pos.sl_price:
-                to_close.append((ticket, "SL", pos.sl_price))
-                continue
-
-            # Check trailing SL
-            if pos.trailing_sl != pos.sl_price:
-                if pos.direction == "BUY" and price <= pos.trailing_sl:
-                    to_close.append((ticket, "TRAILING_SL", pos.trailing_sl))
-                    continue
-                elif pos.direction == "SELL" and price >= pos.trailing_sl:
-                    to_close.append((ticket, "TRAILING_SL", pos.trailing_sl))
+        with self._positions_lock:
+            for ticket, pos in self.open_positions.items():
+                price = current_prices.get(pos.symbol)
+                if price is None:
                     continue
 
-            # Update trailing stop (move to breakeven at 1R, trail at 0.5R increments)
-            self._update_trailing_stop(pos)
+                pos.current_price = price
 
-        # Close positions
+                # Calculate floating P&L using proper tick_value conversion
+                from bridge.risk_bridge import calculate_pnl
+                pos.floating_pnl = calculate_pnl(
+                    pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction
+                )
+
+                # Check TP1 hit (partial close at 50%)
+                if not pos.tp1_hit and pos.tp2_price > 0:
+                    tp1_triggered = (
+                        (pos.direction == "BUY" and price >= pos.tp_price) or
+                        (pos.direction == "SELL" and price <= pos.tp_price)
+                    )
+                    if tp1_triggered:
+                        pos.tp1_hit = True
+                        partial_pnl = calculate_pnl(
+                            pos.symbol.split(":")[-1], pos.entry_price, pos.tp_price,
+                            pos.lot_size * 0.5, pos.direction
+                        )
+                        self.balance += partial_pnl
+                        pos.lot_size = round(pos.lot_size * 0.5, 4)
+                        pos.trailing_sl = pos.entry_price  # move to breakeven
+                        self._log_event("PARTIAL_CLOSE", {
+                            "ticket": ticket, "symbol": pos.symbol,
+                            "exit_price": pos.tp_price, "pnl": round(partial_pnl, 2),
+                            "reason": "TP1_PARTIAL", "remaining_lots": pos.lot_size,
+                        })
+                        print(f"  [PARTIAL] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} partial PnL={partial_pnl:+.2f}", flush=True)
+
+                # Check TP2 hit (full close of remaining)
+                tp_final = pos.tp2_price if (pos.tp2_price > 0 and pos.tp1_hit) else pos.tp_price
+                if pos.direction == "BUY" and price >= tp_final:
+                    to_close.append((ticket, "TP2" if pos.tp1_hit else "TP", tp_final))
+                    continue
+                elif pos.direction == "SELL" and price <= tp_final:
+                    to_close.append((ticket, "TP2" if pos.tp1_hit else "TP", tp_final))
+                    continue
+
+                # Check SL hit
+                if pos.direction == "BUY" and price <= pos.sl_price:
+                    to_close.append((ticket, "SL", pos.sl_price))
+                    continue
+                elif pos.direction == "SELL" and price >= pos.sl_price:
+                    to_close.append((ticket, "SL", pos.sl_price))
+                    continue
+
+                # Check trailing SL
+                if pos.trailing_sl != pos.sl_price:
+                    if pos.direction == "BUY" and price <= pos.trailing_sl:
+                        to_close.append((ticket, "TRAILING_SL", pos.trailing_sl))
+                        continue
+                    elif pos.direction == "SELL" and price >= pos.trailing_sl:
+                        to_close.append((ticket, "TRAILING_SL", pos.trailing_sl))
+                        continue
+
+                # Update trailing stop (move to breakeven at 1R, trail at 0.5R increments)
+                self._update_trailing_stop(pos)
+
+        # Close positions (outside lock — _close_position acquires its own lock)
         for ticket, reason, exit_price in to_close:
             event = self._close_position(ticket, reason, exit_price)
             if event:
@@ -332,7 +332,8 @@ class PaperExecutor:
 
     def _close_position(self, ticket: int, reason: str, exit_price: float) -> dict | None:
         """Close a position and record the result."""
-        pos = self.open_positions.pop(ticket, None)
+        with self._positions_lock:
+            pos = self.open_positions.pop(ticket, None)
         if pos is None:
             return None
 
@@ -341,13 +342,15 @@ class PaperExecutor:
         actual_price = pos.current_price  # last known market price
         closed_at = datetime.now(timezone.utc).isoformat()
 
-        if pos.direction == "BUY":
-            pnl = (exit_price - pos.entry_price) * pos.lot_size
-        else:
-            pnl = (pos.entry_price - exit_price) * pos.lot_size
+        from bridge.risk_bridge import calculate_pnl
+        pnl = calculate_pnl(
+            pos.symbol.split(":")[-1], pos.entry_price, exit_price, pos.lot_size, pos.direction
+        )
 
-        risk = abs(pos.entry_price - pos.sl_price)
-        r_mult = pnl / (risk * pos.lot_size) if risk > 0 and pos.lot_size > 0 else 0.0
+        risk_pnl = abs(calculate_pnl(
+            pos.symbol, pos.entry_price, pos.sl_price, pos.lot_size, pos.direction
+        ))
+        r_mult = pnl / risk_pnl if risk_pnl > 0 else 0.0
 
         closed = ClosedPosition(
             ticket=ticket,

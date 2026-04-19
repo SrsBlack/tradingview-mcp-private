@@ -22,24 +22,37 @@ from pathlib import Path
 LOCK_FILE = Path.home() / ".tradingview-mcp" / "bridge.lock"
 
 
+def _is_pid_alive(pid: int) -> bool:
+    """Check if a PID is still running (Windows-compatible)."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"Get-Process -Id {pid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return str(pid) in result.stdout.strip()
+    except Exception:
+        # Fallback: assume alive to be safe
+        return True
+
+
 def _acquire_lock() -> None:
     """Prevent multiple bridge instances from running simultaneously."""
     LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
     if LOCK_FILE.exists():
         try:
             old_pid = int(LOCK_FILE.read_text().strip())
-            # Check if that PID is still alive (Windows-compatible)
-            try:
-                os.kill(old_pid, 0)
+            if _is_pid_alive(old_pid):
                 print(f"[LOCK] Another bridge is already running (PID {old_pid}).", flush=True)
                 print(f"[LOCK] If this is stale, delete: {LOCK_FILE}", flush=True)
                 sys.exit(1)
-            except OSError:
-                # Process is dead — stale lock, safe to overwrite
+            else:
                 print(f"[LOCK] Stale lock from PID {old_pid} — overwriting.", flush=True)
         except (ValueError, OSError):
             pass  # Corrupt lock file, overwrite
     LOCK_FILE.write_text(str(os.getpid()))
+    atexit.register(_kill_child_node_processes)
     atexit.register(_release_lock)
     print(f"[LOCK] Acquired (PID {os.getpid()})", flush=True)
 
@@ -51,6 +64,33 @@ def _release_lock() -> None:
             stored_pid = int(LOCK_FILE.read_text().strip())
             if stored_pid == os.getpid():
                 LOCK_FILE.unlink()
+    except Exception:
+        pass
+
+
+def _kill_child_node_processes() -> None:
+    """Kill orphaned node.exe subprocesses spawned by TVClient.
+
+    On Windows, `subprocess.run(shell=True)` spawns cmd.exe → npm → node chains.
+    When the bridge is killed (taskkill), these child processes aren't cleaned up
+    and continue sending CDP commands to TradingView, causing chart chaos.
+    """
+    try:
+        import subprocess
+        my_pid = os.getpid()
+        result = subprocess.run(
+            ["wmic", "process", "where",
+             f"(Name='node.exe' or Name='node20.exe') and ParentProcessId={my_pid}",
+             "get", "ProcessId"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.isdigit():
+                try:
+                    os.kill(int(line), 9)
+                except OSError:
+                    pass
     except Exception:
         pass
 

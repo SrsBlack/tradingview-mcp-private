@@ -53,10 +53,10 @@ _TV_TO_ALPACA: dict[str, str] = {
 }
 
 # Map TradingView base symbols to Finnhub ETF proxies + conversion factor
-# US500 ≈ SPY * 10 (SPY is S&P 500 / 10), US100 ≈ QQQ * 30 (approximate)
+# US500 ≈ SPY * 10 (SPY is S&P 500 / 10), US100 ≈ QQQ * 41 (updated 2026-04)
 _TV_TO_FINNHUB: dict[str, tuple[str, float]] = {
     "US500": ("SPY", 10.0),   # SPY ≈ S&P 500 / 10
-    "US100": ("QQQ", 30.0),   # QQQ ≈ Nasdaq 100 / 30
+    "US100": ("QQQ", 41.0),   # QQQ ≈ Nasdaq 100 / 41 (updated 2026-04)
 }
 
 # TV base symbol → MT5/FTMO symbol name
@@ -64,12 +64,18 @@ _TV_TO_FINNHUB: dict[str, tuple[str, float]] = {
 _TV_TO_MT5: dict[str, str] = {
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
+    "USDJPY": "USDJPY",
+    "AUDUSD": "AUDUSD",
+    "NZDUSD": "NZDUSD",
     "XAUUSD": "XAUUSD",
+    "XAGUSD": "XAGUSD",
     "UKOIL":  "UKOIL.cash",
     "YM1!":   "US30.cash",
     "US500":  "US500.cash",
     "US100":  "US100.cash",
     "US30":   "US30.cash",
+    "GER40":  "GER40.cash",
+    "DAX":    "GER40.cash",
 }
 
 # Maximum allowed deviation between TV and external price (as fraction of price).

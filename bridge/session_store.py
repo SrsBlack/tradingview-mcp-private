@@ -24,6 +24,8 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -32,6 +34,10 @@ from typing import Any
 # Analyses can be 100+ per hour across all symbols — cap to prevent bloat
 MAX_ANALYSES = 500
 MAX_SNAPSHOTS = 200
+
+# Thread-safety: all writes to a single SessionStore serialized through this
+# lock. The lock is per-instance (via __init__) to allow future multi-store
+# use, but 99% of the time there's only one store so the effect is global.
 
 
 class SessionStore:
@@ -56,6 +62,7 @@ class SessionStore:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self._today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self._session_file = self.base_dir / f"{self._today}.json"
+        self._save_lock = threading.Lock()
         self._data = self._load_or_create()
 
     def _load_or_create(self) -> dict:
@@ -91,15 +98,60 @@ class SessionStore:
         }
 
     def _save(self) -> None:
-        """Atomic write: write to tmp, backup old, then rename."""
+        """Thread-safe atomic write with retry on Windows file-lock errors.
+
+        Windows os.replace() raises PermissionError (WinError 5) when the
+        target file is briefly held by another process (antivirus scan,
+        indexer, another thread). We serialize writes with a lock and
+        retry with backoff, falling back to direct write if replace keeps
+        failing.
+        """
+        with self._save_lock:
+            self._save_locked()
+
+    def _save_locked(self) -> None:
         tmp_path = self._session_file.with_suffix(".tmp")
         backup_path = self._session_file.with_suffix(".backup.json")
         try:
             payload = json.dumps(self._data, indent=2, default=str)
             tmp_path.write_text(payload, encoding="utf-8")
             if self._session_file.exists():
-                shutil.copy2(self._session_file, backup_path)
-            os.replace(tmp_path, self._session_file)
+                try:
+                    shutil.copy2(self._session_file, backup_path)
+                except PermissionError:
+                    # Backup is best-effort; don't fail the save over it.
+                    pass
+
+            # Atomic rename with retry for Windows file-lock transients.
+            last_err: Exception | None = None
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, self._session_file)
+                    return
+                except PermissionError as e:
+                    last_err = e
+                    time.sleep(0.1 * (attempt + 1))
+
+            # Atomic replace kept failing — fall back to direct write.
+            # Less safe but better than repeatedly dropping snapshots.
+            try:
+                self._session_file.write_text(payload, encoding="utf-8")
+                if tmp_path.exists():
+                    try:
+                        tmp_path.unlink()
+                    except OSError:
+                        pass
+                print(
+                    f"[SessionStore] WARNING: atomic replace failed after 5 "
+                    f"retries ({last_err}); used direct write fallback",
+                    flush=True,
+                )
+            except Exception as e2:
+                print(
+                    f"[SessionStore] ERROR: save failed completely: "
+                    f"replace={last_err}, fallback={e2}",
+                    flush=True,
+                )
         except Exception as e:
             print(f"[SessionStore] WARNING: save failed: {e}", flush=True)
             if tmp_path.exists():

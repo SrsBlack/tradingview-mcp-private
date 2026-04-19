@@ -183,6 +183,12 @@ class Orchestrator:
             if paper_restored:
                 print(f"[PAPER] Restored {len(paper_restored)} shadow position(s) from state", flush=True)
 
+        # Reconcile MT5 positions not in bridge state (adopted from broker)
+        if self.mode == "live":
+            mt5_adopted = self.position_manager.reconcile_mt5_on_startup(self.symbols)
+            if mt5_adopted:
+                restored_positions.extend(mt5_adopted)
+
         # Mirror live MT5 positions into paper shadow
         if self.paper_shadow is not self.executor and restored_positions:
             self.position_manager.mirror_live_to_paper(
@@ -199,7 +205,7 @@ class Orchestrator:
                 None, self.position_manager.reconcile_restored
             )
 
-        # Clean up stale trade drawings
+        # Clean up stale trade drawings (scan all watchlist symbols for orphans)
         try:
             active_tickets: set[str] = set()
             for ticket in self.executor.open_positions:
@@ -208,7 +214,8 @@ class Orchestrator:
                 for ticket in self.paper_shadow.open_positions:
                     active_tickets.add(str(ticket))
             await asyncio.get_running_loop().run_in_executor(
-                None, self.drawings.cleanup_stale, active_tickets
+                None,
+                lambda: self.drawings.cleanup_stale(active_tickets, watchlist=self.symbols),
             )
         except Exception as e:
             print(f"  [DRAW] Startup cleanup error (non-fatal): {e}", flush=True)
@@ -398,7 +405,7 @@ class Orchestrator:
         print(f"  Symbols : {', '.join(self.symbols)}", flush=True)
         print(f"  Balance : ${self.executor.balance:,.2f}  "
               f"(initial=${self.executor.initial_balance:,.2f})", flush=True)
-        daily_pnl = self.executor.balance - self.executor.initial_balance
+        daily_pnl = self.executor.daily_pnl
         pnl_sign = "+" if daily_pnl >= 0 else ""
         print(f"  Daily P&L: {pnl_sign}${daily_pnl:,.2f}  "
               f"W={self.executor.wins} L={self.executor.losses}", flush=True)

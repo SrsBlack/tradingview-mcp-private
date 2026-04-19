@@ -82,6 +82,12 @@ class AnalysisPipeline:
         if self._check_kill_switch(symbol):
             return
 
+        # Per-symbol loss cooldown — skip if this symbol recently hit SL
+        if hasattr(self.executor, 'is_symbol_on_loss_cooldown'):
+            if self.executor.is_symbol_on_loss_cooldown(symbol):
+                print(f"  [{symbol}] On post-loss cooldown — skipping", flush=True)
+                return
+
         # Run ICT pipeline + skip gates
         analysis, ea_signals = self._run_ict_analysis(symbol)
         if analysis is None:
@@ -139,11 +145,18 @@ class AnalysisPipeline:
             skip_reason = f"PRICE_ERROR: got {analysis.current_price:.4f}, expected {rng[0]}-{rng[1]}"
             print(f"  [{symbol}] {skip_reason}. Chart not switched correctly, skipping.", flush=True)
         elif not analysis.sweep_detected:
-            skip_reason = "NO_SWEEP"
-            print(f"  [{symbol}] NO_SWEEP — skipping (no liquidity sweep detected)", flush=True)
-        else:
+            # No sweep is a warning, not a hard gate — the score already penalizes
+            # missing sweeps. Grade D setups are still filtered downstream.
+            print(f"  [{symbol}] NO_SWEEP — reduced confidence (no liquidity sweep detected)", flush=True)
+
+        if not skip_reason:
             try:
-                ea_signals = self.strategy_engine.process_symbol(symbol)
+                # Reuse ICT pipeline's verified OHLCV data instead of re-collecting
+                # from TradingView (avoids chart contention and contamination)
+                verified_dfs = getattr(self.pipeline, '_last_collected_dfs', None)
+                ea_signals = self.strategy_engine.process_symbol(
+                    symbol, dataframes=verified_dfs if verified_dfs else None
+                )
             except Exception as e:
                 print(f"  [{symbol}] EA ensemble error: {e}", flush=True)
 
@@ -172,7 +185,7 @@ class AnalysisPipeline:
             f"struct={analysis.structure_score:.0f} ob={analysis.ob_score:.0f} fvg={analysis.fvg_score:.0f} "
             f"sess={analysis.session_score:.0f} ote={analysis.ote_score:.0f} smt={analysis.smt_score:.0f} "
             f"sweep={'Y' if analysis.sweep_detected else 'N'} disp={'Y' if analysis.displacement_confirmed else 'N'} "
-            f"pd={analysis.pd_zone or '?'}{'✓' if analysis.pd_aligned else '✗'} kz={'Y' if analysis.is_kill_zone else 'N'}",
+            f"pd={analysis.pd_zone or '?'}{'Y' if analysis.pd_aligned else 'N'} kz={'Y' if analysis.is_kill_zone else 'N'}",
             flush=True,
         )
 
@@ -183,16 +196,17 @@ class AnalysisPipeline:
         return analysis, ea_signals
 
     def _apply_ea_override(self, symbol: str, analysis: SymbolAnalysis, ea_signals: list) -> None:
-        """If ICT is low-grade but EA ensemble has a strong signal, upgrade."""
+        """Add EA ensemble as informational context, DO NOT override ICT grade."""
         if analysis.grade in ("D", "INVALID") and ea_signals:
             sig = ea_signals[0]
             if sig.final_score >= 65:
-                print(f"  [{symbol}] EA ensemble override: {sig.grade.value} ({sig.final_score:.0f})", flush=True)
-                analysis.total_score = sig.final_score
-                analysis.grade = sig.grade.value
-                direction_str = "BULLISH" if sig.direction.value == "bullish" else "BEARISH"
-                analysis.direction = direction_str
-                analysis.confluence_factors.append(f"EA_ensemble({sig.strategy_count}_strategies)")
+                # Add as informational context, DO NOT override ICT grade
+                analysis.confluence_factors.append(
+                    f"EA_ensemble({sig.direction.value}, score={sig.final_score:.0f}) — ICT grade maintained"
+                )
+                print(f"  [{symbol}] EA ensemble agrees ({sig.direction.value}, {sig.final_score:.0f}) but ICT grade {analysis.grade} maintained", flush=True)
+                # Previously: analysis.direction = sig.direction; analysis.total_score = sig.final_score; analysis.grade = ...
+                # REMOVED: Grade override bypasses ICT quality gates
 
     def _apply_backtest_confidence(self, symbol: str, analysis: SymbolAnalysis) -> float:
         """Apply backtest confidence multiplier and re-grade. Returns the multiplier."""
@@ -224,8 +238,15 @@ class AnalysisPipeline:
             else:
                 adverse_move_pct = (analysis.current_price - anchor_price) / anchor_price * 100
 
-            if adverse_move_pct > 0.05:
-                decay_factor = min(adverse_move_pct / 0.1 * 0.03, 0.20)
+            # Use asset-class-aware decay threshold
+            asset_class = "crypto" if any(c in symbol.upper() for c in ["BTC", "ETH", "SOL", "DOGE"]) else "forex"
+            if asset_class == "crypto":
+                decay_threshold = 0.3  # 0.3% before decay starts (crypto is volatile)
+            else:
+                decay_threshold = 0.1  # 0.1% for forex/indices
+
+            if adverse_move_pct > (decay_threshold / 2):
+                decay_factor = min(adverse_move_pct / decay_threshold * 0.03, 0.20)
                 original_score = analysis.total_score
                 analysis.total_score *= (1.0 - decay_factor)
                 analysis.confluence_factors.append(
@@ -257,8 +278,9 @@ class AnalysisPipeline:
         """Call Claude for trade decision."""
         decision = self.decision_maker.evaluate(analysis)
 
-        if decision.is_trade:
-            self.cooldown.decisions[symbol] = time.time()
+        if not decision.is_trade:
+            # SKIP cooldown = 15 min (one M15 bar — structure doesn't change faster)
+            self.cooldown.decisions[symbol] = time.time() - self.cooldown.seconds + 900  # 15 min cooldown
 
         self.session.log_decision(decision.to_dict())
 
@@ -283,6 +305,8 @@ class AnalysisPipeline:
         try:
             shadow_result = self.paper_shadow.open_position(decision, lot_size=paper_lot)
             if shadow_result["success"]:
+                # Set cooldown after successful paper execution
+                self.cooldown.decisions[symbol] = time.time()
                 paper_ticket = shadow_result["ticket"]
                 print(f"  [{symbol}] Paper #{paper_ticket}: {decision.action} @ {decision.entry_price:.2f}", flush=True)
                 self.session.log_trade({
@@ -323,7 +347,10 @@ class AnalysisPipeline:
 
     def _check_kill_switch_trigger(self, symbol: str) -> bool:
         """Check if daily loss has reached 2% — halt trading if so."""
-        daily_pnl_pct = self.executor.daily_pnl / self.executor.initial_balance if self.executor.initial_balance else 0
+        # Use day-start balance as denominator (matches daily_pnl which is
+        # now balance - day_start_balance, not balance - initial_balance).
+        denom = getattr(self.executor, '_day_start_balance', self.executor.initial_balance)
+        daily_pnl_pct = self.executor.daily_pnl / denom if denom else 0
         if daily_pnl_pct <= -0.02 and not self.kill_switch.triggered:
             self.kill_switch.triggered = True
             self.kill_switch.date = now_utc().strftime("%Y-%m-%d")
@@ -341,6 +368,21 @@ class AnalysisPipeline:
     def _execute_live(self, symbol: str, decision: TradeDecision) -> None:
         """Apply risk gates and execute the trade if approved."""
         if not decision.is_trade:
+            return
+
+        # Per-symbol minimum grade gate
+        profile = self._rules.get("symbol_profiles", {}).get(symbol, {})
+        min_grade = profile.get("min_grade_live")
+        if min_grade:
+            grade_order = {"A": 0, "B": 1, "C": 2, "D": 3}
+            if grade_order.get(decision.grade, 3) > grade_order.get(min_grade, 0):
+                print(f"  [{symbol}] BLOCKED: Grade {decision.grade} below min_grade_live={min_grade}", flush=True)
+                return
+
+        # Minimum confidence gate for live trades
+        min_confidence = self._rules.get("min_live_confidence", 65)
+        if decision.confidence < min_confidence:
+            print(f"  [{symbol}] BLOCKED: Confidence {decision.confidence} below min {min_confidence}", flush=True)
             return
 
         # Per-symbol risk override
@@ -379,6 +421,8 @@ class AnalysisPipeline:
 
         result = self.executor.open_position(decision, lot_size=lot_size)
         if result["success"]:
+            # Set cooldown after successful live execution
+            self.cooldown.decisions[symbol] = time.time()
             print(f"  [{symbol}] OPENED: {result['message']}", flush=True)
             self.session.log_trade({
                 "event": "OPEN",
@@ -447,12 +491,22 @@ class AnalysisPipeline:
         else:
             analysis.grade = "INVALID"
 
-    def _fallback_paper_lots(self, decision: TradeDecision) -> float:
+    def _fallback_paper_lots(self, decision: TradeDecision, symbol: str = "") -> float:
         """Calculate a reasonable paper lot size when risk gate doesn't provide one."""
         if decision.entry_price <= 0 or decision.sl_price <= 0:
             return 1.0
+        from bridge.risk_bridge import PAPER_SYMBOL_SPECS, _clamp_to_hard_max
         risk_usd = self.paper_shadow.balance * (decision.risk_pct or 0.0075)
         sl_distance = abs(decision.entry_price - decision.sl_price)
-        if sl_distance <= 0:
-            return 1.0
-        return round(risk_usd / sl_distance, 4)
+        if sl_distance == 0:
+            return 0.01
+        sym = symbol or decision.symbol or ""
+        sym = sym.split(":")[-1] if ":" in sym else sym
+        spec = PAPER_SYMBOL_SPECS.get(sym)
+        if spec and spec.tick_size > 0 and spec.tick_value > 0:
+            sl_ticks = sl_distance / spec.tick_size
+            cost_per_lot = sl_ticks * spec.tick_value
+            if cost_per_lot > 0:
+                lots = round(risk_usd / cost_per_lot, 2)
+                return _clamp_to_hard_max(sym, lots)
+        return _clamp_to_hard_max(sym, round(risk_usd / sl_distance, 4))

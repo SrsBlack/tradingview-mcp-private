@@ -59,6 +59,9 @@ SYMBOL_MAP: dict[str, str] = {
     # Forex
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
+    "USDJPY": "USDJPY",
+    "AUDUSD": "AUDUSD",
+    "NZDUSD": "NZDUSD",
     # Gold / commodities
     "XAUUSD": "XAUUSD",
     "XAGUSD": "XAGUSD",
@@ -76,6 +79,10 @@ SYMBOL_MAP: dict[str, str] = {
     "US100":  "US100",
     "SPX500": "US500",
     "US500":  "US500",
+    # DAX
+    "GER40":  "GER40",
+    "FDAX1!": "GER40",
+    "DAX":    "GER40",
     # Crypto
     "BTCUSD":  "BTCUSD",
     "ETHUSD":  "ETHUSD",
@@ -89,6 +96,9 @@ SYMBOL_MAP: dict[str, str] = {
 TV_TO_FTMO: dict[str, str] = {
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
+    "USDJPY": "USDJPY",
+    "AUDUSD": "AUDUSD",
+    "NZDUSD": "NZDUSD",
     "XAUUSD": "XAUUSD",
     "XAGUSD": "XAGUSD",
     "UKOIL":  "UKOIL.cash",
@@ -96,6 +106,7 @@ TV_TO_FTMO: dict[str, str] = {
     "US30":   "US30.cash",
     "US500":  "US500.cash",
     "US100":  "US100.cash",
+    "GER40":  "GER40.cash",
     "BTCUSD": "BTCUSD",
     "ETHUSD": "ETHUSD",
     "SOLUSD": "SOLUSD",
@@ -106,7 +117,18 @@ TV_TO_FTMO: dict[str, str] = {
 def tv_to_ftmo_symbol(tv_symbol: str) -> str:
     """Convert a TradingView symbol to the FTMO/MT5 broker symbol name."""
     base = tv_symbol.split(":")[-1]
-    return TV_TO_FTMO.get(base, base)
+    # Normalize aliases (e.g. FDAX1! -> GER40, NQ1! -> US100) before FTMO lookup
+    internal = SYMBOL_MAP.get(base, base)
+    return TV_TO_FTMO.get(internal, TV_TO_FTMO.get(base, base))
+
+# Reverse: FTMO/MT5 symbol → TradingView symbol (for position reconciliation)
+FTMO_TO_TV: dict[str, str] = {v: k for k, v in TV_TO_FTMO.items()}
+
+
+def ftmo_to_tv_symbol(ftmo_symbol: str) -> str:
+    """Convert an FTMO/MT5 symbol back to TradingView symbol name."""
+    return FTMO_TO_TV.get(ftmo_symbol, ftmo_symbol)
+
 
 # Reverse: trading-ai-v2 name → TradingView name (for chart switching)
 REVERSE_SYMBOL_MAP: dict[str, str] = {v: k for k, v in SYMBOL_MAP.items()}
@@ -121,8 +143,13 @@ SMT_PAIRS: dict[str, str] = {
     "US100": "US500",
     "EURUSD": "GBPUSD",
     "GBPUSD": "EURUSD",
+    "USDJPY": "EURUSD",
+    "AUDUSD": "NZDUSD",
+    "NZDUSD": "AUDUSD",
     "XAUUSD": "XAGUSD",
     "XAGUSD": "XAUUSD",
+    "GER40": "US500",
+    "GER40.cash": "US500.cash",
     "BTCUSD": "ETHUSD",
     "ETHUSD": "BTCUSD",
     "SOLUSD": "BTCUSD",
@@ -158,13 +185,19 @@ PRICE_RANGES: dict[str, tuple[float, float]] = {
     "DOGEUSD": (0.001,  5),        # DOGE ATH ~0.74; 5 gives headroom
     "EURUSD":  (0.80,   1.60),     # EUR/USD never outside 0.82–1.60 in modern history
     "GBPUSD":  (1.00,   2.00),     # GBP/USD realistic range
+    "USDJPY":  (70,     200),      # USD/JPY realistic range
+    "AUDUSD":  (0.50,   1.10),     # AUD/USD realistic range
+    "NZDUSD":  (0.40,   1.00),     # NZD/USD realistic range
     "YM1!":    (10_000, 50_000),   # Dow futures; ATH ~45k
     "ES1!":    (2_000,  7_000),    # S&P 500 E-mini futures; ATH ~6,100
     "NQ1!":    (8_000,  30_000),   # Nasdaq 100 E-mini futures; ~25,100 Apr 2026
     "US500":   (2_000,  8_000),    # S&P 500 CFD; ~6,800 Apr 2026
     "US100":   (8_000,  30_000),   # Nasdaq 100 CFD; ~25,100 Apr 2026
     "XAUUSD":  (1_000,  6_000),    # Gold spot confirmed ~4,767 Apr 2026; 6k gives headroom
+    "XAGUSD":  (10,     100),      # Silver spot realistic range
     "UKOIL":   (10,     150),      # Brent crude realistic range
+    "GER40":   (8_000,  25_000),   # DAX index; ~22k Apr 2026
+    "DAX":     (8_000,  25_000),   # DAX alias
 }
 
 

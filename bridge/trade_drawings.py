@@ -69,11 +69,18 @@ class TradeDrawingManager:
     def all_drawings(self) -> dict[int | str, list[str]]:
         return self._drawings
 
-    def cleanup_stale(self, active_tickets: set[str]) -> int:
+    def cleanup_stale(
+        self,
+        active_tickets: set[str],
+        watchlist: list[str] | None = None,
+    ) -> int:
         """Remove chart drawings for positions that are no longer open.
 
         Uses saved entity IDs first (fast, precise). Then falls back to
         scanning chart drawings by text pattern for any orphaned lines.
+
+        If watchlist is provided, cycles through each symbol to scan for
+        orphaned drawings on every chart — not just the currently loaded one.
 
         Returns total number of drawing elements removed.
         """
@@ -94,8 +101,19 @@ class TradeDrawingManager:
             except Exception:
                 pass
 
-        # Step 2: Scan chart for orphaned trade drawings
-        removed_orphan = self._tv_client.draw_remove_stale_trades(active_tickets)
+        # Step 2: Scan chart(s) for orphaned trade drawings
+        removed_orphan = 0
+        if watchlist:
+            # Cycle through every watchlist symbol to catch orphans on any chart
+            for symbol in watchlist:
+                try:
+                    self._tv_client.set_symbol(symbol, require_ready=True)
+                    removed_orphan += self._tv_client.draw_remove_stale_trades(active_tickets)
+                except Exception as e:
+                    print(f"  [DRAW] Cleanup failed for {symbol}: {e}", flush=True)
+        else:
+            # Fallback: only scan current chart
+            removed_orphan = self._tv_client.draw_remove_stale_trades(active_tickets)
 
         total = removed_tracked + removed_orphan
         if total > 0:

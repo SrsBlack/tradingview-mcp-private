@@ -4,9 +4,16 @@
     "COINBASE:ETHUSD",
     "COINBASE:SOLUSD",
     "OANDA:EURUSD",
+    "OANDA:GBPUSD",
+    "OANDA:USDJPY",
+    "FX:AUDUSD",
+    "FX:NZDUSD",
     "CBOT:YM1!",
     "CAPITALCOM:US500",
     "CAPITALCOM:US100",
+    "XETR:DAX",
+    "OANDA:XAUUSD",
+    "OANDA:XAGUSD",
     "TVC:UKOIL",
     "COINBASE:DOGEUSD"
   ],
@@ -32,6 +39,7 @@
     "Maximum drawdown: 4%"
   ],
   "strategy_ensemble": [],
+  "min_live_confidence": 65,
   "liquidity_sweep_required": true,
   "daily_loss_limit_pct": 2.0,
   "score_weights": {
@@ -42,5 +50,209 @@
     "session": 12,
     "ote": 12,
     "smt": 8
+  },
+  "symbol_profiles": {
+    "BITSTAMP:BTCUSD": {
+      "asset_class": "crypto",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon", "asian"],
+      "backtest_confidence": 1.0,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "fvg_fill"],
+      "smt_pair": "COINBASE:ETHUSD",
+      "notes": "24/7 market; respect weekly opens and prior-day highs/lows",
+      "min_grade_live": "A",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
+    },
+    "COINBASE:ETHUSD": {
+      "asset_class": "crypto",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 0.9,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest"],
+      "smt_pair": "BITSTAMP:BTCUSD",
+      "notes": "Tracks BTC closely; divergence is a tradeable SMT signal",
+      "min_grade_live": "A",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
+    },
+    "COINBASE:SOLUSD": {
+      "asset_class": "crypto",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 0.85,
+      "primary_strategies": ["liquidity_sweep", "fvg_fill"],
+      "smt_pair": "COINBASE:ETHUSD",
+      "notes": "Higher beta than BTC/ETH; widen SL slightly for volatility"
+    },
+    "COINBASE:DOGEUSD": {
+      "asset_class": "crypto",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 0.7,
+      "primary_strategies": ["liquidity_sweep"],
+      "notes": "Meme-driven; avoid during low-volume asian session",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
+    },
+    "OANDA:EURUSD": {
+      "asset_class": "forex",
+      "best_sessions": ["london_open", "london_ny_overlap"],
+      "backtest_confidence": 1.0,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
+      "notes": "Cleanest ICT setups during London session; avoid post-NY close"
+    },
+    "OANDA:GBPUSD": {
+      "asset_class": "forex",
+      "best_sessions": ["london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.7,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
+      "smt_pair": "OANDA:EURUSD",
+      "notes": "SMT pair with EURUSD; wider spreads and more volatile — needs London session confirmation"
+    },
+    "OANDA:USDJPY": {
+      "asset_class": "forex",
+      "best_sessions": ["london_open", "london_ny_overlap", "asian"],
+      "backtest_confidence": 0.8,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
+      "notes": "JPY-quoted — tick_value changes with USD/JPY rate; strong Tokyo session structure"
+    },
+    "FX:AUDUSD": {
+      "asset_class": "forex",
+      "best_sessions": ["asian", "london_open"],
+      "backtest_confidence": 0.8,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest"],
+      "smt_pair": "FX:NZDUSD",
+      "notes": "SMT pair with NZD; best during Asian + early London sessions"
+    },
+    "FX:NZDUSD": {
+      "asset_class": "forex",
+      "best_sessions": ["asian", "london_open"],
+      "backtest_confidence": 0.8,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest"],
+      "smt_pair": "FX:AUDUSD",
+      "notes": "SMT pair with AUD; lower liquidity than AUD — tighter position sizing"
+    },
+    "CBOT:YM1!": {
+      "asset_class": "index_futures",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 1.0,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
+      "smt_pair": "CAPITALCOM:US500",
+      "notes": "ICT Silver Bullet 10-11am ET window is prime; respect cash session open"
+    },
+    "CAPITALCOM:US500": {
+      "asset_class": "index_cfd",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 0.95,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
+      "smt_pair": "CBOT:YM1!",
+      "notes": "Divergence with YM/NQ is a strong SMT signal"
+    },
+    "CAPITALCOM:US100": {
+      "asset_class": "index_cfd",
+      "best_sessions": ["london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 0.95,
+      "primary_strategies": ["liquidity_sweep", "silver_bullet", "fvg_fill"],
+      "smt_pair": "CAPITALCOM:US500",
+      "notes": "Higher beta than ES; expect wider SL and larger R targets"
+    },
+    "OANDA:XAUUSD": {
+      "asset_class": "commodity_cfd",
+      "best_sessions": ["london_open", "london_ny_overlap", "ny_afternoon"],
+      "backtest_confidence": 0.95,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
+      "notes": "High volatility, wide spreads during news — respect session timing",
+      "risk_overrides": {
+        "grade_a": 0.01,
+        "grade_b": 0.005
+      }
+    },
+    "OANDA:XAGUSD": {
+      "asset_class": "commodity_cfd",
+      "best_sessions": ["london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.7,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest"],
+      "smt_pair": "OANDA:XAUUSD",
+      "notes": "SMT pair with XAUUSD; tick_value=5.0 per 0.001 tick — position size carefully"
+    },
+    "XETR:DAX": {
+      "asset_class": "index_cfd",
+      "best_sessions": ["london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.8,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
+      "smt_pair": "CAPITALCOM:US500",
+      "notes": "EUR-quoted tick_value; prime during Frankfurt/London overlap 8-11am CET"
+    },
+    "TVC:UKOIL": {
+      "asset_class": "commodity_cfd",
+      "best_sessions": ["london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.8,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest"],
+      "notes": "Event-driven (OPEC/EIA); skip setups near scheduled releases"
+    }
+  },
+  "time_filters": {
+    "kill_zone_windows": [
+      {
+        "name": "London Open",
+        "et_start": "02:00",
+        "et_end": "05:00",
+        "description": "Prime ICT kill zone — London session liquidity runs"
+      },
+      {
+        "name": "NY AM",
+        "et_start": "07:00",
+        "et_end": "10:00",
+        "description": "NY open kill zone — cash session liquidity grabs"
+      },
+      {
+        "name": "London Silver Bullet",
+        "et_start": "03:00",
+        "et_end": "04:00",
+        "description": "ICT London Silver Bullet — FVG fills on forex/gold"
+      },
+      {
+        "name": "Silver Bullet AM",
+        "et_start": "10:00",
+        "et_end": "11:00",
+        "description": "ICT NY AM Silver Bullet — highest-probability 1hr window"
+      },
+      {
+        "name": "NY PM",
+        "et_start": "13:30",
+        "et_end": "15:00",
+        "description": "PM reversal window — afternoon liquidity sweeps"
+      },
+      {
+        "name": "Silver Bullet PM",
+        "et_start": "14:00",
+        "et_end": "15:00",
+        "description": "ICT NY PM Silver Bullet — continuation trades"
+      }
+    ],
+    "no_trade_windows": [
+      {
+        "name": "Daily Rollover",
+        "et_start": "17:00",
+        "et_end": "18:00",
+        "reason": "Broker rollover — spreads widen, liquidity drops"
+      },
+      {
+        "name": "Friday Close",
+        "et_start": "15:00",
+        "et_end": "17:00",
+        "reason": "Weekend-gap risk — avoid new positions near Friday close"
+      }
+    ],
+    "session_confidence_multipliers": {
+      "london_open": 1.1,
+      "london_ny_overlap": 1.2,
+      "ny_afternoon": 1.0,
+      "ny_close": 0.8,
+      "asian": 0.7
+    }
   }
 }

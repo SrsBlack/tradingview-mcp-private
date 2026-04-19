@@ -33,8 +33,12 @@ export async function setSymbol({ symbol }) {
     (function() {
       var chart = ${CHART_API};
       return new Promise(function(resolve) {
-        chart.setSymbol('${symbol.replace(/'/g, "\\'")}', {});
-        setTimeout(resolve, 500);
+        chart.setSymbol('${symbol.replace(/'/g, "\\'")}', function() {
+          // Callback fires when symbol change is acknowledged
+          setTimeout(resolve, 1000);
+        });
+        // Fallback timeout in case callback never fires
+        setTimeout(resolve, 5000);
       });
     })()
   `);

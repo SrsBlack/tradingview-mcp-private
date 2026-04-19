@@ -34,11 +34,11 @@ ensure_trading_ai_path()
 from analysis.structure import detect_swings, classify_structure, get_current_bias, SwingPoint, StructureEvent
 from analysis.fvg import detect_fvgs, get_active_fvgs, price_in_fvg, FVGZone
 from analysis.order_blocks import detect_order_blocks, get_active_obs, OrderBlock
-from analysis.liquidity import scan_sweeps, get_draw_on_liquidity, swing_to_liquidity, LiquidityLevel, LiquiditySweep
+from analysis.liquidity import scan_sweeps, get_draw_on_liquidity, swing_to_liquidity, build_liquidity_map, LiquidityLevel, LiquiditySweep
 from analysis.sessions import get_session_info, SessionInfo
 from analysis.smt import detect_smt_divergence, SMT_PAIRS
 from analysis.ict.scorer import score_ict_setup, ICTScoreBreakdown, get_pd_zone, pd_aligned_with_bias
-from core.types import Direction, SignalGrade
+from core.types import Direction, SignalGrade, FVGQuality
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +170,8 @@ class ICTPipeline:
         # Cache for H4 data (changes infrequently)
         self._h4_cache: dict[str, tuple[pd.DataFrame, float]] = {}
         self._H4_CACHE_TTL = 3600  # 1 hour
+        self._last_verified_price: float = 0.0
+        self._last_collected_dfs: dict[str, pd.DataFrame] = {}
 
     # ------------------------------------------------------------------
     # Single symbol analysis
@@ -242,7 +244,7 @@ class ICTPipeline:
             fvgs: list[FVGZone] = []
             df_fvg = df_ltf if (df_ltf is not None and len(df_ltf) >= 10) else df_primary
             if df_fvg is not None and len(df_fvg) >= 10:
-                fvgs = detect_fvgs(df_fvg, max_age_bars=50)
+                fvgs = detect_fvgs(df_fvg, max_age_bars=50, min_quality=FVGQuality.VERY_AGGRESSIVE)
 
             # -- Step 4: Order Block detection --
             obs: list[OrderBlock] = []
@@ -252,7 +254,7 @@ class ICTPipeline:
                 # detect_order_blocks needs fvgs and swings
                 obs = detect_order_blocks(
                     df_ob, fvgs=fvgs, swings=ltf_swings,
-                    lookback=20, require_fvg=True, require_bos=True,
+                    lookback=20, require_fvg=True, require_bos=False,
                 )
 
             # -- Step 5: Liquidity detection --
@@ -262,10 +264,10 @@ class ICTPipeline:
             df_liq = df_ltf if (df_ltf is not None and len(df_ltf) >= 20) else df_primary
             if df_liq is not None and len(df_liq) >= 20:
                 liq_swings = detect_swings(df_liq, lookback=5)
-                # Build liquidity levels from swing points
-                levels = swing_to_liquidity(liq_swings)
-                # Scan recent bars for sweeps (20 bars = 5 hours on M15, sweeps stay valid)
-                sweeps = scan_sweeps(levels, df_liq, lookback_bars=20)
+                # Build comprehensive liquidity map: swings + PDH/PDL + PWH/PWL + equal levels
+                levels = build_liquidity_map(df_liq, liq_swings)
+                # Scan recent bars for sweeps (64 bars = 16 hours on M15 — covers London→NY)
+                sweeps = scan_sweeps(levels, df_liq, lookback_bars=64)
                 result.sweep_detected = len(sweeps) > 0
 
                 # Displacement confirmation: sweep + FVG in opposite direction = proven manipulation
@@ -300,10 +302,7 @@ class ICTPipeline:
                 try:
                     smt_df = self._get_smt_data(smt_pair)
                     if smt_df is not None and len(smt_df) >= 20:
-                        smt_result = detect_smt_divergence(
-                            self.config.internal_symbol(symbol), df_primary
-                        )
-                        # detect_smt_divergence returns bool or SMTDivergence
+                        smt_result = detect_smt_divergence(df_primary, smt_df)
                         has_smt = bool(smt_result)
                         result.smt_pair = smt_pair
                 except Exception:
@@ -312,13 +311,15 @@ class ICTPipeline:
             result.has_smt = has_smt
 
             # -- Step 8: Determine dealing range for OTE/premium-discount --
-            # Use the most recent swing high/low pair from structure analysis
-            # (the dealing range), NOT the full dataset range which is too wide.
-            swing_highs = [s for s in swings if s.swing_type == "swing_high"]
-            swing_lows = [s for s in swings if s.swing_type == "swing_low"]
-            if swing_highs and swing_lows:
-                range_high = float(max(s.price for s in swing_highs[-3:]))  # Recent 3 swing highs
-                range_low = float(min(s.price for s in swing_lows[-3:]))    # Recent 3 swing lows
+            # Use M15 (trigger TF) swings for the dealing range — tighter and more
+            # precise than H4 swings, which produce OTE zones too wide to score.
+            ltf_swing_list = detect_swings(df_primary, lookback=5) if df_primary is not None else []
+            ltf_highs = [s for s in ltf_swing_list if s.swing_type == "swing_high"]
+            ltf_lows = [s for s in ltf_swing_list if s.swing_type == "swing_low"]
+            if ltf_highs and ltf_lows:
+                # Use the most recent swing high/low pair as the dealing range
+                range_high = float(max(s.price for s in ltf_highs[-3:]))
+                range_low = float(min(s.price for s in ltf_lows[-3:]))
             else:
                 # Fallback: use last 50 bars (12.5 hours on M15) instead of full dataset
                 recent = df_primary.iloc[-50:] if len(df_primary) >= 50 else df_primary
@@ -489,51 +490,93 @@ class ICTPipeline:
         dfs: dict[str, pd.DataFrame | None] = {"H4": None, "H1": None, "M15": None}
         cfg = self.config
 
+        # Hold exclusive chart access for the entire switch+verify+collect
+        # sequence. Without this, another thread (position manager, strategy
+        # engine) can switch the chart to a different symbol between our
+        # set_symbol() and get_ohlcv() calls, causing cross-symbol contamination.
+        with self.client.chart_session():
+            return self._collect_multi_tf_locked(symbol, dfs, cfg)
+
+    def _collect_multi_tf_locked(
+        self,
+        symbol: str,
+        dfs: dict[str, pd.DataFrame | None],
+        cfg: Any,
+    ) -> dict[str, pd.DataFrame | None]:
+        """Inner collect logic — called while holding chart_session lock."""
         # Switch to the correct symbol and poll until BOTH the quote symbol AND
         # the live price are consistent with the target.
         # TV Desktop lags: the quote symbol name can update before the price stream
         # stabilises, so we validate the price against known ranges as a second gate.
         target_sym = symbol.split(":")[-1]
         # Step 1: Switch symbol and wait for chart_ready (CLI polls up to 10s internally)
-        try:
-            result = self.client.set_symbol(symbol, require_ready=True)
-            if not result.get("chart_ready", False):
-                print(f"[WARN] Chart not ready for {symbol} after set_symbol — skipping", flush=True)
+        # Retry the full switch+verify sequence up to 2 times on failure.
+        symbol_confirmed = False
+        for switch_attempt in range(2):
+            try:
+                result = self.client.set_symbol(symbol, require_ready=True)
+                if not result.get("chart_ready", False):
+                    if switch_attempt == 0:
+                        time.sleep(3.0)
+                        continue
+                    print(f"[WARN] Chart not ready for {symbol} after set_symbol — skipping", flush=True)
+                    return dfs
+
+                # TV Desktop needs significant time to fully load OHLCV data
+                # after the symbol name appears in the quote widget. The quote
+                # symbol updates immediately but bars lag behind by 3-8 seconds.
+                time.sleep(5.0)
+
+                # Verify quote confirms the symbol with a live price
+                quote = self.client.get_quote()
+                chart_sym = quote.get("symbol", "").split(":")[-1]
+                if chart_sym != target_sym:
+                    if switch_attempt == 0:
+                        time.sleep(3.0)
+                        continue
+                    print(f"[WARN] Quote symbol mismatch: expected {target_sym}, got {chart_sym} — skipping", flush=True)
+                    return dfs
+
+                live_price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                if live_price <= 0:
+                    if switch_attempt == 0:
+                        time.sleep(3.0)
+                        continue
+                    print(f"[WARN] {symbol} quote returned zero price — skipping", flush=True)
+                    return dfs
+
+                # Cross-check against Alpaca live feed (primary defense for crypto)
+                price_ok, alpaca_price = self.price_verifier.verify(symbol, live_price)
+                if not price_ok:
+                    print(
+                        f"[REJECT] {symbol}: TV price {live_price:.4f} doesn't match "
+                        f"Alpaca {alpaca_price:.4f} — contaminated data, skipping",
+                        flush=True,
+                    )
+                    return dfs
+
+                # Safety net: price range check (catches forex/commodities not on Alpaca)
+                if not self._price_in_range(symbol, live_price):
+                    print(
+                        f"[WARN] {symbol}: symbol confirmed but price {live_price:.4f} "
+                        f"fails range check — data may be stale, skipping",
+                        flush=True,
+                    )
+                    return dfs
+
+                # Store verified price for cross-checking OHLCV data
+                self._last_verified_price = live_price
+                symbol_confirmed = True
+                break
+
+            except TVClientError as e:
+                if switch_attempt == 0:
+                    time.sleep(3.0)
+                    continue
+                print(f"[WARN] Failed to switch to {symbol}: {e}", flush=True)
                 return dfs
 
-            # Verify quote confirms the symbol with a live price
-            quote = self.client.get_quote()
-            chart_sym = quote.get("symbol", "").split(":")[-1]
-            if chart_sym != target_sym:
-                print(f"[WARN] Quote symbol mismatch: expected {target_sym}, got {chart_sym} — skipping", flush=True)
-                return dfs
-
-            live_price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-            if live_price <= 0:
-                print(f"[WARN] {symbol} quote returned zero price — skipping", flush=True)
-                return dfs
-
-            # Cross-check against Alpaca live feed (primary defense for crypto)
-            price_ok, alpaca_price = self.price_verifier.verify(symbol, live_price)
-            if not price_ok:
-                print(
-                    f"[REJECT] {symbol}: TV price {live_price:.4f} doesn't match "
-                    f"Alpaca {alpaca_price:.4f} — contaminated data, skipping",
-                    flush=True,
-                )
-                return dfs
-
-            # Safety net: price range check (catches forex/commodities not on Alpaca)
-            if not self._price_in_range(symbol, live_price):
-                print(
-                    f"[WARN] {symbol}: symbol confirmed but price {live_price:.4f} "
-                    f"fails range check — data may be stale, skipping",
-                    flush=True,
-                )
-                return dfs
-
-        except TVClientError as e:
-            print(f"[WARN] Failed to switch to {symbol}: {e}", flush=True)
+        if not symbol_confirmed:
             return dfs
 
         # Chart is confirmed: symbol name matches, price verified against Alpaca, in range.
@@ -543,9 +586,9 @@ class ICTPipeline:
             """Switch timeframe (symbol already confirmed) and fetch verified OHLCV."""
             try:
                 tf_result = self.client.set_timeframe(timeframe)
-                if not tf_result.get("chart_ready", True):
-                    # chart_ready=false after TF switch — wait a bit more
-                    time.sleep(2.0)
+                # Always give chart time to load new timeframe data
+                wait = 4.0 if not tf_result.get("chart_ready", True) else 2.5
+                time.sleep(wait)
 
                 # Read OHLCV with post-read symbol verification
                 raw = self.client.get_ohlcv_verified(symbol, count=count)
@@ -558,15 +601,38 @@ class ICTPipeline:
                 if not valid:
                     return None
 
-                # Safety net: verify OHLCV close prices are in valid range
-                last_close = float(df["close"].iloc[-1]) if not df.empty else 0
-                if last_close > 0 and not self._price_in_range(symbol, last_close):
-                    print(
-                        f"[WARN] OHLCV contamination on {symbol} {timeframe}: "
-                        f"last close {last_close:.4f} is out of valid range — discarding",
-                        flush=True,
-                    )
-                    return None
+                # Comprehensive price range validation — check multiple bars
+                # to catch contamination even when ranges partially overlap.
+                if not df.empty:
+                    check_prices = [
+                        float(df["close"].iloc[-1]),
+                        float(df["high"].iloc[-1]),
+                        float(df["low"].iloc[-1]),
+                    ]
+                    if len(df) > 10:
+                        check_prices.append(float(df["close"].iloc[len(df)//2]))
+                    for p in check_prices:
+                        if p > 0 and not self._price_in_range(symbol, p):
+                            print(
+                                f"[WARN] OHLCV contamination on {symbol} {timeframe}: "
+                                f"price {p:.4f} is out of valid range — discarding",
+                                flush=True,
+                            )
+                            return None
+
+                    # Cross-check: OHLCV prices should be close to the verified
+                    # live quote price (within 5% for same-day data).
+                    last_close = float(df["close"].iloc[-1])
+                    if hasattr(self, '_last_verified_price') and self._last_verified_price > 0:
+                        deviation = abs(last_close - self._last_verified_price) / self._last_verified_price
+                        if deviation > 0.05:
+                            print(
+                                f"[WARN] OHLCV data mismatch on {symbol} {timeframe}: "
+                                f"bars show {last_close:.4f} but verified price is "
+                                f"{self._last_verified_price:.4f} ({deviation:.1%} off) — discarding",
+                                flush=True,
+                            )
+                            return None
 
                 return df
             except TVClientError:
@@ -592,17 +658,27 @@ class ICTPipeline:
         if df is not None:
             dfs["M15"] = df
 
+        # Store for reuse by other components (e.g. StrategyEngine)
+        # Map internal TF labels → TV resolution strings
+        self._last_collected_dfs = {}
+        tf_to_tv = {"H4": cfg.htf, "H1": cfg.itf, "M15": cfg.ltf}
+        for label, df_val in dfs.items():
+            if df_val is not None:
+                tv_tf = tf_to_tv.get(label, label)
+                self._last_collected_dfs[tv_tf] = df_val
+
         return dfs
 
     def _get_smt_data(self, smt_symbol: str) -> pd.DataFrame | None:
         """Fetch OHLCV for a correlated symbol (for SMT divergence check)."""
         try:
             tv_symbol = self.config.tv_symbol(smt_symbol)
-            raw = self.client.get_ohlcv(
-                symbol=tv_symbol,
-                timeframe=self.config.ltf,
-                count=50,
-            )
+            with self.client.chart_session():
+                raw = self.client.get_ohlcv(
+                    symbol=tv_symbol,
+                    timeframe=self.config.ltf,
+                    count=50,
+                )
             df = bars_to_dataframe(raw)
             valid, _ = validate_dataframe(df, min_bars=10)
             return df if valid else None

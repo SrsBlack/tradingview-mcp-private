@@ -7,8 +7,8 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from bridge.config import price_in_range
-from bridge.decision_types import TradeDecision
+from bridge.config import price_in_range, tv_to_ftmo_symbol, ftmo_to_tv_symbol, TV_TO_FTMO
+from bridge.decision_types import TradeDecision, PaperPosition
 from bridge.tv_client import TVClient, TVClientError
 from bridge.price_verify import PriceVerifier
 from bridge.session_store import SessionStore
@@ -64,29 +64,41 @@ class PositionManager:
                     else:
                         print(f"[POSITIONS] {pos.symbol} Alpaca price {alpaca_price:.4f} FAILED range check", flush=True)
 
-                # Fallback: TradingView chart quote
-                target_sym = pos.symbol.split(":")[-1]
-                result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
-                if not result.get("chart_ready", False):
-                    print(f"[POSITIONS] Chart not ready for {pos.symbol} — skipping this cycle", flush=True)
-                    continue
+                # Try MT5 for forex/indices/commodities — no chart switching needed
+                mt5_price = self.price_verifier.get_mt5_price(pos.symbol)
+                if mt5_price and mt5_price > 0:
+                    if price_in_range(pos.symbol, mt5_price):
+                        prices[pos.symbol] = mt5_price
+                        continue
+                    else:
+                        print(f"[POSITIONS] {pos.symbol} MT5 price {mt5_price:.4f} FAILED range check", flush=True)
 
-                quote = self.tv_client.get_quote()
-                chart_sym = quote.get("symbol", "").split(":")[-1]
-                if chart_sym != target_sym:
-                    print(f"[POSITIONS] Symbol mismatch: expected {target_sym}, got {chart_sym}", flush=True)
-                    continue
+                # Last resort fallback: TradingView chart quote
+                # Hold chart session lock to prevent other threads from switching
+                # the chart between set_symbol and get_quote.
+                with self.tv_client.chart_session():
+                    target_sym = pos.symbol.split(":")[-1]
+                    result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
+                    if not result.get("chart_ready", False):
+                        print(f"[POSITIONS] Chart not ready for {pos.symbol} — skipping this cycle", flush=True)
+                        continue
 
-                p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-                if p <= 0:
-                    print(f"[POSITIONS] Zero price for {pos.symbol}", flush=True)
-                    continue
+                    quote = self.tv_client.get_quote()
+                    chart_sym = quote.get("symbol", "").split(":")[-1]
+                    if chart_sym != target_sym:
+                        print(f"[POSITIONS] Symbol mismatch: expected {target_sym}, got {chart_sym}", flush=True)
+                        continue
 
-                if not price_in_range(pos.symbol, p):
-                    print(f"[POSITIONS] {pos.symbol} price {p:.4f} FAILED range check", flush=True)
-                    continue
+                    p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                    if p <= 0:
+                        print(f"[POSITIONS] Zero price for {pos.symbol}", flush=True)
+                        continue
 
-                prices[pos.symbol] = p
+                    if not price_in_range(pos.symbol, p):
+                        print(f"[POSITIONS] {pos.symbol} price {p:.4f} FAILED range check", flush=True)
+                        continue
+
+                    prices[pos.symbol] = p
 
             except TVClientError as e:
                 print(f"[POSITIONS] TVClient error for {pos.symbol}: {e}", flush=True)
@@ -109,17 +121,23 @@ class PositionManager:
                     shadow_prices[pos.symbol] = alpaca_price
                     continue
 
-                sym_base = pos.symbol.split(":")[-1]
-                result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
-                if not result.get("chart_ready", False):
+                mt5_price = self.price_verifier.get_mt5_price(pos.symbol)
+                if mt5_price and mt5_price > 0 and price_in_range(pos.symbol, mt5_price):
+                    shadow_prices[pos.symbol] = mt5_price
                     continue
-                quote = self.tv_client.get_quote()
-                chart_sym = quote.get("symbol", "").split(":")[-1]
-                if chart_sym != sym_base:
-                    continue
-                p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-                if p > 0 and price_in_range(pos.symbol, p):
-                    shadow_prices[pos.symbol] = p
+
+                with self.tv_client.chart_session():
+                    sym_base = pos.symbol.split(":")[-1]
+                    result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
+                    if not result.get("chart_ready", False):
+                        continue
+                    quote = self.tv_client.get_quote()
+                    chart_sym = quote.get("symbol", "").split(":")[-1]
+                    if chart_sym != sym_base:
+                        continue
+                    p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                    if p > 0 and price_in_range(pos.symbol, p):
+                        shadow_prices[pos.symbol] = p
             except Exception:
                 pass
 
@@ -195,19 +213,31 @@ class PositionManager:
 
         for ticket, pos in list(self.executor.open_positions.items()):
             try:
-                target_sym = pos.symbol.split(":")[-1]
-                result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
-                if not result.get("chart_ready", False):
-                    print(f"  [RECONCILE] {pos.symbol} chart not ready — will check in position loop", flush=True)
-                    continue
+                # Try Alpaca / MT5 first to avoid chart contention
+                price = 0.0
+                alpaca_price = self.price_verifier.get_alpaca_price(pos.symbol)
+                if alpaca_price and alpaca_price > 0 and price_in_range(pos.symbol, alpaca_price):
+                    price = alpaca_price
+                if not price:
+                    mt5_price = self.price_verifier.get_mt5_price(pos.symbol)
+                    if mt5_price and mt5_price > 0 and price_in_range(pos.symbol, mt5_price):
+                        price = mt5_price
 
-                quote = self.tv_client.get_quote()
-                chart_sym = quote.get("symbol", "").split(":")[-1]
-                if chart_sym != target_sym:
-                    print(f"  [RECONCILE] Symbol mismatch for {pos.symbol} — skipping", flush=True)
-                    continue
+                if not price:
+                    with self.tv_client.chart_session():
+                        target_sym = pos.symbol.split(":")[-1]
+                        result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
+                        if not result.get("chart_ready", False):
+                            print(f"  [RECONCILE] {pos.symbol} chart not ready — will check in position loop", flush=True)
+                            continue
 
-                price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                        quote = self.tv_client.get_quote()
+                        chart_sym = quote.get("symbol", "").split(":")[-1]
+                        if chart_sym != target_sym:
+                            print(f"  [RECONCILE] Symbol mismatch for {pos.symbol} — skipping", flush=True)
+                            continue
+
+                        price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
                 if price <= 0:
                     continue
 
@@ -219,6 +249,7 @@ class PositionManager:
                 if not price_in_range(pos.symbol, price):
                     continue
 
+                from bridge.risk_bridge import calculate_pnl as calc_pnl
                 if pos.direction == "BUY":
                     if price <= pos.sl_price:
                         to_close.append((ticket, "SL (while offline)", pos.sl_price))
@@ -226,7 +257,7 @@ class PositionManager:
                         exit_p = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
                         to_close.append((ticket, "TP (while offline)", exit_p))
                     else:
-                        pnl = (price - pos.entry_price) * pos.lot_size
+                        pnl = calc_pnl(pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction)
                         print(f"  [RECONCILE] #{ticket} {pos.symbol} STILL OPEN — price {price:.4f} (PnL {pnl:+.2f})", flush=True)
                 else:
                     if price >= pos.sl_price:
@@ -235,7 +266,7 @@ class PositionManager:
                         exit_p = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
                         to_close.append((ticket, "TP (while offline)", exit_p))
                     else:
-                        pnl = (pos.entry_price - price) * pos.lot_size
+                        pnl = calc_pnl(pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction)
                         print(f"  [RECONCILE] #{ticket} {pos.symbol} STILL OPEN — price {price:.4f} (PnL {pnl:+.2f})", flush=True)
 
             except TVClientError as e:
@@ -245,10 +276,8 @@ class PositionManager:
             pos = self.executor.open_positions.get(ticket)
             if not pos:
                 continue
-            if pos.direction == "BUY":
-                pnl = (exit_price - pos.entry_price) * pos.lot_size
-            else:
-                pnl = (pos.entry_price - exit_price) * pos.lot_size
+            from bridge.risk_bridge import calculate_pnl as calc_pnl
+            pnl = calc_pnl(pos.symbol.split(":")[-1], pos.entry_price, exit_price, pos.lot_size, pos.direction)
             print(
                 f"  [RECONCILE] CLOSING #{ticket} {pos.symbol} — {reason} "
                 f"(entry {pos.entry_price:.4f} -> exit {exit_price:.4f}, PnL {pnl:+.2f})",
@@ -284,7 +313,15 @@ class PositionManager:
                 return events
 
             to_close = []
-            for ticket, pos in self.executor.open_positions.items():
+            # NOTE: acquire executor._positions_lock when iterating open_positions
+            lock = getattr(self.executor, '_positions_lock', None)
+            positions_snapshot = {}
+            if lock:
+                with lock:
+                    positions_snapshot = dict(self.executor.open_positions)
+            else:
+                positions_snapshot = dict(self.executor.open_positions)
+            for ticket, pos in positions_snapshot.items():
                 mt5_pos = mt5.positions_get(ticket=ticket)
                 if mt5_pos is None or len(mt5_pos) == 0:
                     now = datetime.now(timezone.utc)
@@ -296,8 +333,8 @@ class PositionManager:
                     pnl = 0.0
                     reason = "BROKER_CLOSE"
                     if deals:
-                        mt5_sym = pos.symbol.split(":")[-1]
-                        close_deals = [d for d in deals if d.entry == 1 and d.symbol == mt5_sym]
+                        ftmo_sym = tv_to_ftmo_symbol(pos.symbol)
+                        close_deals = [d for d in deals if d.entry == 1 and d.symbol == ftmo_sym]
                         if close_deals:
                             last_deal = close_deals[-1]
                             exit_price = last_deal.price
@@ -310,13 +347,13 @@ class PositionManager:
                     to_close.append((ticket, reason, exit_price, pnl))
 
             for ticket, reason, exit_price, mt5_pnl in to_close:
-                pos = self.executor.open_positions[ticket]
-                if pos.direction == "BUY":
-                    local_pnl = (exit_price - pos.entry_price) * pos.lot_size
-                else:
-                    local_pnl = (pos.entry_price - exit_price) * pos.lot_size
-                sl_dist = abs(pos.entry_price - pos.sl_price)
-                r_multiple = round(local_pnl / (sl_dist * pos.lot_size), 2) if sl_dist > 0 else 0.0
+                pos = self.executor.open_positions.get(ticket)
+                if pos is None:
+                    continue  # another thread already removed it
+                from bridge.risk_bridge import calculate_pnl as calc_pnl
+                local_pnl = calc_pnl(pos.symbol, pos.entry_price, exit_price, pos.lot_size, pos.direction)
+                risk_pnl = abs(calc_pnl(pos.symbol, pos.entry_price, pos.sl_price, pos.lot_size, pos.direction))
+                r_multiple = round(local_pnl / risk_pnl, 2) if risk_pnl > 0 else 0.0
 
                 print(
                     f"  [MT5_SYNC] #{ticket} {pos.symbol} closed by broker ({reason}) "
@@ -330,7 +367,14 @@ class PositionManager:
                     self.executor.wins += 1
                 else:
                     self.executor.losses += 1
-                del self.executor.open_positions[ticket]
+                    # Set per-symbol loss cooldown if executor supports it
+                    if hasattr(self.executor, 'set_symbol_loss_cooldown'):
+                        self.executor.set_symbol_loss_cooldown(pos.symbol)
+                if lock:
+                    with lock:
+                        del self.executor.open_positions[ticket]
+                else:
+                    del self.executor.open_positions[ticket]
 
                 events.append({
                     "ticket": ticket,
@@ -345,6 +389,14 @@ class PositionManager:
                     "mt5_pnl": round(mt5_pnl, 2) if mt5_pnl else None,
                 })
             if events:
+                # Re-sync balance from MT5 to correct for tick_value drift
+                try:
+                    info = mt5.account_info()
+                    if info:
+                        self.executor.balance = info.balance
+                        print(f"  [SYNC] Balance re-synced from MT5: ${info.balance:,.2f}", flush=True)
+                except Exception as e:
+                    print(f"  [SYNC] MT5 balance re-sync failed: {e}", flush=True)
                 self.state_store.save(self.executor, self.mode)
 
         except ImportError:
@@ -352,3 +404,155 @@ class PositionManager:
         except Exception as e:
             print(f"[MT5_SYNC] Error checking MT5 positions: {e}", flush=True)
         return events
+
+    def reconcile_mt5_on_startup(self, watchlist: list[str]) -> list[dict]:
+        """Scan MT5 for ICT_Bridge positions missing from bridge state.
+
+        On startup, query MT5 for ALL open positions with "ICT_Bridge" in the
+        comment. Any position not already in self.executor.open_positions gets
+        re-adopted into bridge state so we can track its SL/TP/close.
+
+        Also checks recent deal history for ICT_Bridge trades that closed while
+        the bridge had no record of them (the US30 #425415101 scenario).
+
+        Returns list of newly adopted position dicts (for display).
+        """
+        from bridge.live_executor_adapter import LiveExecutorAdapter
+        if not isinstance(self.executor, LiveExecutorAdapter):
+            return []
+
+        try:
+            import MetaTrader5 as mt5
+            if not mt5.terminal_info():
+                print("[MT5_RECON] MT5 terminal not connected — skipping reconciliation", flush=True)
+                return []
+        except ImportError:
+            return []
+
+        # Build reverse map: FTMO symbol -> full TV symbol (with exchange prefix)
+        # e.g. "US30.cash" -> "CBOT:YM1!"
+        ftmo_to_full_tv: dict[str, str] = {}
+        for tv_sym in watchlist:
+            base = tv_sym.split(":")[-1]
+            ftmo_sym = TV_TO_FTMO.get(base, base)
+            ftmo_to_full_tv[ftmo_sym] = tv_sym
+
+        known_tickets = set(self.executor.open_positions.keys())
+        adopted: list[dict] = []
+
+        # --- Phase 1: Find open MT5 positions tagged ICT_Bridge not in bridge state ---
+        try:
+            all_positions = mt5.positions_get()
+            if all_positions:
+                for pos in all_positions:
+                    comment = pos.comment or ""
+                    if "ICT_Bridge" not in comment:
+                        continue
+                    if pos.ticket in known_tickets:
+                        continue
+
+                    # Convert MT5 symbol back to TV symbol
+                    mt5_sym = pos.symbol
+                    tv_symbol = ftmo_to_full_tv.get(mt5_sym, mt5_sym)
+
+                    direction = "BUY" if pos.type == 0 else "SELL"
+
+                    # Try to get SL/TP from the MT5 position
+                    sl_price = pos.sl if pos.sl > 0 else 0.0
+                    tp_price = pos.tp if pos.tp > 0 else 0.0
+
+                    paper_pos = PaperPosition(
+                        ticket=pos.ticket,
+                        symbol=tv_symbol,
+                        direction=direction,
+                        entry_price=pos.price_open,
+                        sl_price=sl_price,
+                        tp_price=tp_price,
+                        tp2_price=0.0,
+                        lot_size=pos.volume,
+                        risk_pct=0.01,
+                        opened_at=datetime.fromtimestamp(pos.time, tz=timezone.utc).isoformat(),
+                        ict_grade="?",
+                        ict_score=0,
+                        reasoning=f"Adopted from MT5 on startup (comment: {comment})",
+                        trade_type="intraday",
+                        trailing_sl=sl_price,
+                        tp1_hit=False,
+                        current_price=pos.price_current,
+                    )
+                    self.executor.open_positions[pos.ticket] = paper_pos
+
+                    # Advance ticket counter
+                    if hasattr(self.executor, "_next_ticket"):
+                        self.executor._next_ticket = max(
+                            self.executor._next_ticket, pos.ticket + 1
+                        )
+
+                    unrealized = pos.profit
+                    print(
+                        f"  [MT5_RECON] ADOPTED #{pos.ticket} {direction} {tv_symbol} "
+                        f"({mt5_sym}) Entry={pos.price_open:.2f} "
+                        f"SL={sl_price:.2f} TP={tp_price:.2f} "
+                        f"Lots={pos.volume} Unrealized={unrealized:+.2f}",
+                        flush=True,
+                    )
+                    adopted.append(paper_pos.to_dict())
+
+        except Exception as e:
+            print(f"[MT5_RECON] Error scanning open positions: {e}", flush=True)
+
+        # --- Phase 2: Find recently closed ICT_Bridge deals not in bridge state ---
+        try:
+            now = datetime.now(timezone.utc)
+            # Look back 7 days to catch swing trades
+            deals = mt5.history_deals_get(now - timedelta(days=7), now)
+            if deals:
+                # Group close deals (entry==1) by position ticket
+                close_deals: dict[int, Any] = {}
+                for d in deals:
+                    if d.entry == 1 and d.comment and "ICT_Bridge" in d.comment:
+                        close_deals[d.position_id] = d
+
+                # Also find open deals to get entry prices
+                open_deals: dict[int, Any] = {}
+                for d in deals:
+                    if d.entry == 0 and d.position_id in close_deals:
+                        open_deals[d.position_id] = d
+
+                for pos_id, close_deal in close_deals.items():
+                    if pos_id in known_tickets:
+                        continue  # already tracked
+                    if pos_id in {p["ticket"] for p in adopted}:
+                        continue  # just adopted as open
+
+                    mt5_sym = close_deal.symbol
+                    tv_symbol = ftmo_to_full_tv.get(mt5_sym, mt5_sym)
+                    entry_deal = open_deals.get(pos_id)
+                    entry_price = entry_deal.price if entry_deal else 0.0
+
+                    reason = "BROKER_CLOSE"
+                    if close_deal.comment:
+                        lc = close_deal.comment.lower()
+                        if "tp" in lc:
+                            reason = "TP"
+                        elif "sl" in lc:
+                            reason = "SL"
+
+                    print(
+                        f"  [MT5_RECON] MISSED CLOSE #{pos_id} {tv_symbol} ({mt5_sym}) "
+                        f"Entry={entry_price:.2f} Exit={close_deal.price:.2f} "
+                        f"PnL={close_deal.profit:+.2f} Reason={reason} "
+                        f"@ {datetime.fromtimestamp(close_deal.time, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+                        flush=True,
+                    )
+
+        except Exception as e:
+            print(f"[MT5_RECON] Error scanning deal history: {e}", flush=True)
+
+        if adopted:
+            self.state_store.save(self.executor, self.mode)
+            print(f"[MT5_RECON] Adopted {len(adopted)} position(s) from MT5 into bridge state", flush=True)
+        else:
+            print("[MT5_RECON] All MT5 ICT_Bridge positions accounted for", flush=True)
+
+        return adopted

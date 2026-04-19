@@ -144,6 +144,7 @@ SYMBOL_SESSIONS: dict[str, list[tuple[int, int]]] = {
     "BITSTAMP:BTCUSD":  [(0, 24)],
     "COINBASE:ETHUSD":  [(0, 24)],
     "COINBASE:SOLUSD":  [(0, 24)],
+    "COINBASE:DOGEUSD": [(0, 24)],
     # Gold — Asia + London + NY
     "OANDA:XAUUSD": [(2, 12), (13, 17)],
     # Oil — London + NY only
@@ -153,7 +154,7 @@ SYMBOL_SESSIONS: dict[str, list[tuple[int, int]]] = {
 # Symbols that trade 24/7
 ALWAYS_ON = {
     "BITSTAMP:BTCUSD", "COINBASE:ETHUSD", "COINBASE:SOLUSD",
-    "COINBASE:AVAXUSD", "COINBASE:LINKUSD", "COINBASE:DOGEUSD",
+    "COINBASE:DOGEUSD",
 }
 
 

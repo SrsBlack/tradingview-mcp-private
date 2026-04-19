@@ -3,7 +3,13 @@ HONEST INDEPENDENT AUDIT — reads raw logs, flags everything suspicious.
 No sugar-coating. Every trade gets a verdict and a confidence level.
 """
 
-import json, glob, os
+import json, glob, os, sys
+
+# Force UTF-8 stdout on Windows so box-drawing chars don't crash cp1252.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+except (AttributeError, Exception):  # pragma: no cover
+    pass
 
 # ─── Current market prices (Apr 9 2026, web-verified) ───
 # Previous values were WRONG: BTC was 79k (actually ~72k), ETH was 1550 (actually ~2180), SOL was 108 (actually ~82)
