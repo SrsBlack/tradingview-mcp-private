@@ -158,10 +158,33 @@ ALWAYS_ON = {
 }
 
 
+def is_friday_close_window(dt: datetime) -> bool:
+    """Friday after 20:00 UTC (4pm ET) — no new positions, weekend gap risk."""
+    wd = dt.weekday()
+    return wd == 4 and utc_hour(dt) >= 20
+
+
+def _is_weekend(dt: datetime) -> bool:
+    """Check if it's a forex/indices weekend (Fri 22:00 UTC to Sun 22:00 UTC)."""
+    wd = dt.weekday()  # 0=Mon, 4=Fri, 5=Sat, 6=Sun
+    h = utc_hour(dt)
+    if wd == 5:  # Saturday — always closed
+        return True
+    if wd == 6 and h < 22:  # Sunday before 22:00 UTC — still closed
+        return True
+    if wd == 4 and h >= 22:  # Friday after 22:00 UTC — closed
+        return True
+    return False
+
+
 def symbol_is_active(symbol: str, dt: datetime) -> bool:
     """Check if a symbol should be analyzed at the given UTC time."""
+    # Crypto trades 24/7 including weekends
     if symbol in ALWAYS_ON:
         return True
+    # Non-crypto: check weekend first (forex/indices/commodities closed)
+    if _is_weekend(dt):
+        return False
     sessions = SYMBOL_SESSIONS.get(symbol)
     if not sessions:
         h = utc_hour(dt)

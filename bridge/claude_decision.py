@@ -387,7 +387,7 @@ class ClaudeDecisionMaker:
     SONNET = "claude-sonnet-4-6"   # Grade A trades — deeper analysis
     HAIKU = "claude-haiku-4-5-20251001"    # Grade B/C trades — fast, cost-efficient
 
-    def __init__(self, min_rr: float = 1.5):
+    def __init__(self, min_rr: float = 1.25):
         self.min_rr = min_rr
         self._client = None
         # Decision cache: avoid redundant API calls when signal hasn't changed
@@ -612,7 +612,7 @@ SCORE BREAKDOWN (sub-scores are additive — 0 in one component does NOT disqual
 {mr_warning}
 
 RULES:
-- Minimum R:R 1.5:1 (hard gate — trades below this are auto-rejected). Prefer 2:1+ but 1.5:1 is acceptable with strong confluence.
+- Minimum R:R 1.25:1 (hard gate — trades below this are auto-rejected). Prefer 2:1+ but 1.25:1 is acceptable with strong confluence.
 - Grade A: full conviction | Grade B: strict risk | Grade C: pullback only
 - SL behind nearest structure level/OB, but NEVER closer than 2x ATR(14) from entry{f' (minimum {min_sl_dist:.5f} distance)' if min_sl_dist > 0 else ''}
 - CRITICAL: Tight stops get hunted — our data shows sweeps regularly exceed 2x ATR. Place SL BEYOND the liquidity sweep wick, not at the edge. For crypto, minimum 0.5% of price distance. The trade that got stopped at 9pt on ETH would have made +30pts with a 12pt SL.

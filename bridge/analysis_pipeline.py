@@ -372,6 +372,12 @@ class AnalysisPipeline:
         if not decision.is_trade:
             return
 
+        # Friday close window — no new positions (weekend gap risk)
+        from bridge.trading_hours import is_friday_close_window, now_utc
+        if is_friday_close_window(now_utc()):
+            print(f"  [{symbol}] BLOCKED: Friday close window — no new positions (weekend gap risk)", flush=True)
+            return
+
         # Per-symbol minimum grade gate (fallback to global default "B")
         profile = self._rules.get("symbol_profiles", {}).get(symbol, {})
         min_grade = profile.get("min_grade_live") or self._rules.get("min_grade_live", "B")

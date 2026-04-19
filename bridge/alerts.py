@@ -26,6 +26,34 @@ ensure_trading_ai_path()
 
 
 # ---------------------------------------------------------------------------
+# Lightweight Telegram fallback (no trading-ai-v2 dependency)
+# ---------------------------------------------------------------------------
+
+class _DirectTelegramSender:
+    """Minimal Telegram sender using urllib — no external deps needed."""
+
+    def __init__(self, token: str, chat_id: str):
+        self.token = token
+        self.chat_id = chat_id
+        self.enabled = True
+
+    async def send_raw(self, message: str) -> None:
+        import urllib.request
+        import urllib.parse
+        url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+        data = urllib.parse.urlencode({
+            "chat_id": self.chat_id,
+            "text": message,
+            "parse_mode": "Markdown",
+        }).encode()
+        try:
+            req = urllib.request.Request(url, data=data)
+            urllib.request.urlopen(req, timeout=10)
+        except Exception:
+            pass  # Don't let Telegram failures affect trading
+
+
+# ---------------------------------------------------------------------------
 # Bridge Alerts
 # ---------------------------------------------------------------------------
 
@@ -46,6 +74,36 @@ class BridgeAlerts:
 
     def _init_telegram(self) -> None:
         """Try to initialize Telegram alerts."""
+        import os
+        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+        # Direct env var path — works without trading-ai-v2 Settings
+        if token and chat_id:
+            try:
+                from monitoring.alerts import AlertManager
+                from core.config import Settings
+                settings = Settings()
+                # Override with env vars in case config.yaml differs
+                settings.monitoring.telegram_token = token
+                settings.monitoring.telegram_chat_id = chat_id
+                self._alert_mgr = AlertManager(settings)
+                if self._alert_mgr.enabled:
+                    print("[ALERTS] Telegram alerts enabled", flush=True)
+                    return
+            except Exception:
+                pass
+            # Fallback: lightweight direct Telegram sender
+            try:
+                self._telegram_token = token
+                self._telegram_chat_id = chat_id
+                self._alert_mgr = _DirectTelegramSender(token, chat_id)
+                print("[ALERTS] Telegram alerts enabled (direct mode)", flush=True)
+                return
+            except Exception as e:
+                print(f"[ALERTS] Telegram init failed: {e}", flush=True)
+
+        # Legacy path: try trading-ai-v2 Settings
         try:
             from monitoring.alerts import AlertManager
             from core.config import Settings
@@ -54,6 +112,7 @@ class BridgeAlerts:
             if self._alert_mgr.enabled:
                 print("[ALERTS] Telegram alerts enabled", flush=True)
             else:
+                print("Telegram not configured — alerts disabled", flush=True)
                 print("[ALERTS] Telegram not configured (console only)", flush=True)
         except Exception as e:
             print(f"[ALERTS] Telegram unavailable: {e}", flush=True)
