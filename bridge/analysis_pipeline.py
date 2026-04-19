@@ -279,8 +279,10 @@ class AnalysisPipeline:
         decision = self.decision_maker.evaluate(analysis)
 
         if not decision.is_trade:
-            # SKIP cooldown = 15 min (one M15 bar — structure doesn't change faster)
-            self.cooldown.decisions[symbol] = time.time() - self.cooldown.seconds + 900  # 15 min cooldown
+            # SKIP cooldown: expire 15 min from now regardless of cooldown.seconds.
+            # Formula: _is_on_cooldown checks (now - stored) < cooldown.seconds,
+            # so stored = now - cooldown.seconds + 900 makes it expire after 900s.
+            self.cooldown.decisions[symbol] = time.time() - self.cooldown.seconds + 900
 
         self.session.log_decision(decision.to_dict())
 
@@ -370,9 +372,9 @@ class AnalysisPipeline:
         if not decision.is_trade:
             return
 
-        # Per-symbol minimum grade gate
+        # Per-symbol minimum grade gate (fallback to global default "B")
         profile = self._rules.get("symbol_profiles", {}).get(symbol, {})
-        min_grade = profile.get("min_grade_live")
+        min_grade = profile.get("min_grade_live") or self._rules.get("min_grade_live", "B")
         if min_grade:
             grade_order = {"A": 0, "B": 1, "C": 2, "D": 3}
             if grade_order.get(decision.grade, 3) > grade_order.get(min_grade, 0):

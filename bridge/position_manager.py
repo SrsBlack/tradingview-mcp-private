@@ -40,6 +40,8 @@ class PositionManager:
         self.paper_state_store = paper_state_store
         self.drawings = drawings
         self.mode = mode
+        # Dedup: tickets recently closed by MT5 sync (avoid double P&L counting)
+        self._recently_closed: set[int] = set()
 
     def check_positions_sync(self) -> list[dict]:
         """Get current prices and check positions.
@@ -105,7 +107,14 @@ class PositionManager:
 
         events: list[dict] = list(broker_closed_events)
         if prices:
-            events.extend(self.executor.check_positions(prices))
+            pos_events = self.executor.check_positions(prices)
+            # Filter out tickets already closed by MT5 sync (prevent double P&L)
+            for ev in pos_events:
+                if ev.get("ticket") not in self._recently_closed:
+                    events.append(ev)
+        # Prune dedup set to avoid unbounded growth (keep last 100)
+        if len(self._recently_closed) > 100:
+            self._recently_closed = set(list(self._recently_closed)[-50:])
         return events
 
     def check_paper_positions(self) -> list[dict]:
@@ -347,35 +356,41 @@ class PositionManager:
                     to_close.append((ticket, reason, exit_price, pnl))
 
             for ticket, reason, exit_price, mt5_pnl in to_close:
-                pos = self.executor.open_positions.get(ticket)
-                if pos is None:
-                    continue  # another thread already removed it
                 from bridge.risk_bridge import calculate_pnl as calc_pnl
-                local_pnl = calc_pnl(pos.symbol, pos.entry_price, exit_price, pos.lot_size, pos.direction)
-                risk_pnl = abs(calc_pnl(pos.symbol, pos.entry_price, pos.sl_price, pos.lot_size, pos.direction))
-                r_multiple = round(local_pnl / risk_pnl, 2) if risk_pnl > 0 else 0.0
 
-                print(
-                    f"  [MT5_SYNC] #{ticket} {pos.symbol} closed by broker ({reason}) "
-                    f"Entry={pos.entry_price:.2f} Exit={exit_price:.2f} "
-                    f"PnL={local_pnl:+.2f} ({r_multiple:+.1f}R)",
-                    flush=True,
-                )
-
-                self.executor.balance += local_pnl
-                if local_pnl >= 0:
-                    self.executor.wins += 1
-                else:
-                    self.executor.losses += 1
-                    # Set per-symbol loss cooldown if executor supports it
-                    if hasattr(self.executor, 'set_symbol_loss_cooldown'):
-                        self.executor.set_symbol_loss_cooldown(pos.symbol)
+                # Acquire lock for all state mutations to avoid races with check_positions
                 if lock:
-                    with lock:
-                        del self.executor.open_positions[ticket]
-                else:
-                    del self.executor.open_positions[ticket]
+                    lock.acquire()
+                try:
+                    pos = self.executor.open_positions.get(ticket)
+                    if pos is None:
+                        continue  # another thread already removed it
+                    local_pnl = calc_pnl(pos.symbol, pos.entry_price, exit_price, pos.lot_size, pos.direction)
+                    risk_pnl = abs(calc_pnl(pos.symbol, pos.entry_price, pos.sl_price, pos.lot_size, pos.direction))
+                    r_multiple = round(local_pnl / risk_pnl, 2) if risk_pnl > 0 else 0.0
 
+                    print(
+                        f"  [MT5_SYNC] #{ticket} {pos.symbol} closed by broker ({reason}) "
+                        f"Entry={pos.entry_price:.2f} Exit={exit_price:.2f} "
+                        f"PnL={local_pnl:+.2f} ({r_multiple:+.1f}R)",
+                        flush=True,
+                    )
+
+                    self.executor.balance += local_pnl
+                    if local_pnl >= 0:
+                        self.executor.wins += 1
+                    else:
+                        self.executor.losses += 1
+                        # Set per-symbol loss cooldown if executor supports it
+                        if hasattr(self.executor, 'set_symbol_loss_cooldown'):
+                            self.executor.set_symbol_loss_cooldown(pos.symbol)
+                    del self.executor.open_positions[ticket]
+                finally:
+                    if lock:
+                        lock.release()
+
+                # Track recently closed to prevent double P&L counting
+                self._recently_closed.add(ticket)
                 events.append({
                     "ticket": ticket,
                     "symbol": pos.symbol,

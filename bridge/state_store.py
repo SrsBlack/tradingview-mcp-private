@@ -227,7 +227,7 @@ class StateStore:
                 if hasattr(executor, "_next_ticket"):
                     executor._next_ticket = max(executor._next_ticket, pos.ticket + 1)
                 restored.append(p)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [STATE] Failed to restore position: {e} — data: {p}", flush=True)
 
         return restored

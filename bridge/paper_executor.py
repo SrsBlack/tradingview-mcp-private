@@ -70,6 +70,10 @@ class PaperExecutor:
         self.grade_a_wins = 0
         self.grade_a_losses = 0
 
+        # Daily P&L: track from day-start balance, reset at midnight UTC
+        self._day_start_balance: float = initial_balance
+        self._day_start_date: str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
         # Slippage simulation: half-spread applied against trader on entry & exit
         # Keys are base symbol names (no exchange prefix)
         self._slippage_bps: dict[str, float] = {
@@ -428,14 +432,24 @@ class PaperExecutor:
     # Account state
     # ------------------------------------------------------------------
 
+    def _check_daily_reset(self) -> None:
+        """Reset day-start balance at midnight UTC."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if today != self._day_start_date:
+            self._day_start_balance = self.balance
+            self._day_start_date = today
+            print(f"[PAPER] Daily reset — day-start balance: ${self._day_start_balance:,.2f}", flush=True)
+
     @property
     def daily_pnl(self) -> float:
-        """Today's P&L (realized only)."""
-        return round(self.balance - self.initial_balance, 2)
+        """Today's P&L — resets at midnight UTC."""
+        self._check_daily_reset()
+        return round(self.balance - self._day_start_balance, 2)
 
     @property
     def daily_pnl_pct(self) -> float:
-        return self.daily_pnl / self.initial_balance if self.initial_balance else 0.0
+        self._check_daily_reset()
+        return self.daily_pnl / self._day_start_balance if self._day_start_balance else 0.0
 
     @property
     def total_drawdown_pct(self) -> float:

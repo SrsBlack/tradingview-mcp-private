@@ -284,9 +284,16 @@ class LiveExecutorAdapter:
         """
         Check MT5 positions against current prices.
         Handles TP1 partial close, trailing SL sync to MT5, and SL/TP detection.
+
+        Lock is held only for in-memory state updates; MT5 I/O runs outside
+        the lock to avoid blocking other threads during network calls.
         """
+        from bridge.risk_bridge import calculate_pnl
+
         events = []
         to_remove = []
+        # Deferred MT5 operations: run outside lock
+        mt5_ops: list[tuple[str, int, Any, Any]] = []  # (op, ticket, arg1, arg2)
 
         with self._positions_lock:
             for ticket, pos in self.open_positions.items():
@@ -295,7 +302,6 @@ class LiveExecutorAdapter:
                     continue
 
                 pos.current_price = price
-                from bridge.risk_bridge import calculate_pnl
                 pos.floating_pnl = calculate_pnl(
                     pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction
                 )
@@ -315,14 +321,13 @@ class LiveExecutorAdapter:
                             pos.lot_size * 0.5, pos.direction
                         )
 
-                        # Partial close 50% on MT5
-                        self._mt5_partial_close(ticket, pos, pos.lot_size * 0.5)
                         self.balance += partial_pnl
                         pos.lot_size = round(pos.lot_size * 0.5, 4)
                         pos.trailing_sl = pos.entry_price  # breakeven
 
-                        # Update SL to breakeven on MT5
-                        self._mt5_modify_sl(ticket, pos.entry_price)
+                        # Defer MT5 I/O: partial close + SL modify
+                        mt5_ops.append(("partial_close", ticket, pos, pos.lot_size))
+                        mt5_ops.append(("modify_sl", ticket, pos.entry_price, None))
 
                         print(
                             f"  [LIVE TP1] {pos.symbol} TP1 hit @ {pos.tp_price:.2f} "
@@ -388,19 +393,28 @@ class LiveExecutorAdapter:
                     })
                     continue
 
-                # -- Update trailing stop and sync to MT5 --
+                # -- Update trailing stop (in-memory only; MT5 sync deferred) --
                 old_trailing = pos.trailing_sl
                 self._update_trailing_stop(pos)
                 if pos.trailing_sl != old_trailing:
-                    self._mt5_modify_sl(ticket, pos.trailing_sl)
+                    mt5_ops.append(("trail_sl", ticket, pos.trailing_sl, old_trailing))
                     print(
                         f"  [LIVE TRAIL] {pos.symbol} #{ticket} trailing SL "
-                        f"{old_trailing:.2f} → {pos.trailing_sl:.2f} (synced to MT5)",
+                        f"{old_trailing:.2f} → {pos.trailing_sl:.2f} (syncing to MT5)",
                         flush=True,
                     )
 
             for t in to_remove:
                 self.open_positions.pop(t, None)
+
+        # -- Execute deferred MT5 I/O outside the lock --
+        for op, ticket, arg1, arg2 in mt5_ops:
+            if op == "partial_close":
+                self._mt5_partial_close(ticket, arg1, arg1.lot_size)
+            elif op == "modify_sl":
+                self._mt5_modify_sl(ticket, arg1)
+            elif op == "trail_sl":
+                self._mt5_modify_sl_with_revert(ticket, arg1, arg2)
 
         return events
 
@@ -423,14 +437,18 @@ class LiveExecutorAdapter:
             if new_sl < pos.trailing_sl:
                 pos.trailing_sl = round(new_sl, 5)
 
-    def _mt5_modify_sl(self, ticket: int, new_sl: float) -> None:
-        """Update SL on MT5 position. Fire-and-forget with logging."""
+    def _mt5_modify_sl(self, ticket: int, new_sl: float) -> bool:
+        """Update SL on MT5 position. Returns True on success."""
+        success = False
         def _run():
+            nonlocal success
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 result = loop.run_until_complete(self._live.modify_sl(ticket, new_sl))
-                if not result:
+                if result:
+                    success = True
+                else:
                     print(f"  [MT5_SL] Failed to modify SL for #{ticket} to {new_sl:.5f}", flush=True)
             except Exception as e:
                 print(f"  [MT5_SL] Error modifying SL for #{ticket}: {e}", flush=True)
@@ -440,6 +458,19 @@ class LiveExecutorAdapter:
         t = threading.Thread(target=_run, daemon=True)
         t.start()
         t.join(timeout=10)
+        return success
+
+    def _mt5_modify_sl_with_revert(self, ticket: int, new_sl: float, old_sl: float) -> None:
+        """Update SL on MT5 and revert in-memory trailing_sl if MT5 call fails."""
+        if not self._mt5_modify_sl(ticket, new_sl):
+            with self._positions_lock:
+                pos = self.open_positions.get(ticket)
+                if pos:
+                    pos.trailing_sl = old_sl
+                    print(
+                        f"  [MT5_SL] Reverted trailing SL for #{ticket} to {old_sl:.5f} (MT5 sync failed)",
+                        flush=True,
+                    )
 
     def _mt5_partial_close(self, ticket: int, pos: PaperPosition, close_lots: float) -> None:
         """Partial close on MT5 — close specified lot size."""

@@ -205,7 +205,7 @@ class RiskBridge:
                     volume_step=info.volume_step,
                 )
                 dir_enum = Direction.BULLISH if direction == "BUY" else Direction.BEARISH
-                return calculate_lots(
+                lots = calculate_lots(
                     account_balance=balance,
                     risk_pct=risk_pct,
                     entry_price=entry_price,
@@ -213,6 +213,7 @@ class RiskBridge:
                     direction=dir_enum,
                     spec=spec,
                 )
+                return _clamp_to_hard_max(symbol, lots)
         except ImportError:
             pass
         except Exception as e:

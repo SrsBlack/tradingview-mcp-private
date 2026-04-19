@@ -38,6 +38,9 @@ from analysis.liquidity import scan_sweeps, get_draw_on_liquidity, swing_to_liqu
 from analysis.sessions import get_session_info, SessionInfo
 from analysis.smt import detect_smt_divergence, SMT_PAIRS
 from analysis.ict.scorer import score_ict_setup, ICTScoreBreakdown, get_pd_zone, pd_aligned_with_bias
+from analysis.ict.core import detect_cisd, get_latest_cisd, detect_po3_phase, PO3Phase, detect_judas_swing, JudasSwing
+from analysis.ict.advanced import run_advanced_analysis, AdvancedAnalysis
+from analysis.sessions import get_asian_range, get_ndog, get_cbdr
 from core.types import Direction, SignalGrade, FVGQuality
 
 
@@ -109,6 +112,21 @@ class SymbolAnalysis:
     # Volatility (ATR-14 on M15)
     atr_m15: float = 0.0
 
+    # Advanced ICT concepts
+    has_cisd: bool = False
+    po3_phase: str = ""  # accumulation, manipulation, distribution
+    has_judas_swing: bool = False
+    judas_direction: str = ""  # BULLISH / BEARISH
+    is_macro_time: bool = False
+    asian_range: tuple[float, float] | None = None
+    ndog_count: int = 0  # New Day Opening Gaps detected
+    cbdr_range: tuple[float, float] | None = None
+    advanced_score: float = 0.0
+    advanced_factors: list[str] = field(default_factory=list)
+
+    # Fibonacci extension TP levels
+    fib_tp_levels: list[float] = field(default_factory=list)
+
     # Error info
     error: str | None = None
 
@@ -144,6 +162,19 @@ class SymbolAnalysis:
             "pd_aligned": self.pd_aligned,
             "risk_level": self.risk_level,
             "atr_m15": self.atr_m15,
+            "advanced": {
+                "has_cisd": self.has_cisd,
+                "po3_phase": self.po3_phase,
+                "has_judas_swing": self.has_judas_swing,
+                "judas_direction": self.judas_direction,
+                "is_macro_time": self.is_macro_time,
+                "asian_range": list(self.asian_range) if self.asian_range else None,
+                "ndog_count": self.ndog_count,
+                "cbdr_range": list(self.cbdr_range) if self.cbdr_range else None,
+                "advanced_score": round(self.advanced_score, 1),
+                "advanced_factors": self.advanced_factors,
+                "fib_tp_levels": [round(l, 5) for l in self.fib_tp_levels],
+            },
         }
         if self.error:
             d["error"] = self.error
@@ -333,6 +364,131 @@ class ICTPipeline:
                     result.current_price, range_high, range_low, direction
                 )
 
+            # -- Step 8c: Macro time check --
+            result.is_macro_time = getattr(session_info, 'is_macro_time', False)
+
+            # -- Step 8d: CISD detection (on M15 — earliest reversal signal) --
+            cisd_signals = detect_cisd(df_primary) if df_primary is not None and len(df_primary) >= 10 else []
+            latest_cisd = get_latest_cisd(cisd_signals, direction=direction, max_age_bars=20)
+            result.has_cisd = latest_cisd is not None
+
+            # -- Step 8e: PO3 phase detection --
+            # Use the last 20 M15 bars as "session" slice (~5 hours of current session)
+            po3_result = None
+            if df_primary is not None and len(df_primary) >= 6:
+                session_slice = df_primary.iloc[-20:] if len(df_primary) >= 20 else df_primary
+                po3_result = detect_po3_phase(session_slice, daily_bias=direction)
+                result.po3_phase = po3_result.phase.value
+                # PO3 factor appended in Step 10b (after score sets confluence_factors)
+
+            # -- Step 8e2: Asian Range detection --
+            asian_rng = None
+            if df_primary is not None and len(df_primary) >= 20:
+                try:
+                    asian_rng = get_asian_range(df_primary)
+                    if asian_rng:
+                        result.asian_range = asian_rng
+                except Exception:
+                    pass
+
+            # -- Step 8e3: Judas Swing detection --
+            if df_primary is not None and len(df_primary) >= 6 and direction != Direction.NEUTRAL:
+                session_slice = df_primary.iloc[-20:] if len(df_primary) >= 20 else df_primary
+                judas = detect_judas_swing(session_slice, daily_bias=direction, asian_range=asian_rng)
+                if judas:
+                    result.has_judas_swing = True
+                    result.judas_direction = judas.direction.name
+
+            # -- Step 8e4: NDOG (New Day Opening Gaps) --
+            if df_primary is not None and len(df_primary) >= 30:
+                try:
+                    ndogs = get_ndog(df_primary)
+                    result.ndog_count = len(ndogs)
+                except Exception:
+                    pass
+
+            # -- Step 8e5: CBDR (Central Bank Dealers Range) --
+            cbdr_data = None
+            if df_primary is not None and len(df_primary) >= 20:
+                try:
+                    cbdr_data = get_cbdr(df_primary)
+                    if cbdr_data:
+                        result.cbdr_range = cbdr_data
+                except Exception:
+                    pass
+
+            # -- Step 8f: Advanced ICT analysis (CRT, Turtle Soup, Unicorn, IPDA, etc.) --
+            adv: AdvancedAnalysis | None = None
+            try:
+                if df_primary is not None and len(df_primary) >= 20:
+                    # Compute CBDR range in pips for advanced scoring
+                    cbdr_pips = 0.0
+                    if cbdr_data:
+                        cbdr_pips = abs(cbdr_data[0] - cbdr_data[1])
+                        # Rough conversion: forex pairs have 5-digit prices
+                        base_sym = self.config.internal_symbol(symbol)
+                        if base_sym in ("EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"):
+                            cbdr_pips *= 10000  # to pips
+                        elif base_sym == "USDJPY":
+                            cbdr_pips *= 100
+                    session_slice_adv = df_primary.iloc[-20:] if len(df_primary) >= 20 else df_primary
+                    adv = run_advanced_analysis(
+                        df=df_primary,
+                        symbol=self.config.internal_symbol(symbol),
+                        obs=obs,
+                        fvgs=fvgs,
+                        direction=direction,
+                        has_cisd=result.has_cisd,
+                        in_kill_zone=result.is_kill_zone,
+                        daily_bias=direction,
+                        session_df=session_slice_adv,
+                        cbdr=cbdr_data,
+                        cbdr_range_pips=cbdr_pips,
+                    )
+                    result.advanced_score = adv.advanced_score
+                    # Add advanced findings as confluence factors
+                    if adv.crt_setups:
+                        result.advanced_factors.append(f"CRT({len(adv.crt_setups)})")
+                    if adv.turtle_soups:
+                        result.advanced_factors.append(f"TurtleSoup({len(adv.turtle_soups)})")
+                    if adv.unicorn_zones:
+                        result.advanced_factors.append(f"Unicorn({len(adv.unicorn_zones)})")
+                    if adv.venom_setup:
+                        result.advanced_factors.append("Venom")
+                    if adv.propulsion_blocks:
+                        result.advanced_factors.append(f"PropBlock({len(adv.propulsion_blocks)})")
+                    if adv.rejection_blocks:
+                        result.advanced_factors.append(f"RejBlock({len(adv.rejection_blocks)})")
+                    if adv.ipda_levels:
+                        from analysis.ict.advanced import is_near_ipda_level
+                        if is_near_ipda_level(result.current_price, adv.ipda_levels):
+                            result.advanced_factors.append("near_IPDA")
+                    if result.is_macro_time:
+                        result.advanced_factors.append("MACRO_TIME")
+                    if result.has_judas_swing:
+                        result.advanced_factors.append(f"JudasSwing({result.judas_direction})")
+                    if result.asian_range:
+                        # Check if price swept Asian range (confluence with Judas)
+                        if direction == Direction.BULLISH and result.current_price > result.asian_range[1]:
+                            result.advanced_factors.append("AsianRange_swept_low")
+                        elif direction == Direction.BEARISH and result.current_price < result.asian_range[0]:
+                            result.advanced_factors.append("AsianRange_swept_high")
+                    if result.ndog_count > 0:
+                        result.advanced_factors.append(f"NDOG({result.ndog_count})")
+                    if cbdr_data and adv.intraday_profile.value != "invalid":
+                        result.advanced_factors.append(f"Profile_{adv.intraday_profile.value}")
+            except Exception as e:
+                print(f"  [{symbol}] Advanced ICT analysis error: {e}", flush=True)
+
+            # -- Step 8g: Fibonacci extension TP levels --
+            if range_high > range_low and direction in (Direction.BULLISH, Direction.BEARISH):
+                rng = range_high - range_low
+                fib_ratios = [1.272, 1.618, 2.0, 2.618]
+                if direction == Direction.BULLISH:
+                    result.fib_tp_levels = [round(range_low + rng * r, 5) for r in fib_ratios]
+                else:
+                    result.fib_tp_levels = [round(range_high - rng * r, 5) for r in fib_ratios]
+
             # -- Step 9: Score! --
             if score_both_directions:
                 # HTF is NEUTRAL — score both directions, pick the stronger one
@@ -388,8 +544,34 @@ class ICTPipeline:
             result.ote_score = score.ote
             result.smt_score = score.smt
 
+            # -- Step 10b: Apply advanced ICT confluence bonus --
+            # Add PO3 phase and CISD as confluence factors
+            if po3_result and po3_result.phase != PO3Phase.UNKNOWN:
+                result.advanced_factors.insert(0, f"PO3_{po3_result.phase.value}")
+            if result.has_cisd:
+                result.advanced_factors.insert(0, "CISD")
+
+            # Advanced concepts (CRT, Unicorn, CISD, etc.) add up to +10 points
+            # as confluence evidence — they don't replace the core score.
+            if result.advanced_factors:
+                bonus = min(len(result.advanced_factors) * 2.5, 10.0)
+                result.total_score = min(100, result.total_score + bonus)
+                result.confluence_factors.extend(result.advanced_factors)
+                result.confluence_factors.append(f"adv_bonus(+{bonus:.0f})")
+                # Re-grade after bonus
+                if result.total_score >= 80:
+                    result.grade = "A"
+                elif result.total_score >= 65:
+                    result.grade = "B"
+                elif result.total_score >= 50:
+                    result.grade = "C"
+                elif result.total_score >= 35:
+                    result.grade = "D"
+                else:
+                    result.grade = "INVALID"
+
             # Confidence = normalized score (0-1)
-            result.confidence = min(score.total / 100.0, 1.0)
+            result.confidence = min(result.total_score / 100.0, 1.0)
 
             # Risk level based on grade
             if score.grade in (SignalGrade.A,):

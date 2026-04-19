@@ -34,24 +34,36 @@ from bridge.ict_pipeline import SymbolAnalysis
 
 _KNOWLEDGE_DIR = Path(__file__).parent / "strategy_knowledge"
 
+# In-memory cache for JSON files (loaded once, reused across calls)
+_json_cache: dict[str, dict] = {}
+
 
 def _load_json(name: str) -> dict:
-    """Load a JSON file from strategy_knowledge/, returning {} on failure."""
+    """Load a JSON file from strategy_knowledge/, cached in memory."""
+    if name in _json_cache:
+        return _json_cache[name]
     path = _KNOWLEDGE_DIR / name
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            _json_cache[name] = data
+            return data
         except Exception:
             return {}
     return {}
 
 
 def _load_rules_json() -> dict:
-    """Load rules.json from project root."""
+    """Load rules.json from project root, cached in memory."""
+    cache_key = "__rules_json__"
+    if cache_key in _json_cache:
+        return _json_cache[cache_key]
     path = Path(__file__).parent.parent / "rules.json"
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            _json_cache[cache_key] = data
+            return data
         except Exception:
             return {}
     return {}
@@ -540,6 +552,29 @@ class ClaudeDecisionMaker:
         atr_line = f"\n- ATR(14) on M15: {a.atr_m15:.5f}" if a.atr_m15 > 0 else ""
         min_sl_dist = a.atr_m15 * 2.0 if a.atr_m15 > 0 else 0
 
+        # Fibonacci extension TP levels (if available)
+        fib_line = ""
+        fib_tp = getattr(a, 'fib_tp_levels', [])
+        if fib_tp:
+            fib_line = f"\n- Fib Extension TPs: 1.272={fib_tp[0]:,.2f}, 1.618={fib_tp[1]:,.2f}, 2.0={fib_tp[2]:,.2f}, 2.618={fib_tp[3]:,.2f}"
+
+        # Advanced ICT context
+        adv_line = ""
+        adv_factors = getattr(a, 'advanced_factors', [])
+        if adv_factors:
+            adv_line = f"\n- Advanced ICT: {', '.join(adv_factors)} (score: {getattr(a, 'advanced_score', 0):.0f}/100)"
+
+        # Judas Swing context
+        judas_line = ""
+        if getattr(a, 'has_judas_swing', False):
+            judas_line = f"\n- JUDAS SWING detected ({getattr(a, 'judas_direction', '?')}) — manipulation phase complete, distribution move expected"
+
+        # Asian Range context
+        asian_line = ""
+        asian_rng = getattr(a, 'asian_range', None)
+        if asian_rng:
+            asian_line = f"\n- Asian Range: {asian_rng[0]:,.2f} – {asian_rng[1]:,.2f} (sweep of this range = high-probability entry)"
+
         return f"""You are an ICT trading decision engine trained in ICT methodology (market structure, PO3, AMD, liquidity engineering, premium/discount, OTE, displacement, FVGs, order blocks, SMT divergence). Enhanced with 33 ChartFanatics strategies and 375K MT5 backtest passes. Evaluate this signal using ICT principles and respond with ONLY a JSON object.
 
 SIGNAL:
@@ -548,7 +583,7 @@ SIGNAL:
 - Confluence: {', '.join(a.confluence_factors) if a.confluence_factors else 'None'}
 - Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}
 - P/D Zone: {a.pd_zone or 'unknown'} | Aligned: {a.pd_aligned}
-- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}
+- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}{fib_line}{adv_line}{judas_line}{asian_line}
 
 SCORE BREAKDOWN (sub-scores are additive — 0 in one component does NOT disqualify):
 - Structure: {a.structure_score:.0f}/30{' (strong)' if a.structure_score >= 20 else ' (partial)' if a.structure_score >= 10 else ' (weak)'}
@@ -567,9 +602,9 @@ RULES:
 - SL behind nearest structure level/OB, but NEVER closer than 2x ATR(14) from entry{f' (minimum {min_sl_dist:.5f} distance)' if min_sl_dist > 0 else ''}
 - CRITICAL: Tight stops get hunted — our data shows sweeps regularly exceed 2x ATR. Place SL BEYOND the liquidity sweep wick, not at the edge. For crypto, minimum 0.5% of price distance. The trade that got stopped at 9pt on ETH would have made +30pts with a 12pt SL.
 - TP at next liquidity target
-- TP1 (tp_price): nearest HTF FVG or Order Block in trade direction (partial close at 50%)
-- TP2 (tp2_price): next liquidity pool / swing high/low (final target, trail remainder)
-- If only one TP level is clear, set tp2_price = tp_price * 1.5 (for BUY) or * 0.667 (for SELL) as fallback
+- TP1 (tp_price): nearest HTF FVG or Order Block in trade direction (partial close at 50%). Prefer the 1.272 Fibonacci extension if available.
+- TP2 (tp2_price): next liquidity pool / swing high/low (final target, trail remainder). Prefer the 1.618 or 2.0 Fibonacci extension if available.
+- If only one TP level is clear, use Fibonacci extensions as TP targets. Fallback: tp2_price = tp_price * 1.5 (BUY) or * 0.667 (SELL).
 - Max risk for this symbol/grade: {max_risk:.1%}
 - Trade type: {trade_type.upper()} → SL placement: {'beyond the swept high/low (give buffer beyond the wick)' if trade_type == 'swing' else 'behind the OB/FVG entry zone (at least 1.5x ATR from entry)'}
 - CRITICAL ZONE CHECK: BUY in premium or SELL in discount = WRONG ZONE. Auto-downgrade by 1 grade or SKIP unless strong confluence overrides.
