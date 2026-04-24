@@ -125,14 +125,28 @@ class LiveExecutorAdapter:
             "kill_switch_triggered": self._live._kill_switch,
             "kill_switch_date": getattr(self, "_kill_switch_date", ""),
             "last_updated": datetime.now(timezone.utc).isoformat(),
-            # Per-ticket trailing SL state — survives restart so adopted
-            # positions don't lose trail progress (fixes ticket #100040 bug).
+            # Per-ticket position state — survives restart so adopted positions
+            # retain trail progress AND the original TP/TP2 targets, grade, and
+            # reasoning. Without TP/TP2 here the adoption code zeroes them and
+            # silently disables TP management on the position (discovered
+            # 2026-04-24 after a mid-session restart stripped TPs from 3
+            # positions; salvaged by setting MT5 TP directly, then this fix).
             "trailing_sl_by_ticket": {
                 str(t): {
                     "trailing_sl": float(p.trailing_sl),
                     "tp1_hit": bool(getattr(p, "tp1_hit", False)),
                     "trail_desync": bool(getattr(p, "_trail_desync", False)),
                     "desired_sl": float(getattr(p, "_desired_sl", p.trailing_sl)),
+                    # Preserve the full planned exit ladder across restarts
+                    "tp_price": float(getattr(p, "tp_price", 0.0) or 0.0),
+                    "tp2_price": float(getattr(p, "tp2_price", 0.0) or 0.0),
+                    "entry_price": float(getattr(p, "entry_price", 0.0) or 0.0),
+                    "ict_grade": str(getattr(p, "ict_grade", "") or ""),
+                    "ict_score": float(getattr(p, "ict_score", 0.0) or 0.0),
+                    "trade_type": str(getattr(p, "trade_type", "intraday") or "intraday"),
+                    "risk_pct": float(getattr(p, "risk_pct", 0.01) or 0.01),
+                    "opened_at": str(getattr(p, "opened_at", "") or ""),
+                    "reasoning": str(getattr(p, "reasoning", "") or "")[:500],  # cap to keep file small
                 }
                 for t, p in self.open_positions.items()
             },

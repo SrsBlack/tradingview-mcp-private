@@ -482,15 +482,26 @@ class PositionManager:
                     sl_price = pos.sl if pos.sl > 0 else 0.0
                     tp_price = pos.tp if pos.tp > 0 else 0.0
 
-                    # Restore persisted trailing SL state if this ticket was
-                    # tracked before the restart. Without this, we lose all trail
-                    # progress and revert to the original entry SL.
+                    # Restore persisted position state if this ticket was
+                    # tracked before the restart. Without this, we lose trail
+                    # progress, TP targets, grade, and reasoning — which
+                    # silently disables TP management for adopted positions.
                     persisted = getattr(self.executor, "_persisted_trail_state", {}) or {}
                     trail_state = persisted.get(str(pos.ticket)) or {}
                     restored_trail = trail_state.get("trailing_sl", sl_price)
                     restored_tp1_hit = bool(trail_state.get("tp1_hit", False))
                     restored_desync = bool(trail_state.get("trail_desync", False))
                     restored_desired = trail_state.get("desired_sl", restored_trail)
+                    # Two-tier TP / grade / reasoning — previously dropped
+                    # at restart, causing silent TP-management disable.
+                    restored_tp = float(trail_state.get("tp_price", 0.0) or 0.0)
+                    restored_tp2 = float(trail_state.get("tp2_price", 0.0) or 0.0)
+                    restored_grade = str(trail_state.get("ict_grade", "") or "?")
+                    restored_score = float(trail_state.get("ict_score", 0.0) or 0.0)
+                    restored_trade_type = str(trail_state.get("trade_type", "") or "")
+                    restored_risk = float(trail_state.get("risk_pct", 0.0) or 0.01)
+                    restored_opened = str(trail_state.get("opened_at", "") or "")
+                    restored_reasoning = str(trail_state.get("reasoning", "") or "")
 
                     # Prefer the broker's actual SL if it's MORE favorable than
                     # what we had persisted — broker-side trail (rare) or manual
@@ -500,21 +511,39 @@ class PositionManager:
                     elif direction == "SELL" and 0 < sl_price < restored_trail:
                         restored_trail = sl_price
 
+                    # Prefer persisted TP over MT5's tp field — for two-tier
+                    # trades the bridge intentionally sets MT5 tp=0 and manages
+                    # TP1/TP2 internally. If nothing persisted (first run ever),
+                    # fall back to MT5's tp field.
+                    effective_tp = restored_tp if restored_tp > 0 else tp_price
+                    effective_trade_type = (
+                        restored_trade_type
+                        or self._infer_trade_type(pos.price_open, sl_price, effective_tp)
+                    )
+                    effective_reasoning = (
+                        restored_reasoning
+                        or f"Adopted from MT5 on startup (comment: {comment})"
+                    )
+                    effective_opened = (
+                        restored_opened
+                        or datetime.fromtimestamp(pos.time, tz=timezone.utc).isoformat()
+                    )
+
                     paper_pos = PaperPosition(
                         ticket=pos.ticket,
                         symbol=tv_symbol,
                         direction=direction,
                         entry_price=pos.price_open,
                         sl_price=sl_price,
-                        tp_price=tp_price,
-                        tp2_price=0.0,
+                        tp_price=effective_tp,
+                        tp2_price=restored_tp2,
                         lot_size=pos.volume,
-                        risk_pct=0.01,
-                        opened_at=datetime.fromtimestamp(pos.time, tz=timezone.utc).isoformat(),
-                        ict_grade="?",
-                        ict_score=0,
-                        reasoning=f"Adopted from MT5 on startup (comment: {comment})",
-                        trade_type=self._infer_trade_type(pos.price_open, sl_price, tp_price),
+                        risk_pct=restored_risk,
+                        opened_at=effective_opened,
+                        ict_grade=restored_grade,
+                        ict_score=restored_score,
+                        reasoning=effective_reasoning,
+                        trade_type=effective_trade_type,
                         trailing_sl=restored_trail,
                         tp1_hit=restored_tp1_hit,
                         current_price=pos.price_current,
