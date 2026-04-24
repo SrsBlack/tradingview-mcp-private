@@ -16,5 +16,10 @@
   ],
   "core_principle": "Every liquidity level has a PAIR. PDH ↔ PDL. PWH ↔ PWL. Asian High ↔ Asian Low. Equal highs ↔ Equal lows. When price sweeps one side of the pair, the OTHER side becomes the new target.",
   "application": "After a confirmed liquidity_sweep of SSL (sell-side swept), the draw on liquidity is BSL (buy-side). Your TP = the paired BSL level. This is HOW you determine TP — not from arbitrary R:R multiples but from the paired liquidity target.",
-  "why_it_works": "Institutions sweep one side to fill orders, then drive price to the other side where more orders wait. The pairing IS the institutional order book in action."
+  "why_it_works": "Institutions sweep one side to fill orders, then drive price to the other side where more orders wait. The pairing IS the institutional order book in action.",
+  "bridge_integration": {
+    "detection": "After sweep detection, paired liquidity target computed from session level map (PDH↔PDL, PWH↔PWL, Asian High↔Asian Low).",
+    "prompt_display": "draw_on_liquidity field shows the paired target as the primary TP level. Explicitly shown in trade parameters.",
+    "score_impact": "Clear paired target with R:R >= 2.0 = +5 to execution score. No clear paired target = TP ambiguity penalty."
+  }
 }

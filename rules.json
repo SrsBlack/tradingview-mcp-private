@@ -6,12 +6,15 @@
     "OANDA:EURUSD",
     "OANDA:GBPUSD",
     "OANDA:USDJPY",
+    "OANDA:EURJPY",
+    "OANDA:GBPJPY",
+    "OANDA:USDCAD",
     "FX:AUDUSD",
     "FX:NZDUSD",
     "CBOT:YM1!",
     "CAPITALCOM:US500",
     "CAPITALCOM:US100",
-    "XETR:DAX",
+    "VANTAGE:GER40",
     "OANDA:XAUUSD",
     "OANDA:XAGUSD",
     "TVC:UKOIL",
@@ -84,7 +87,11 @@
       "backtest_confidence": 0.85,
       "primary_strategies": ["liquidity_sweep", "fvg_fill"],
       "smt_pair": "COINBASE:ETHUSD",
-      "notes": "Higher beta than BTC/ETH; widen SL slightly for volatility"
+      "notes": "Higher beta than BTC/ETH; widen SL slightly for volatility",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
     },
     "COINBASE:DOGEUSD": {
       "asset_class": "crypto",
@@ -102,7 +109,11 @@
       "best_sessions": ["london_open", "london_ny_overlap"],
       "backtest_confidence": 1.0,
       "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
-      "notes": "Cleanest ICT setups during London session; avoid post-NY close"
+      "notes": "Cleanest ICT setups during London session; avoid post-NY close",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "OANDA:GBPUSD": {
       "asset_class": "forex",
@@ -110,14 +121,58 @@
       "backtest_confidence": 0.7,
       "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
       "smt_pair": "OANDA:EURUSD",
-      "notes": "SMT pair with EURUSD; wider spreads and more volatile — needs London session confirmation"
+      "notes": "SMT pair with EURUSD; wider spreads and more volatile — needs London session confirmation",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
     },
     "OANDA:USDJPY": {
       "asset_class": "forex",
       "best_sessions": ["london_open", "london_ny_overlap", "asian"],
       "backtest_confidence": 0.8,
       "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
-      "notes": "JPY-quoted — tick_value changes with USD/JPY rate; strong Tokyo session structure"
+      "notes": "JPY-quoted — tick_value changes with USD/JPY rate; strong Tokyo session structure",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
+    },
+    "OANDA:EURJPY": {
+      "asset_class": "forex",
+      "best_sessions": ["asian", "london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.75,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest"],
+      "smt_pair": "OANDA:USDJPY",
+      "notes": "JPY cross — volatile during Tokyo + London; wide-range session; watch JPY news; lower risk than USDJPY until we see fills",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
+    },
+    "OANDA:GBPJPY": {
+      "asset_class": "forex",
+      "best_sessions": ["asian", "london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.75,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
+      "smt_pair": "OANDA:USDJPY",
+      "notes": "The 'dragon' — highest-range major JPY cross; big sweeps in Tokyo + London KZ; widen SL for volatility (2.5x ATR min like crypto)",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
+    },
+    "OANDA:USDCAD": {
+      "asset_class": "forex",
+      "best_sessions": ["london_open", "london_ny_overlap"],
+      "backtest_confidence": 0.75,
+      "primary_strategies": ["liquidity_sweep", "order_block_retest", "ote_retrace"],
+      "smt_pair": "TVC:UKOIL",
+      "notes": "Oil-correlated (inverse); NY session plays when EURUSD is dead; watch oil inventory reports (Wed 10:30 ET)",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "FX:AUDUSD": {
       "asset_class": "forex",
@@ -125,7 +180,11 @@
       "backtest_confidence": 0.8,
       "primary_strategies": ["liquidity_sweep", "order_block_retest"],
       "smt_pair": "FX:NZDUSD",
-      "notes": "SMT pair with NZD; best during Asian + early London sessions"
+      "notes": "SMT pair with NZD; best during Asian + early London sessions",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "FX:NZDUSD": {
       "asset_class": "forex",
@@ -133,7 +192,11 @@
       "backtest_confidence": 0.8,
       "primary_strategies": ["liquidity_sweep", "order_block_retest"],
       "smt_pair": "FX:AUDUSD",
-      "notes": "SMT pair with AUD; lower liquidity than AUD — tighter position sizing"
+      "notes": "SMT pair with AUD; lower liquidity than AUD — tighter position sizing",
+      "risk_overrides": {
+        "grade_a": 0.005,
+        "grade_b": 0.0025
+      }
     },
     "CBOT:YM1!": {
       "asset_class": "index_futures",
@@ -141,7 +204,11 @@
       "backtest_confidence": 1.0,
       "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
       "smt_pair": "CAPITALCOM:US500",
-      "notes": "ICT Silver Bullet 10-11am ET window is prime; respect cash session open"
+      "notes": "ICT Silver Bullet 10-11am ET window is prime; respect cash session open",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "CAPITALCOM:US500": {
       "asset_class": "index_cfd",
@@ -149,7 +216,11 @@
       "backtest_confidence": 0.95,
       "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
       "smt_pair": "CBOT:YM1!",
-      "notes": "Divergence with YM/NQ is a strong SMT signal"
+      "notes": "Divergence with YM/NQ is a strong SMT signal",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "CAPITALCOM:US100": {
       "asset_class": "index_cfd",
@@ -157,7 +228,11 @@
       "backtest_confidence": 0.95,
       "primary_strategies": ["liquidity_sweep", "silver_bullet", "fvg_fill"],
       "smt_pair": "CAPITALCOM:US500",
-      "notes": "Higher beta than ES; expect wider SL and larger R targets"
+      "notes": "Higher beta than ES; expect wider SL and larger R targets",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "OANDA:XAUUSD": {
       "asset_class": "commodity_cfd",
@@ -176,22 +251,34 @@
       "backtest_confidence": 0.7,
       "primary_strategies": ["liquidity_sweep", "order_block_retest"],
       "smt_pair": "OANDA:XAUUSD",
-      "notes": "SMT pair with XAUUSD; tick_value=5.0 per 0.001 tick — position size carefully"
+      "notes": "SMT pair with XAUUSD; tick_value=5.0 per 0.001 tick — position size carefully",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
-    "XETR:DAX": {
+    "VANTAGE:GER40": {
       "asset_class": "index_cfd",
       "best_sessions": ["london_open", "london_ny_overlap"],
       "backtest_confidence": 0.8,
       "primary_strategies": ["liquidity_sweep", "order_block_retest", "silver_bullet"],
       "smt_pair": "CAPITALCOM:US500",
-      "notes": "EUR-quoted tick_value; prime during Frankfurt/London overlap 8-11am CET"
+      "notes": "EUR-quoted tick_value; prime during Frankfurt/London overlap 8-11am CET",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     },
     "TVC:UKOIL": {
       "asset_class": "commodity_cfd",
       "best_sessions": ["london_open", "london_ny_overlap"],
       "backtest_confidence": 0.8,
       "primary_strategies": ["liquidity_sweep", "order_block_retest"],
-      "notes": "Event-driven (OPEC/EIA); skip setups near scheduled releases"
+      "notes": "Event-driven (OPEC/EIA); skip setups near scheduled releases",
+      "risk_overrides": {
+        "grade_a": 0.0075,
+        "grade_b": 0.004
+      }
     }
   },
   "time_filters": {

@@ -15,5 +15,10 @@
   ],
   "cycle": "Contraction → Expansion → Contraction → Expansion. After 2-3 contracting candles, expect expansion. After 5+ expanding candles, expect contraction (mean reversion).",
   "trading_rule": "Enter during late contraction (before expansion). Exit or reduce during late expansion (before contraction). DO NOT enter during mid-expansion — you're chasing.",
-  "how_to_detect": "Compare current candle range to average of last 5. If current < 60% of average for 2-3 candles = contraction. If current > 140% for 3+ candles = expansion."
+  "how_to_detect": "Compare current candle range to average of last 5. If current < 60% of average for 2-3 candles = contraction. If current > 140% for 3+ candles = expansion.",
+  "bridge_integration": {
+    "detection": "Range expansion candles identified when body > 140% of 5-bar average range with minimal wicks. Flags displacement candidate.",
+    "prompt_display": "Contraction periods flag low-conviction setups. Expansion confirms displacement when combined with sweep.",
+    "score_impact": "Mid-expansion entry = chasing penalty (-3 score). Late contraction before expansion = ideal entry window."
+  }
 }

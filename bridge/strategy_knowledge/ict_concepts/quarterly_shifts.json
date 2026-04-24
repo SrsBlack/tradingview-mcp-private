@@ -70,9 +70,10 @@
   },
 
   "bridge_integration": {
-    "detection": "Analyze last 12 weekly closes for direction reversal. Flag quarterly shift when 3+ weeks confirm.",
-    "bias_override": "Quarterly direction overrides daily_bias when they conflict",
-    "score_impact": "Trade aligned with quarterly shift = +5 to macro score. Counter-quarterly = -5.",
-    "risk_adjustment": "Counter-quarterly trades get 50% risk reduction automatically"
+    "detection": "Analyzes weekly closes from H4 data. Identifies when 3+ consecutive weekly closes reverse the prior quarterly direction.",
+    "auto_injection": "Quarterly shift detected → QShift_BULLISH/BEARISH(confirmed/developing) added to advanced_factors → injected into Claude prompt.",
+    "bias_override": "Confirmed quarterly shift (3+ weeks) MUST align with all trades. Developing shift (2 weeks) downgrades counter-trades by 1 grade.",
+    "score_impact": "Trade aligned with quarterly shift = +5 macro confidence. Counter-shift = -5 and max Grade B.",
+    "risk_adjustment": "Counter-quarterly trades get 50% risk reduction automatically. Aligned trades can use full risk allocation."
   }
 }

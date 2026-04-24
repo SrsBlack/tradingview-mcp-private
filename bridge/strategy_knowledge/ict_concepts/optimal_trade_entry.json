@@ -22,5 +22,17 @@
     "above_0.786": "Danger — pullback may be reversal. Connects to market_structure — if this level breaks, the displacement may have been a fake."
   },
   "application_chain": "displacement (layer 3) → creates FVG + OB (layer 4) → draw Fibonacci on the displacement → OTE zone (0.618-0.786) within the FVG/OB = entry. This IS the layer 3→4→5 chain.",
-  "common_mistake": "Entering at 0.5 without waiting for OTE. The 0.5 is equilibrium, not optimal. Patient wait for 0.618-0.705 dramatically improves win rate."
+  "common_mistake": "Entering at 0.5 without waiting for OTE. The 0.5 is equilibrium, not optimal. Patient wait for 0.618-0.705 dramatically improves win rate.",
+  "trading_rules": {
+    "rule_1": "OTE entry is ONLY valid when the OTE zone overlaps with an FVG or OB — standalone Fibonacci without a zone is not ICT methodology.",
+    "rule_2": "Deep retracement to 0.786 = higher R:R but lower fill probability. 0.705 is the sweet spot.",
+    "rule_3": "If price passes through 0.786 and keeps going = displacement may have been fake. Do NOT enter — thesis is invalidated.",
+    "rule_4": "OTE must be in the correct premium/discount zone. OTE for longs in premium = reduce grade by 1.",
+    "rule_5": "Use OTE with limit orders, not market orders — precise zone entry defines the trade's R:R."
+  },
+  "bridge_integration": {
+    "detection": "ote_score computed from Fibonacci retracement distance relative to displacement move. Score >= 6 = in OTE zone.",
+    "prompt_display": "OTE score shown in confluence factors. At 0.618-0.786 retracement = optimal entry hint injected.",
+    "score_impact": "OTE score contributes to overall ICT score. OTE + FVG + OB stack = maximum precision entry."
+  }
 }

@@ -18,5 +18,10 @@
   "vs_turtle_soup": "Turtle soup: price breaks through and closes back inside = confirmed reversal. SFP: price can't even close beyond = exhaustion signal. SFP is WEAKER confirmation than turtle soup but fires earlier.",
   "buy_SFP": "Price wicks below a prior swing low but closes above it. Indicates buying pressure absorbed the sell-side raid.",
   "sell_SFP": "Price wicks above a prior swing high but closes below it. Indicates selling pressure absorbed the buy-side raid.",
-  "how_to_use": "SFP at a HTF key level (PDH/PDL, OB, FVG boundary) = high-conviction reversal signal. SFP at a random swing = lower significance."
+  "how_to_use": "SFP at a HTF key level (PDH/PDL, OB, FVG boundary) = high-conviction reversal signal. SFP at a random swing = lower significance.",
+  "bridge_integration": {
+    "detection": "Scanned via swing_failure_pattern check: candle wicks through prior swing but body closes back inside. Flagged in confluence_factors.",
+    "prompt_display": "SFP adds to sweep confluence. Noted as 'failed breakout' signal in analysis context for Claude.",
+    "score_impact": "SFP at PDH/PDL or session level = +4 reversal confluence. SFP confirming existing sweep = cumulative sweep score boost."
+  }
 }

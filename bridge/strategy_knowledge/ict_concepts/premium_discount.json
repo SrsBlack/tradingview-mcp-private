@@ -20,5 +20,17 @@
     "sell_in_premium": "Shorts ONLY above 50% — selling above fair value.",
     "zone_violation": "An order_block or fair_value_gap in the WRONG zone (OB for longs in premium) is still technically valid but has significantly lower probability. Reduce grade by 1."
   },
-  "nested_application": "Premium/discount applies at EVERY timeframe via nested dealing_ranges. HTF discount + LTF discount = strongest alignment."
+  "nested_application": "Premium/discount applies at EVERY timeframe via nested dealing_ranges. HTF discount + LTF discount = strongest alignment.",
+  "trading_rules": {
+    "rule_1": "NEVER buy in premium. NEVER sell in discount. This is the #1 rule — zone violations are the top cause of losses.",
+    "rule_2": "An order block in the wrong zone is still technically valid but has ~30% lower win rate. Auto-downgrade by 1 grade.",
+    "rule_3": "Equilibrium (50%) is not a trading zone — it's a waiting zone. Price at equilibrium = expect chop, reduce size.",
+    "rule_4": "Premium/discount must be assessed on the TRADING timeframe dealing range, not just HTF.",
+    "rule_5": "HTF discount + LTF discount = strongest buy alignment. HTF discount + LTF premium = wait for LTF pullback."
+  },
+  "bridge_integration": {
+    "detection": "pd_zone (premium/discount) and pd_aligned computed from current dealing range. Pre-gate rejects zone violations.",
+    "prompt_display": "Shows P/D Zone and Aligned status. Zone violation triggers CRITICAL ZONE CHECK rule.",
+    "score_impact": "Zone alignment is a binary gate — misaligned trades are either auto-skipped or downgraded by 1 grade."
+  }
 }

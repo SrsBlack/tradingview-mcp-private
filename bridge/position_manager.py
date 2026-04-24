@@ -43,6 +43,24 @@ class PositionManager:
         # Dedup: tickets recently closed by MT5 sync (avoid double P&L counting)
         self._recently_closed: set[int] = set()
 
+    @staticmethod
+    def _infer_trade_type(entry: float, sl: float, tp: float) -> str:
+        """Infer trade type from SL/TP distance for adopted positions.
+
+        Uses risk:reward ratio as a proxy — wider TP targets imply swing trades.
+        """
+        if entry <= 0 or sl == 0:
+            return "intraday"
+        sl_dist = abs(entry - sl)
+        tp_dist = abs(tp - entry) if tp > 0 else 0
+        if sl_dist == 0:
+            return "intraday"
+        rr = tp_dist / sl_dist if sl_dist > 0 else 0
+        # Wide TP (>2.5 R:R) with wide SL → swing
+        if rr >= 2.5 and sl_dist / entry > 0.003:
+            return "swing"
+        return "intraday"
+
     def check_positions_sync(self) -> list[dict]:
         """Get current prices and check positions.
 
@@ -67,7 +85,8 @@ class PositionManager:
                         print(f"[POSITIONS] {pos.symbol} Alpaca price {alpaca_price:.4f} FAILED range check", flush=True)
 
                 # Try MT5 for forex/indices/commodities — no chart switching needed
-                mt5_price = self.price_verifier.get_mt5_price(pos.symbol)
+                mt5_sym = pos.symbol.split(":")[-1].replace(".cash", "")
+                mt5_price = self.price_verifier.get_mt5_price(mt5_sym)
                 if mt5_price and mt5_price > 0:
                     if price_in_range(pos.symbol, mt5_price):
                         prices[pos.symbol] = mt5_price
@@ -75,32 +94,11 @@ class PositionManager:
                     else:
                         print(f"[POSITIONS] {pos.symbol} MT5 price {mt5_price:.4f} FAILED range check", flush=True)
 
-                # Last resort fallback: TradingView chart quote
-                # Hold chart session lock to prevent other threads from switching
-                # the chart between set_symbol and get_quote.
-                with self.tv_client.chart_session():
-                    target_sym = pos.symbol.split(":")[-1]
-                    result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
-                    if not result.get("chart_ready", False):
-                        print(f"[POSITIONS] Chart not ready for {pos.symbol} — skipping this cycle", flush=True)
-                        continue
-
-                    quote = self.tv_client.get_quote()
-                    chart_sym = quote.get("symbol", "").split(":")[-1]
-                    if chart_sym != target_sym:
-                        print(f"[POSITIONS] Symbol mismatch: expected {target_sym}, got {chart_sym}", flush=True)
-                        continue
-
-                    p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-                    if p <= 0:
-                        print(f"[POSITIONS] Zero price for {pos.symbol}", flush=True)
-                        continue
-
-                    if not price_in_range(pos.symbol, p):
-                        print(f"[POSITIONS] {pos.symbol} price {p:.4f} FAILED range check", flush=True)
-                        continue
-
-                    prices[pos.symbol] = p
+                # NEVER use TradingView for position price checks.
+                # Switching the chart to check a position's price causes the
+                # analysis loop's chart to get stuck on the wrong symbol.
+                # Alpaca (crypto) + MT5 (everything else) cover all symbols.
+                print(f"[POSITIONS] {pos.symbol} — no price from Alpaca or MT5, skipping this cycle", flush=True)
 
             except TVClientError as e:
                 print(f"[POSITIONS] TVClient error for {pos.symbol}: {e}", flush=True)
@@ -130,28 +128,25 @@ class PositionManager:
                     shadow_prices[pos.symbol] = alpaca_price
                     continue
 
-                mt5_price = self.price_verifier.get_mt5_price(pos.symbol)
+                # Try MT5 — strip .cash suffix and exchange prefix for lookup
+                mt5_sym = pos.symbol.split(":")[-1].replace(".cash", "")
+                mt5_price = self.price_verifier.get_mt5_price(mt5_sym)
                 if mt5_price and mt5_price > 0 and price_in_range(pos.symbol, mt5_price):
                     shadow_prices[pos.symbol] = mt5_price
                     continue
 
-                with self.tv_client.chart_session():
-                    sym_base = pos.symbol.split(":")[-1]
-                    result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
-                    if not result.get("chart_ready", False):
-                        continue
-                    quote = self.tv_client.get_quote()
-                    chart_sym = quote.get("symbol", "").split(":")[-1]
-                    if chart_sym != sym_base:
-                        continue
-                    p = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
-                    if p > 0 and price_in_range(pos.symbol, p):
-                        shadow_prices[pos.symbol] = p
-            except Exception:
-                pass
+                # Last resort: TradingView chart — SKIP for closed-market symbols
+                # to avoid switching the chart away from live symbols and blocking
+                # the analysis loop. If both Alpaca and MT5 fail, just skip this cycle.
+                # The position will be checked again next cycle.
+            except Exception as e:
+                print(f"[PAPER] Price fetch error for {pos.symbol}: {e}", flush=True)
 
         if shadow_prices:
             return self.paper_shadow.check_positions(shadow_prices)
+        if self.paper_shadow.open_positions and not shadow_prices:
+            syms = [p.symbol for p in self.paper_shadow.open_positions.values()]
+            print(f"[PAPER] WARNING: no prices resolved for paper positions {syms} — skipping check", flush=True)
         return []
 
     def mirror_live_to_paper(self, restored_positions: list[dict],
@@ -233,20 +228,11 @@ class PositionManager:
                         price = mt5_price
 
                 if not price:
-                    with self.tv_client.chart_session():
-                        target_sym = pos.symbol.split(":")[-1]
-                        result = self.tv_client.set_symbol(pos.symbol, require_ready=True)
-                        if not result.get("chart_ready", False):
-                            print(f"  [RECONCILE] {pos.symbol} chart not ready — will check in position loop", flush=True)
-                            continue
-
-                        quote = self.tv_client.get_quote()
-                        chart_sym = quote.get("symbol", "").split(":")[-1]
-                        if chart_sym != target_sym:
-                            print(f"  [RECONCILE] Symbol mismatch for {pos.symbol} — skipping", flush=True)
-                            continue
-
-                        price = float(quote.get("last") or quote.get("lp") or quote.get("close") or 0)
+                    # Also try MT5 with .cash suffix stripped
+                    mt5_sym2 = pos.symbol.split(":")[-1].replace(".cash", "")
+                    mt5_price2 = self.price_verifier.get_mt5_price(mt5_sym2)
+                    if mt5_price2 and mt5_price2 > 0 and price_in_range(pos.symbol, mt5_price2):
+                        price = mt5_price2
                 if price <= 0:
                     continue
 
@@ -259,21 +245,22 @@ class PositionManager:
                     continue
 
                 from bridge.risk_bridge import calculate_pnl as calc_pnl
+                # Determine effective TP (skip TP check if no TP is set)
+                effective_tp = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
+
                 if pos.direction == "BUY":
-                    if price <= pos.sl_price:
+                    if pos.sl_price > 0 and price <= pos.sl_price:
                         to_close.append((ticket, "SL (while offline)", pos.sl_price))
-                    elif price >= (pos.tp2_price if pos.tp2_price > 0 else pos.tp_price):
-                        exit_p = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
-                        to_close.append((ticket, "TP (while offline)", exit_p))
+                    elif effective_tp > 0 and price >= effective_tp:
+                        to_close.append((ticket, "TP (while offline)", effective_tp))
                     else:
                         pnl = calc_pnl(pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction)
                         print(f"  [RECONCILE] #{ticket} {pos.symbol} STILL OPEN — price {price:.4f} (PnL {pnl:+.2f})", flush=True)
                 else:
-                    if price >= pos.sl_price:
+                    if pos.sl_price > 0 and price >= pos.sl_price:
                         to_close.append((ticket, "SL (while offline)", pos.sl_price))
-                    elif price <= (pos.tp2_price if pos.tp2_price > 0 else pos.tp_price):
-                        exit_p = pos.tp2_price if pos.tp2_price > 0 else pos.tp_price
-                        to_close.append((ticket, "TP (while offline)", exit_p))
+                    elif effective_tp > 0 and price <= effective_tp:
+                        to_close.append((ticket, "TP (while offline)", effective_tp))
                     else:
                         pnl = calc_pnl(pos.symbol.split(":")[-1], pos.entry_price, price, pos.lot_size, pos.direction)
                         print(f"  [RECONCILE] #{ticket} {pos.symbol} STILL OPEN — price {price:.4f} (PnL {pnl:+.2f})", flush=True)
@@ -292,11 +279,25 @@ class PositionManager:
                 f"(entry {pos.entry_price:.4f} -> exit {exit_price:.4f}, PnL {pnl:+.2f})",
                 flush=True,
             )
-            prices = {pos.symbol: exit_price}
-            events = self.executor.check_positions(prices)
-            for event in events:
-                event["reason"] = reason
-                self.session.log_trade({"event": "CLOSE", **event})
+            # Use close_position_by_ticket instead of check_positions.
+            # check_positions() passes exit_price as the "current market price" which
+            # re-triggers SL/TP detection and queues a second MT5 close order — causing
+            # double closes and the "@ 0.00000" log when MT5 rejects the redundant order.
+            # close_position_by_ticket sends exactly one explicit close and updates state.
+            from bridge.live_executor_adapter import LiveExecutorAdapter
+            if isinstance(self.executor, LiveExecutorAdapter):
+                event = self.executor.close_position_by_ticket(ticket, reason=reason)
+                if event:
+                    event["reason"] = reason
+                    event["exit_price"] = exit_price  # use the SL/TP level, not current_price
+                    self.session.log_trade({"event": "CLOSE", **event})
+            else:
+                # Paper executor: use check_positions with the exit price (no MT5 side-effects)
+                prices = {pos.symbol: exit_price}
+                events = self.executor.check_positions(prices)
+                for event in events:
+                    event["reason"] = reason
+                    self.session.log_trade({"event": "CLOSE", **event})
 
         if to_close:
             self.state_store.save(self.executor, self.mode)
@@ -384,6 +385,9 @@ class PositionManager:
                         # Set per-symbol loss cooldown if executor supports it
                         if hasattr(self.executor, 'set_symbol_loss_cooldown'):
                             self.executor.set_symbol_loss_cooldown(pos.symbol)
+                        # Global loss cooldown — pause all trading after any loss
+                        if hasattr(self.executor, 'set_global_loss_cooldown'):
+                            self.executor.set_global_loss_cooldown()
                     del self.executor.open_positions[ticket]
                 finally:
                     if lock:
@@ -458,12 +462,14 @@ class PositionManager:
         # --- Phase 1: Find open MT5 positions tagged ICT_Bridge not in bridge state ---
         try:
             all_positions = mt5.positions_get()
+            print(f"[MT5_RECON] MT5 returned {len(all_positions) if all_positions else 0} total positions, known_tickets={known_tickets}", flush=True)
             if all_positions:
                 for pos in all_positions:
                     comment = pos.comment or ""
                     if "ICT_Bridge" not in comment:
                         continue
                     if pos.ticket in known_tickets:
+                        print(f"  [MT5_RECON] #{pos.ticket} {pos.symbol} already known — skipping", flush=True)
                         continue
 
                     # Convert MT5 symbol back to TV symbol
@@ -475,6 +481,24 @@ class PositionManager:
                     # Try to get SL/TP from the MT5 position
                     sl_price = pos.sl if pos.sl > 0 else 0.0
                     tp_price = pos.tp if pos.tp > 0 else 0.0
+
+                    # Restore persisted trailing SL state if this ticket was
+                    # tracked before the restart. Without this, we lose all trail
+                    # progress and revert to the original entry SL.
+                    persisted = getattr(self.executor, "_persisted_trail_state", {}) or {}
+                    trail_state = persisted.get(str(pos.ticket)) or {}
+                    restored_trail = trail_state.get("trailing_sl", sl_price)
+                    restored_tp1_hit = bool(trail_state.get("tp1_hit", False))
+                    restored_desync = bool(trail_state.get("trail_desync", False))
+                    restored_desired = trail_state.get("desired_sl", restored_trail)
+
+                    # Prefer the broker's actual SL if it's MORE favorable than
+                    # what we had persisted — broker-side trail (rare) or manual
+                    # adjustment should not be walked back.
+                    if direction == "BUY" and sl_price > restored_trail:
+                        restored_trail = sl_price
+                    elif direction == "SELL" and 0 < sl_price < restored_trail:
+                        restored_trail = sl_price
 
                     paper_pos = PaperPosition(
                         ticket=pos.ticket,
@@ -490,12 +514,40 @@ class PositionManager:
                         ict_grade="?",
                         ict_score=0,
                         reasoning=f"Adopted from MT5 on startup (comment: {comment})",
-                        trade_type="intraday",
-                        trailing_sl=sl_price,
-                        tp1_hit=False,
+                        trade_type=self._infer_trade_type(pos.price_open, sl_price, tp_price),
+                        trailing_sl=restored_trail,
+                        tp1_hit=restored_tp1_hit,
                         current_price=pos.price_current,
                     )
+                    # Attach desync recovery flags so next check cycle re-syncs SL
+                    if restored_desync:
+                        paper_pos._trail_desync = True
+                        paper_pos._desired_sl = restored_desired
                     self.executor.open_positions[pos.ticket] = paper_pos
+                    if trail_state:
+                        print(
+                            f"  [MT5_RECON] #{pos.ticket} restored trail state: "
+                            f"trailing_sl={restored_trail} tp1_hit={restored_tp1_hit} "
+                            f"desync={restored_desync}",
+                            flush=True,
+                        )
+
+                    # CRITICAL: also register with the underlying LiveExecutor's
+                    # open_tickets dict. modify_sl/close_position check this dict
+                    # and silently return False if the ticket isn't there — which
+                    # is why trailing SL never syncs to MT5 for re-adopted trades.
+                    if hasattr(self.executor, "_live") and hasattr(self.executor._live, "open_tickets"):
+                        self.executor._live.open_tickets[pos.ticket] = {
+                            "symbol": mt5_sym,           # FTMO-side symbol for MT5 API
+                            "tv_symbol": tv_symbol,
+                            "direction": direction,
+                            "entry_price": pos.price_open,
+                            "sl_price": sl_price,
+                            "tp_price": tp_price,
+                            "lot_size": pos.volume,
+                            "opened_at": paper_pos.opened_at,
+                            "adopted": True,
+                        }
 
                     # Advance ticket counter
                     if hasattr(self.executor, "_next_ticket"):
@@ -569,5 +621,75 @@ class PositionManager:
             print(f"[MT5_RECON] Adopted {len(adopted)} position(s) from MT5 into bridge state", flush=True)
         else:
             print("[MT5_RECON] All MT5 ICT_Bridge positions accounted for", flush=True)
+
+        # --- Safety net: ensure open_tickets is populated for ALL known positions ---
+        # state_store.restore_into should handle this, but verify and fix any gaps.
+        if hasattr(self.executor, "_live") and hasattr(self.executor._live, "open_tickets"):
+            live_tickets = self.executor._live.open_tickets
+            for ticket, pos_data in self.executor.open_positions.items():
+                if ticket not in live_tickets:
+                    from bridge.config import tv_to_ftmo_symbol
+                    ftmo_sym = tv_to_ftmo_symbol(pos_data.symbol)
+                    live_tickets[ticket] = {
+                        "symbol": ftmo_sym,
+                        "tv_symbol": pos_data.symbol,
+                        "direction": pos_data.direction,
+                        "entry_price": pos_data.entry_price,
+                        "sl_price": pos_data.sl_price,
+                        "tp_price": pos_data.tp_price,
+                        "tp2_price": getattr(pos_data, "tp2_price", 0.0),
+                        "tp1_hit": getattr(pos_data, "tp1_hit", False),
+                        "lot_size": pos_data.lot_size,
+                        "opened_at": getattr(pos_data, "opened_at", ""),
+                    }
+            n_tickets = len(live_tickets)
+            if n_tickets > 0:
+                print(f"[MT5_RECON] open_tickets verified: {n_tickets} position(s) registered for MT5 modify/close", flush=True)
+
+            # Sync any trailing SL that advanced in-memory but never reached MT5
+            # (happens when previous session had open_tickets empty due to the old bug)
+            import MetaTrader5 as mt5
+            import threading
+            synced = 0
+            for ticket, pos_data in self.executor.open_positions.items():
+                trailing = getattr(pos_data, "trailing_sl", 0.0)
+                if trailing <= 0 or trailing == pos_data.sl_price:
+                    continue
+                # Check if MT5's SL is behind the in-memory trailing
+                mt5_pos = mt5.positions_get(ticket=ticket)
+                if not mt5_pos:
+                    continue
+                mt5_sl = mt5_pos[0].sl
+                needs_sync = False
+                if pos_data.direction == "BUY" and trailing > mt5_sl:
+                    needs_sync = True
+                elif pos_data.direction == "SELL" and (mt5_sl == 0 or trailing < mt5_sl):
+                    needs_sync = True
+                if needs_sync:
+                    # Run in a thread to avoid "event loop already running" error
+                    import asyncio
+                    result_holder = [False]
+                    def _sync_sl():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            result_holder[0] = loop.run_until_complete(
+                                self.executor._live.modify_sl(ticket, trailing)
+                            )
+                        finally:
+                            loop.close()
+                    t = threading.Thread(target=_sync_sl, daemon=True)
+                    t.start()
+                    t.join(timeout=10)
+                    if result_holder[0]:
+                        synced += 1
+                        print(
+                            f"  [MT5_RECON] #{ticket} trailing SL synced to MT5: {mt5_sl:.2f} -> {trailing:.2f}",
+                            flush=True,
+                        )
+                    else:
+                        print(f"  [MT5_RECON] #{ticket} trailing SL sync FAILED ({trailing:.2f})", flush=True)
+            if synced > 0:
+                print(f"[MT5_RECON] Synced {synced} stale trailing SL(s) to MT5", flush=True)
 
         return adopted

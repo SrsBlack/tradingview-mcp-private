@@ -326,20 +326,43 @@ def _build_mean_reversion_warning(a: "SymbolAnalysis", rules: dict) -> str:
 
 def _classify_trade_type(a: "SymbolAnalysis") -> str:
     """
-    Classify trade as 'swing' or 'intraday' based on HTF alignment.
+    Classify trade as 'scalp', 'intraday', or 'swing' using multiple signals.
 
-    Swing: HTF H4 bias matches direction AND we're at a HTF structure level.
-    Intraday: Everything else — tighter SL behind OB/FVG entry zone.
+    Scalp  (8h timeout):  Silver Bullet or kill-zone-only entry, no HTF alignment
+    Intraday (48h timeout): Standard ICT setup within a session
+    Swing (168h/1wk timeout): HTF H4 bias aligned + strong structure + displacement
+
+    The classification drives:
+    - Position age timeout (stale losers only — winners/tp1_hit exempt)
+    - SL placement guidance in the Claude prompt
     """
-    if a.htf_analysis is None:
-        return "intraday"
-    htf_bias = a.htf_analysis.bias  # e.g. "BULLISH", "BEARISH", "NEUTRAL"
-    if htf_bias == "NEUTRAL":
-        return "intraday"
-    # If HTF bias matches signal direction → swing trade
-    if (htf_bias == "BULLISH" and a.direction == "BULLISH") or \
-       (htf_bias == "BEARISH" and a.direction == "BEARISH"):
-        return "swing"
+    htf_aligned = False
+    if a.htf_analysis is not None:
+        htf_bias = a.htf_analysis.bias
+        if htf_bias != "NEUTRAL":
+            htf_aligned = (
+                (htf_bias == "BULLISH" and a.direction == "BULLISH") or
+                (htf_bias == "BEARISH" and a.direction == "BEARISH")
+            )
+
+    # --- Swing: HTF aligned + strong confluence ---
+    # Needs H4 bias match AND at least two of: displacement, OB, structure >=20
+    if htf_aligned:
+        swing_signals = sum([
+            a.displacement_confirmed,
+            a.ob_score >= 12,
+            a.structure_score >= 20,
+            a.sweep_detected,
+            a.has_cisd,
+        ])
+        if swing_signals >= 2:
+            return "swing"
+
+    # --- Scalp: Silver Bullet or pure kill-zone play with no HTF backing ---
+    if a.is_silver_bullet and not htf_aligned:
+        return "scalp"
+
+    # --- Default: intraday ---
     return "intraday"
 
 
@@ -432,17 +455,21 @@ class ClaudeDecisionMaker:
         model = self.SONNET if analysis.grade == "A" else self.HAIKU
 
         # Decision cache: reuse last decision if signal hasn't materially changed
+        # Includes price bucket so stale entries at different prices don't replay
         import time as _time
         score_bucket = int(analysis.total_score // 5) * 5  # bucket by 5-pt bands
+        # Price bucket: 0.2% bands — cache invalidates when price moves significantly
+        price_bucket = int(analysis.current_price / (analysis.current_price * 0.002)) if analysis.current_price > 0 else 0
         cache_key = analysis.symbol
         cached = self._decision_cache.get(cache_key)
         if cached:
-            c_grade, c_dir, c_bucket, c_ts, c_decision = cached
+            c_grade, c_dir, c_bucket, c_ts, c_decision, c_price_bucket = cached
             age = _time.time() - c_ts
             if (age < self._cache_ttl
                     and c_grade == analysis.grade
                     and c_dir == analysis.direction
-                    and c_bucket == score_bucket):
+                    and c_bucket == score_bucket
+                    and c_price_bucket == price_bucket):
                 print(f"  [{analysis.symbol}] Cache hit ({age:.0f}s old) — reusing last decision", flush=True)
                 return c_decision
 
@@ -459,7 +486,7 @@ class ClaudeDecisionMaker:
                     # Cache the decision for reuse
                     self._decision_cache[cache_key] = (
                         analysis.grade, analysis.direction, score_bucket,
-                        _time.time(), decision,
+                        _time.time(), decision, price_bucket,
                     )
                     return decision
                 except Exception as e:
@@ -507,6 +534,163 @@ class ClaudeDecisionMaker:
         if analysis.current_price <= 0:
             return "Invalid price data"
 
+        # HTF DATA GATE: Grade A requires HTF context. Without W1/D1/H4 data,
+        # the system can't confirm macro direction — a M15 CHoCH in a bearish
+        # H4 trend looks like Grade A but is actually a counter-trend bounce.
+        # GER40 -$956 loss (2026-04-22) was caused by this exact scenario.
+        trade_type = _classify_trade_type(analysis)
+        if trade_type != "scalp" and analysis.grade == "A":
+            has_htf = (
+                analysis.htf_analysis is not None
+                and analysis.htf_analysis.bias != "NEUTRAL"
+                and (analysis.w1_bias or analysis.d1_bias)
+            )
+            if not has_htf:
+                # Downgrade to B — no Grade A without confirmed macro context
+                analysis.grade = "B"
+                analysis.total_score = min(analysis.total_score, 79)
+                analysis.confluence_factors.append("HTF_data_missing_cap_B")
+                print(
+                    f"  [{analysis.symbol}] GRADE CAP A->B: HTF data missing "
+                    f"(W1={analysis.w1_bias or '?'} D1={analysis.d1_bias or '?'} "
+                    f"H4={analysis.htf_analysis.bias if analysis.htf_analysis else '?'})",
+                    flush=True,
+                )
+
+        # HTF ALIGNMENT GATE: non-scalp trades must not oppose H4 bias.
+        # Scalps are exempt (fast in/out, don't need HTF confirmation).
+        if trade_type != "scalp" and analysis.htf_analysis:
+            htf_bias = analysis.htf_analysis.bias
+            if htf_bias != "NEUTRAL":
+                opposes_htf = (
+                    (htf_bias == "BULLISH" and analysis.direction == "BEARISH") or
+                    (htf_bias == "BEARISH" and analysis.direction == "BULLISH")
+                )
+                if opposes_htf:
+                    return (
+                        f"HTF MISALIGNMENT: {analysis.direction} opposes H4 bias ({htf_bias}) — "
+                        f"{trade_type} trades must align with HTF. Only scalps exempt."
+                    )
+
+        # ZONE GATE: BUY in premium or SELL in discount = wrong side of fair value.
+        # This was the #1 cause of losses — system was buying into resistance.
+        if analysis.pd_zone and not analysis.pd_aligned:
+            zone = analysis.pd_zone
+            direction = analysis.direction
+            if (direction == "BULLISH" and zone == "premium") or \
+               (direction == "BEARISH" and zone == "discount"):
+                return (
+                    f"ZONE VIOLATION: {direction} in {zone} — "
+                    f"ICT rule: BUY in discount only, SELL in premium only"
+                )
+
+        # HTF ZONE CHECK: M15 vs H4 premium/discount conflict.
+        # Changed from hard block to downgrade — let Claude evaluate.
+        # Strong displacement can break through macro zones. The synergy
+        # scorer already penalizes this (-5 for HTF zone conflict).
+        # Only hard-block Grade C (not worth API call with zone conflict).
+        htf_pd_zone = getattr(analysis, 'htf_pd_zone', '')
+        htf_pd_aligned = getattr(analysis, 'htf_pd_aligned', True)
+        if htf_pd_zone and not htf_pd_aligned:
+            direction = analysis.direction
+            if (direction == "BULLISH" and htf_pd_zone == "premium") or \
+               (direction == "BEARISH" and htf_pd_zone == "discount"):
+                if analysis.grade == "C":
+                    return (
+                        f"HTF ZONE VIOLATION: {direction} in H4 {htf_pd_zone} — "
+                        f"Grade C with zone conflict not worth API call"
+                    )
+                # Downgrade A->B for zone conflict, let Claude decide
+                if analysis.grade == "A":
+                    analysis.grade = "B"
+                    analysis.total_score = min(analysis.total_score, 79)
+                    analysis.confluence_factors.append(f"HTF_zone_conflict(H4_{htf_pd_zone})")
+                    print(
+                        f"  [{analysis.symbol}] GRADE CAP A->B: {direction} in H4 {htf_pd_zone} "
+                        f"— letting Claude evaluate with reduced conviction",
+                        flush=True,
+                    )
+
+        # KILL ZONE GATE: ICT 2022 model says ONLY trade during kill zones.
+        # Kill zones: London 2-5AM ET, NY AM 7-10AM ET, NY PM 1:30-3PM ET.
+        # Silver Bullet windows also qualify (3-4AM, 10-11AM, 2-3PM ET).
+        # Exception 1: Grade A setups with sweep + displacement can trade outside.
+        # Exception 2: Crypto trades 24/7 — exempt from kill zone gate but
+        #   still get reduced session score (already handled in scorer).
+        # Exception 3: JPY pairs during Tokyo open (19:00-23:00 ET = 00:00-04:00 UTC).
+        #   Tokyo is the legitimate ICT kill zone for JPY pairs; treat it as their
+        #   London-equivalent. Non-JPY pairs stay blocked during Asian session
+        #   because they're in the accumulation phase (no directional move expected).
+        _CRYPTO_SYMBOLS = {"BTCUSD", "ETHUSD", "SOLUSD", "DOGEUSD"}
+        base_sym = analysis.symbol.split(":")[-1]
+        is_crypto = base_sym in _CRYPTO_SYMBOLS
+
+        # Tokyo kill zone: 00:00-04:00 UTC (19:00-23:00 ET) for JPY pairs only.
+        now_utc = datetime.now(timezone.utc)
+        is_tokyo_window = 0 <= now_utc.hour < 4
+        is_jpy_pair = "JPY" in base_sym  # USDJPY, EURJPY, GBPJPY, AUDJPY, etc.
+        is_tokyo_kz_for_jpy = is_tokyo_window and is_jpy_pair
+
+        if (
+            not analysis.is_kill_zone
+            and not analysis.is_silver_bullet
+            and not is_crypto
+            and not is_tokyo_kz_for_jpy
+        ):
+            # Allow Grade A with confirmed sweep + displacement outside kill zone
+            # (strong enough signal that timing is less critical)
+            if analysis.grade != "A" or not analysis.displacement_confirmed:
+                return (
+                    f"KILL ZONE GATE: Not in a kill zone or Silver Bullet window. "
+                    f"ICT 2022 model: only trade during London (2-5AM ET), NY AM (7-10AM ET), "
+                    f"or NY PM (1:30-3PM ET). JPY pairs also permitted during Tokyo "
+                    f"(19:00-23:00 ET). Session: {analysis.session_type}"
+                )
+
+        if is_tokyo_kz_for_jpy and not analysis.is_kill_zone:
+            print(
+                f"  [{analysis.symbol}] TOKYO KZ: JPY pair during Tokyo window "
+                f"(19:00-23:00 ET) — allowed as JPY-specific kill zone",
+                flush=True,
+            )
+
+        # DOL PRE-FILTER: ICT 2022 model Step 2 — identify WHERE price needs to go.
+        # If there's no clear Draw on Liquidity target, there's no clear trade.
+        # This is checked roughly here using FVG entry and ATR.
+        if analysis.atr_m15 > 0 and analysis.current_price > 0:
+            # Estimate minimum target distance: 2x SL distance (for 2:1 R:R)
+            min_target_dist = analysis.atr_m15 * 2.0 * 2.0  # 2x ATR SL × 2:1 R:R = 4x ATR
+            # Check if any liquidity target exists at that distance
+            has_target = False
+            fib_levels = getattr(analysis, 'fib_tp_levels', [])
+            if fib_levels:
+                for fib in fib_levels[:2]:  # Check TP1 and TP2
+                    dist = abs(fib - analysis.current_price)
+                    if dist >= min_target_dist:
+                        has_target = True
+                        break
+            # Also check key levels (DOL)
+            key_opens = getattr(analysis, 'key_opens', {})
+            for _, open_price in (key_opens or {}).items():
+                dist = abs(open_price - analysis.current_price)
+                if dist >= min_target_dist:
+                    has_target = True
+                    break
+            if not has_target and analysis.grade not in ("A", "B"):
+                return (
+                    f"NO CLEAR DOL: No liquidity target found >= {min_target_dist:.2f} "
+                    f"({4:.0f}x ATR) from current price. ICT requires clear Draw on Liquidity "
+                    f"before entering. Grade A/B exempt."
+                )
+
+        # INTERMARKET CONFLICT GATE: DXY/US10Y/VIX opposing trade direction
+        # ICT: "Never trade EUR without knowing where DXY is going"
+        if getattr(analysis, 'intermarket_conflict', False) and analysis.grade != "A":
+            return (
+                f"INTERMARKET CONFLICT: {getattr(analysis, 'intermarket_explanation', 'DXY/VIX opposes trade')}. "
+                f"Grade A exempt. Grade {analysis.grade} blocked."
+            )
+
         return None
 
     # ------------------------------------------------------------------
@@ -525,30 +709,57 @@ class ClaudeDecisionMaker:
     )
 
     def _call_claude(self, analysis: SymbolAnalysis, model: str) -> TradeDecision:
-        """Call Claude to evaluate the signal and return a trade decision."""
-        prompt = self._build_prompt(analysis)
+        """Call Claude to evaluate the signal and return a trade decision.
+
+        Uses Anthropic prompt caching on both the system prompt and the rules
+        section to reduce API cost by ~30-40%. The ephemeral cache persists for
+        5 minutes, covering multiple symbols in a single analysis cycle.
+        """
+        signal_prompt = self._build_signal_section(analysis)
+        rules_prompt = self._build_rules_section(analysis)
 
         response = self.client.messages.create(
             model=model,
             max_tokens=512,
-            system=self.SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
+            system=[
+                {
+                    "type": "text",
+                    "text": self.SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": rules_prompt,
+                            "cache_control": {"type": "ephemeral"},
+                        },
+                        {
+                            "type": "text",
+                            "text": signal_prompt,
+                        },
+                    ],
+                }
+            ],
         )
 
         text = response.content[0].text.strip()
         return self._parse_response(text, analysis, model)
 
     def _build_prompt(self, a: SymbolAnalysis) -> str:
-        """Build a concise prompt for Claude trade evaluation with strategy knowledge context."""
-        direction_action = "BUY" if a.direction == "BULLISH" else "SELL" if a.direction == "BEARISH" else "SKIP"
+        """Build the full prompt by combining rules and signal sections (backward compat)."""
+        return self._build_rules_section(a) + "\n\n" + self._build_signal_section(a)
 
-        # Check for EA ensemble signal in confluence factors
-        ea_line = ""
-        for factor in (a.confluence_factors or []):
-            if factor.startswith("EA_ensemble"):
-                ea_line = f"\n- EA Strategy Ensemble: CONFIRMS {a.direction} ({factor})"
-                break
+    def _build_rules_section(self, a: SymbolAnalysis) -> str:
+        """Build the static rules/context section (cached by Anthropic across calls).
 
+        Contains: strategy context, session context, ICT teachings, concept block,
+        and the RULES block. These change rarely within a 5-minute window and are
+        good candidates for prompt caching.
+        """
         # Load strategy knowledge context
         rules = _load_rules_json()
         strategy_ctx = _build_strategy_context(a.symbol, rules)
@@ -564,72 +775,70 @@ class ClaudeDecisionMaker:
 
         trade_type = _classify_trade_type(a)
 
-        atr_line = f"\n- ATR(14) on M15: {a.atr_m15:.5f}" if a.atr_m15 > 0 else ""
-        min_sl_dist = a.atr_m15 * 2.0 if a.atr_m15 > 0 else 0
+        # SL floor uses asset-class-specific ATR multiple.
+        # Crypto needs 2.5x because volatility + wider sweep wicks; forex/indices 2.0x.
+        base_sym = a.symbol.split(":")[-1] if ":" in a.symbol else a.symbol
+        _crypto_syms = {"BTCUSD", "ETHUSD", "SOLUSD", "DOGEUSD", "ADAUSD", "AVAXUSD"}
+        atr_multiplier = 2.5 if base_sym in _crypto_syms else 2.0
+        min_sl_dist = a.atr_m15 * atr_multiplier if a.atr_m15 > 0 else 0
 
-        # Fibonacci extension TP levels (if available)
-        fib_line = ""
-        fib_tp = getattr(a, 'fib_tp_levels', [])
-        if fib_tp:
-            fib_line = f"\n- Fib Extension TPs: 1.272={fib_tp[0]:,.2f}, 1.618={fib_tp[1]:,.2f}, 2.0={fib_tp[2]:,.2f}, 2.618={fib_tp[3]:,.2f}"
+        # Percentage floor used ONLY when ATR is unavailable. The post-gate
+        # enforces max(atr_multiplier * ATR, percent_floor * entry) on what
+        # Claude returns, so the prompt must make the ATR rule the primary one.
+        _pct_floors = {
+            "BTCUSD": 0.005, "ETHUSD": 0.005, "SOLUSD": 0.005, "DOGEUSD": 0.005,
+            "XAUUSD": 0.003, "XAGUSD": 0.003,
+            "US30": 0.003, "US500": 0.003, "US100": 0.003, "GER40": 0.003,
+        }
+        pct_floor = _pct_floors.get(base_sym, 0.0015)  # forex default 0.15%
 
-        # Advanced ICT context
-        adv_line = ""
-        adv_factors = getattr(a, 'advanced_factors', [])
-        if adv_factors:
-            adv_line = f"\n- Advanced ICT: {', '.join(adv_factors)} (score: {getattr(a, 'advanced_score', 0):.0f}/100)"
-
-        # Judas Swing context
-        judas_line = ""
-        if getattr(a, 'has_judas_swing', False):
-            judas_line = f"\n- JUDAS SWING detected ({getattr(a, 'judas_direction', '?')}) — manipulation phase complete, distribution move expected"
-
-        # Asian Range context
-        asian_line = ""
-        asian_rng = getattr(a, 'asian_range', None)
-        if asian_rng:
-            asian_line = f"\n- Asian Range: {asian_rng[0]:,.2f} – {asian_rng[1]:,.2f} (sweep of this range = high-probability entry)"
+        # Concept teaching block — loads relevant ICT concept cards so Claude
+        # reasons from methodology, not just numeric scores.
+        try:
+            from bridge.concept_injector import build_concept_teaching_block, build_gate_violation_warning
+            concept_block = build_concept_teaching_block(a)
+            gate_warning = build_gate_violation_warning(a)
+        except Exception:
+            concept_block = ""
+            gate_warning = ""
 
         return f"""You are an ICT trading decision engine trained in ICT methodology (market structure, PO3, AMD, liquidity engineering, premium/discount, OTE, displacement, FVGs, order blocks, SMT divergence). Enhanced with 33 ChartFanatics strategies and 375K MT5 backtest passes. Evaluate this signal using ICT principles and respond with ONLY a JSON object.
-
-SIGNAL:
-- Symbol: {a.symbol} @ ${a.current_price:,.2f}
-- Direction: {a.direction} | Grade: {a.grade} ({a.total_score:.0f}/100)
-- Confluence: {', '.join(a.confluence_factors) if a.confluence_factors else 'None'}
-- Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}
-- P/D Zone: {a.pd_zone or 'unknown'} | Aligned: {a.pd_aligned}
-- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}{fib_line}{adv_line}{judas_line}{asian_line}
-
-SCORE BREAKDOWN (sub-scores are additive — 0 in one component does NOT disqualify):
-- Structure: {a.structure_score:.0f}/30{' (strong)' if a.structure_score >= 20 else ' (partial)' if a.structure_score >= 10 else ' (weak)'}
-- Order Block: {a.ob_score:.0f}/20{' (confirmed)' if a.ob_score >= 12 else ' (nearby)' if a.ob_score > 0 else ' (none detected — use FVG/structure for entry)'}
-- FVG: {a.fvg_score:.0f}/18{' (displacement confirmed)' if a.fvg_score >= 12 else ' (present)' if a.fvg_score > 0 else ' (none — use OB/structure)'}
-- Session: {a.session_score:.0f}/12 | OTE: {a.ote_score:.0f}/12{' (at optimal level)' if a.ote_score >= 8 else ' (partial retracement)' if a.ote_score > 0 else ' (not at retracement — acceptable)'}
-- SMT: {a.smt_score:.0f}/8{' (divergence confirmed)' if a.smt_score > 0 else ' (no divergence — optional confluence, not required)'}
 {strategy_ctx}
 {session_ctx}
 {ict_ctx}
+{concept_block}
+{gate_warning}
 {mr_warning}
 
 RULES:
 - Minimum R:R 1.25:1 (hard gate — trades below this are auto-rejected). Prefer 2:1+ but 1.25:1 is acceptable with strong confluence.
 - Grade A: full conviction | Grade B: strict risk | Grade C: pullback only
-- SL behind nearest structure level/OB, but NEVER closer than 2x ATR(14) from entry{f' (minimum {min_sl_dist:.5f} distance)' if min_sl_dist > 0 else ''}
-- CRITICAL: Tight stops get hunted — our data shows sweeps regularly exceed 2x ATR. Place SL BEYOND the liquidity sweep wick, not at the edge. For crypto, minimum 0.5% of price distance. The trade that got stopped at 9pt on ETH would have made +30pts with a 12pt SL.
+- **SL PLACEMENT — PRIMARY RULE (hard enforced post-gate):**
+  SL distance from entry MUST be at least {atr_multiplier}x ATR(14) on M15 = **{min_sl_dist:.5f}** (for {base_sym}){' [CRYPTO — 2.5x REQUIRED, not 2.0x]' if base_sym in ('BTCUSD','ETHUSD','SOLUSD','DOGEUSD') else ''}.
+  Do NOT propose an SL that barely clears any % floor — the ATR rule is primary. Place SL BEYOND the liquidity sweep wick plus the ATR buffer, not at the edge.
+  Only when ATR data is zero/missing, fall back to {pct_floor:.1%} of entry as the floor.
+- CRITICAL: Tight stops get hunted. Our data shows ETH/SOL sweeps regularly exceed 2x ATR; 2.5x ATR is the minimum safe distance for crypto. ETH trade 2026-04-23 stopped at 1.31% SL while 2.5x ATR would have required ~1.8% — that's the exact gap that cost the -$361 loss.
 - TP at next liquidity target
 - TP1 (tp_price): nearest HTF FVG or Order Block in trade direction (partial close at 50%). Prefer the 1.272 Fibonacci extension if available.
 - TP2 (tp2_price): next liquidity pool / swing high/low (final target, trail remainder). Prefer the 1.618 or 2.0 Fibonacci extension if available.
 - If only one TP level is clear, use Fibonacci extensions as TP targets. Fallback: tp2_price = tp_price * 1.5 (BUY) or * 0.667 (SELL).
 - Max risk for this symbol/grade: {max_risk:.1%}
-- Trade type: {trade_type.upper()} → SL placement: {'beyond the swept high/low (give buffer beyond the wick)' if trade_type == 'swing' else 'behind the OB/FVG entry zone (at least 1.5x ATR from entry)'}
+- Trade type: {trade_type.upper()} → SL placement: {'beyond the swept high/low (give buffer beyond the wick — this is a multi-day swing)' if trade_type == 'swing' else 'behind the OB/FVG entry zone (at least 1.5x ATR from entry)' if trade_type == 'intraday' else 'tight behind the entry zone (scalp — quick in/out)'}
 - CRITICAL ZONE CHECK: BUY in premium or SELL in discount = WRONG ZONE. Auto-downgrade by 1 grade or SKIP unless strong confluence overrides.
+- KEY OPENS: Daily/Weekly/Monthly/Quarterly opens are equilibrium references. Price above weekly open = bullish week forming. A sweep of the weekly open followed by rejection = high-probability reversal. Monthly and quarterly opens are macro bias levels.
+- IPDA RANGES: Price near IPDA 20-day extreme (>90% or <10%) = high-probability reversal zone. At 40/60-day extreme = macro reversal. IPDA midpoint = equilibrium (expect accumulation, not trending). Trade WITH the IPDA range when in the middle, look for REVERSALS at extremes.
+- QUARTERLY SHIFT: If a quarterly shift is confirmed (3+ weeks), all trades MUST align with the shift direction. A developing shift (2 weeks) should reduce confidence in counter-shift trades by 1 grade.
+- HTF FVG OBSTACLE: If price is inside or approaching an opposing H4 FVG, this is a HIGH-PROBABILITY rejection zone. BUY inside a bearish H4 FVG = buying into institutional resistance. SELL inside a bullish H4 FVG = selling into institutional support. Auto-downgrade by 1 grade or SKIP unless very strong displacement has already broken through the FVG.
+- HTF PULLBACK ACTIVE: If H4 has 3+ consecutive closes moving AGAINST the bias direction, the pullback/retracement is still in progress. DO NOT enter with the bias until the pullback completes — you need a sweep of a significant low (BUY) or high (SELL) followed by displacement BACK in the bias direction. Entering during an active pullback = buying into selling pressure. SKIP or reduce confidence by 20+ points.
+- MTF ALIGNMENT: When Weekly, Daily, and H4 biases all agree, this is the highest-conviction direction. When they conflict (e.g., W1 bearish but H4 bullish), trade with reduced size or SKIP — the H4 move may be a pullback within the larger trend.
+- FVG ENTRY: When an OPTIMAL ENTRY zone is provided, use the FVG CE (consequent encroachment) as entry_price instead of current market price. This creates a limit-order-style entry at the imbalance zone. ICT entries should be at the FVG/OB zone on the pullback, NOT at market price after the move has started.
 - EA ensemble confirmation adds conviction — treat as extra confluence factor
 - If in a kill zone that matches this symbol's best session: boost confidence
 - If mean reversion warning applies: reduce continuation confidence, prefer reversal setups
 - If session confidence multiplier < 1.0: reduce position size proportionally
 
 Respond ONLY with this JSON (no markdown, no explanation):
-{{"action":"{direction_action}","entry_price":<float>,"sl_price":<float>,"tp_price":<float>,"tp2_price":<float>,"confidence":<0-100>,"risk_pct":<decimal e.g. 0.01 means 1%>,"reasoning":"<1 sentence>"}}
+{{"action":"<BUY|SELL|SKIP>","entry_price":<float>,"sl_price":<float>,"tp_price":<float>,"tp2_price":<float>,"confidence":<0-100>,"risk_pct":<decimal e.g. 0.01 means 1%>,"reasoning":"<1 sentence>"}}
 
 risk_pct MUST be a decimal fraction: 0.01 = 1%, 0.005 = 0.5%, 0.0025 = 0.25%. Max allowed: {max_risk:.4f}
 
@@ -640,6 +849,153 @@ Confidence calibration:
 - Below 60: SKIP
 
 If the setup is not convincing, use "SKIP" for action."""
+
+    def _build_signal_section(self, a: SymbolAnalysis) -> str:
+        """Build the dynamic signal section (changes every call — not cached).
+
+        Contains: current price, scores, confluence factors, and live market data.
+        """
+        # Check for EA ensemble signal in confluence factors
+        ea_line = ""
+        for factor in (a.confluence_factors or []):
+            if factor.startswith("EA_ensemble"):
+                ea_line = f"\n- EA Strategy Ensemble: CONFIRMS {a.direction} ({factor})"
+                break
+
+        if a.atr_m15 > 0:
+            _base = a.symbol.split(":")[-1] if ":" in a.symbol else a.symbol
+            _mult = 2.5 if _base in ("BTCUSD", "ETHUSD", "SOLUSD", "DOGEUSD", "ADAUSD", "AVAXUSD") else 2.0
+            _min_sl = a.atr_m15 * _mult
+            atr_line = (
+                f"\n- ATR(14) on M15: {a.atr_m15:.5f}"
+                f"\n- Minimum SL distance ({_mult}x ATR): {_min_sl:.5f}  ← SL must be at least this far from entry"
+            )
+        else:
+            atr_line = "\n- ATR(14) on M15: UNAVAILABLE — use percentage floor fallback (see RULES)"
+
+        # Fibonacci extension TP levels (if available)
+        fib_line = ""
+        fib_tp = getattr(a, "fib_tp_levels", [])
+        if fib_tp:
+            fib_line = f"\n- Fib Extension TPs: 1.272={fib_tp[0]:,.2f}, 1.618={fib_tp[1]:,.2f}, 2.0={fib_tp[2]:,.2f}, 2.618={fib_tp[3]:,.2f}"
+
+        # Advanced ICT context
+        adv_line = ""
+        adv_factors = getattr(a, "advanced_factors", [])
+        if adv_factors:
+            adv_line = f"\n- Advanced ICT: {', '.join(adv_factors)} (score: {getattr(a, 'advanced_score', 0):.0f}/100)"
+
+        # Judas Swing context
+        judas_line = ""
+        if getattr(a, "has_judas_swing", False):
+            judas_line = f"\n- JUDAS SWING detected ({getattr(a, 'judas_direction', '?')}) — manipulation phase complete, distribution move expected"
+
+        # Asian Range context
+        asian_line = ""
+        asian_rng = getattr(a, "asian_range", None)
+        if asian_rng:
+            asian_line = f"\n- Asian Range: {asian_rng[0]:,.2f} \u2013 {asian_rng[1]:,.2f} (sweep of this range = high-probability entry)"
+
+        # Key institutional opens from liquidity map
+        opens_line = ""
+        key_opens = getattr(a, "key_opens", {})
+        if key_opens:
+            parts = []
+            for label, price in key_opens.items():
+                parts.append(f"{label}={price:,.2f}")
+            opens_line = f"\n- Key Opens: {', '.join(parts)}"
+
+        # IPDA ranges — institutional delivery framework
+        ipda_line = ""
+        ipda = getattr(a, "ipda_ranges", None)
+        if ipda:
+            parts = []
+            for label, rng in ipda.items():
+                position = "AT LOW" if rng["pct"] < 10 else "AT HIGH" if rng["pct"] > 90 else f"{rng['pct']:.0f}%"
+                parts.append(f"{label}: {rng['low']:,.2f}-{rng['high']:,.2f} (price at {position})")
+            ipda_line = f"\n- IPDA Ranges: {' | '.join(parts)}"
+
+        # Quarterly shift context
+        qshift_line = ""
+        q_shift = getattr(a, "quarterly_shift", None)
+        if q_shift:
+            qshift_line = f"\n- QUARTERLY SHIFT: {q_shift['direction']} ({q_shift['strength']}, {q_shift['weeks_confirmed']} weeks)"
+
+        # HTF premium/discount context
+        htf_pd_line = ""
+        htf_pd = getattr(a, "htf_pd_zone", "")
+        if htf_pd:
+            htf_aligned = getattr(a, "htf_pd_aligned", False)
+            htf_pd_line = f"\n- H4 P/D Zone: {htf_pd} | Aligned: {htf_aligned}"
+            if not htf_aligned:
+                htf_pd_line += " *** MACRO ZONE CONFLICT ***"
+
+        # Multi-timeframe alignment
+        mtf_line = ""
+        mtf_alignment = getattr(a, "mtf_alignment", "")
+        if mtf_alignment:
+            aligned = getattr(a, "mtf_aligned", False)
+            mtf_line = f"\n- MTF Bias: {mtf_alignment} | {'ALL ALIGNED' if aligned else 'CONFLICT \u2014 reduced conviction'}"
+
+        # FVG entry zone — optimal limit entry price
+        fvg_entry_line = ""
+        fvg_entry = getattr(a, "fvg_entry_price", 0)
+        if fvg_entry > 0:
+            fvg_zone = getattr(a, "fvg_entry_zone", "")
+            fvg_entry_line = f"\n- OPTIMAL ENTRY: {fvg_zone} \u2014 use CE as entry_price instead of current market price"
+
+        # HTF FVG obstacle warning
+        # HTF pullback warning
+        pullback_line = ""
+        if getattr(a, "htf_pullback_active", False):
+            bars = getattr(a, "htf_pullback_bars", 0)
+            pullback_line = f"\n- *** HTF PULLBACK ACTIVE: H4 has {bars} consecutive closes against {a.direction} bias -- retracement NOT complete. Wait for sweep + displacement before entering. ***"
+
+        htf_fvg_line = ""
+        if getattr(a, "htf_fvg_obstacle", False):
+            zone = getattr(a, "htf_fvg_obstacle_zone", "")
+            htf_fvg_line = f"\n- *** HTF FVG OBSTACLE: {zone} \u2014 price is entering an opposing H4 FVG (high-probability rejection zone) ***"
+
+        # Intermarket context for Claude prompt
+        intermarket_line = ""
+        imkt_expl = getattr(a, "intermarket_explanation", "")
+        if imkt_expl:
+            conflict = getattr(a, "intermarket_conflict", False)
+            vix_mult = getattr(a, "vix_risk_multiplier", 1.0)
+            intermarket_line = f"\n- INTERMARKET: {imkt_expl}"
+            if conflict:
+                intermarket_line += " *** CONFLICT \u2014 reduce conviction ***"
+            if vix_mult < 1.0:
+                intermarket_line += f" | VIX elevated \u2014 risk multiplier {vix_mult}x"
+
+        # Upcoming news events
+        news_line = ""
+        if getattr(a, "news_event", ""):
+            news_line = f"\n- NEWS WARNING: {a.news_event} ({a.news_minutes}min away) \u2014 reduce size or avoid"
+
+        # Load rules for score display
+        rules = _load_rules_json()
+        profile = rules.get("symbol_profiles", {}).get(a.symbol, {})
+        risk_overrides = profile.get("risk_overrides", {})
+        grade_key = f"grade_{a.grade.lower()}" if a.grade in ("A", "B", "C") else "grade_c"
+        max_risk = risk_overrides.get(grade_key, 0.01)
+
+        return f"""SIGNAL:
+- Symbol: {a.symbol} @ ${a.current_price:,.2f}
+- Direction: {a.direction} | Grade: {a.grade} ({a.total_score:.0f}/100)
+- Confluence: {', '.join(a.confluence_factors) if a.confluence_factors else 'None'}
+- Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}
+- P/D Zone (M15): {a.pd_zone or 'unknown'} | Aligned: {a.pd_aligned}{htf_pd_line}
+- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}{fib_line}{adv_line}{judas_line}{asian_line}{opens_line}{ipda_line}{qshift_line}{htf_fvg_line}{pullback_line}{mtf_line}{fvg_entry_line}{intermarket_line}{news_line}
+
+SCORE BREAKDOWN (sub-scores are additive \u2014 0 in one component does NOT disqualify):
+- Structure: {a.structure_score:.0f}/30{' (strong)' if a.structure_score >= 20 else ' (partial)' if a.structure_score >= 10 else ' (weak)'}
+- Order Block: {a.ob_score:.0f}/20{' (confirmed)' if a.ob_score >= 12 else ' (nearby)' if a.ob_score > 0 else ' (none detected \u2014 use FVG/structure for entry)'}
+- FVG: {a.fvg_score:.0f}/18{' (displacement confirmed)' if a.fvg_score >= 12 else ' (present)' if a.fvg_score > 0 else ' (none \u2014 use OB/structure)'}
+- Session: {a.session_score:.0f}/12 | OTE: {a.ote_score:.0f}/12{' (at optimal level)' if a.ote_score >= 8 else ' (partial retracement)' if a.ote_score > 0 else ' (not at retracement \u2014 acceptable)'}
+- SMT: {a.smt_score:.0f}/8{' (divergence confirmed)' if a.smt_score > 0 else ' (no divergence \u2014 optional confluence, not required)'}
+
+Max allowed risk_pct for this call: {max_risk:.4f}"""
 
     def _parse_response(self, text: str, analysis: SymbolAnalysis, model: str) -> TradeDecision:
         """Parse Claude's JSON response into a TradeDecision."""
@@ -705,6 +1061,36 @@ If the setup is not convincing, use "SKIP" for action."""
     # Post-gate
     # ------------------------------------------------------------------
 
+    # Phrases in Claude's reasoning that indicate a hard-gate violation it
+    # recognized but tried to rationalize past. When any of these appear,
+    # the trade is rejected regardless of the Grade field Claude returned.
+    # Calibrated against 11 BROKER_CLOSE trades (Apr 19-24): catches 4/5
+    # losers, passes both winners. Phrases like "mtf conflict" and "macro
+    # zone conflict" were REMOVED because winners mention them too — the
+    # loser signal is Claude's *self-downgrade* language plus specific
+    # disqualifiers (outside-kill-zone, PO3-accumulation, score-decay).
+    _REASONING_HARD_GATE_PHRASES: tuple[str, ...] = (
+        # Self-downgrade — Claude admits the trade isn't really Grade A
+        "reduce conviction to grade b",
+        "reduce conviction to grade c",
+        "reduce conviction to b/c",
+        "reduced conviction to grade b",
+        "reduced conviction to grade c",
+        "reduced conviction to b/c",
+        "b/c threshold",
+        "grade b/c execution",
+        # PO3 accumulation — not yet in distribution phase = directional trade is early
+        "distribution not yet started",
+        "not yet distributed",
+        "accumulation phase",
+        # Kill-zone absence — ICT 2022 says don't trade without institutional flow
+        "no active kill zone",
+        "outside kill zone",
+        "kill zone inactive",
+        # Score decay — entry price drifted, setup is stale
+        "score decay",
+    )
+
     def _post_gate(self, decision: TradeDecision, analysis: SymbolAnalysis | None = None) -> str | None:
         """
         Validate a trade decision after Claude responds.
@@ -712,6 +1098,21 @@ If the setup is not convincing, use "SKIP" for action."""
         """
         if not decision.is_trade:
             return None
+
+        # Reasoning self-contradiction gate: Claude sometimes marks a trade
+        # Grade A while its own reasoning admits a hard-gate violation
+        # (MTF conflict, zone conflict, outside kill zone, etc.) and says
+        # "conviction reduced to B/C". Honor Claude's own words — reject.
+        reasoning_lower = (decision.reasoning or "").lower()
+        for phrase in self._REASONING_HARD_GATE_PHRASES:
+            if phrase in reasoning_lower:
+                sym = analysis.symbol if analysis else "?"
+                print(
+                    f"  [{sym}] REASONING GATE: Claude's reasoning contains '{phrase}' "
+                    f"(Grade {decision.grade}). Rejecting — honor stated violation.",
+                    flush=True,
+                )
+                return f"Reasoning admits gate violation: '{phrase}'"
 
         # Check R:R
         rr = decision.risk_reward_ratio
@@ -730,6 +1131,34 @@ If the setup is not convincing, use "SKIP" for action."""
             if decision.tp_price >= decision.entry_price:
                 return "TP above entry for SELL"
 
+        # Hard gate: NEUTRAL HTF bias caps non-scalp trades to Grade B
+        # No H4 directional confirmation = reduced conviction
+        if analysis and decision.grade == "A":
+            trade_type = _classify_trade_type(analysis)
+            if trade_type != "scalp" and analysis.htf_analysis:
+                if analysis.htf_analysis.bias == "NEUTRAL":
+                    print(f"  [{analysis.symbol}] GRADE DOWNGRADE A->B: HTF bias NEUTRAL (no H4 confirmation for {trade_type})", flush=True)
+                    decision.grade = "B"
+
+        # Hard gate: P/D zone mismatch caps grade to B
+        # BUY not in discount or SELL not in premium = wrong zone, reduce sizing
+        if analysis and analysis.pd_zone and not analysis.pd_aligned and decision.grade == "A":
+            zone = analysis.pd_zone
+            direction = analysis.direction
+            is_zone_mismatch = (
+                (direction == "BULLISH" and zone != "discount") or
+                (direction == "BEARISH" and zone != "premium")
+            )
+            if is_zone_mismatch:
+                print(f"  [{analysis.symbol}] GRADE DOWNGRADE A->B: {direction} in {zone} (not aligned with ICT zone rule)", flush=True)
+                decision.grade = "B"
+
+        # Hard gate: OTE 0/12 caps grade to B
+        # Zero optimal trade entry = entry timing is off, reduce sizing
+        if analysis and analysis.ote_score == 0 and decision.grade == "A":
+            print(f"  [{analysis.symbol}] GRADE DOWNGRADE A->B: OTE score 0/12 (no retracement confirmation)", flush=True)
+            decision.grade = "B"
+
         # Risk % sanity
         if decision.risk_pct > 0.02:
             return f"Risk {decision.risk_pct:.1%} exceeds 2% max"
@@ -740,7 +1169,7 @@ If the setup is not convincing, use "SKIP" for action."""
             profiles = rules.get("symbol_profiles", {})
             profile = profiles.get(analysis.symbol, {})
             overrides = profile.get("risk_overrides", {})
-            grade_key = f"grade_{(analysis.grade or 'c').lower()}"
+            grade_key = f"grade_{(decision.grade or 'c').lower()}"
             max_risk = overrides.get(grade_key, 0.01)  # default 1%
             if decision.risk_pct > max_risk:
                 print(f"  [{analysis.symbol}] Risk clamped: {decision.risk_pct:.4f} → {max_risk:.4f} (per-symbol max for {grade_key})", flush=True)
@@ -749,18 +1178,24 @@ If the setup is not convincing, use "SKIP" for action."""
         # Minimum SL distance: must be at least 2x ATR(14) on M15
         # AND at least 0.5% of price for crypto (sweeps go deep), 0.2% for metals
         # Prevents premature stopouts from liquidity sweeps
-        if analysis and analysis.atr_m15 > 0:
+        # ALWAYS enforce percentage floor even without ATR data
+        if analysis and decision.entry_price > 0 and decision.sl_price > 0:
             sl_distance = abs(decision.entry_price - decision.sl_price)
-            min_sl_atr = analysis.atr_m15 * 2.0  # 2x ATR minimum (sweeps exceed 1.5x)
+            # 2.5x ATR for crypto (sweeps regularly exceed 2x), 2x for everything else
+            base_sym_check = analysis.symbol.split(":")[-1]
+            atr_mult = 2.5 if base_sym_check in ("BTCUSD", "ETHUSD", "SOLUSD", "DOGEUSD") else 2.0
+            min_sl_atr = analysis.atr_m15 * atr_mult if analysis.atr_m15 > 0 else 0
 
-            # Per-asset-class minimum as % of price
+            # Per-asset-class minimum as % of price — HARD FLOOR regardless of ATR
             base_sym = analysis.symbol.split(":")[-1]
             if base_sym in ("BTCUSD", "ETHUSD", "SOLUSD", "DOGEUSD"):
-                min_sl_pct = decision.entry_price * 0.005  # 0.5% for crypto (sweeps go deep)
+                min_sl_pct = decision.entry_price * 0.005  # 0.5% for crypto
             elif base_sym in ("XAUUSD", "XAGUSD"):
                 min_sl_pct = decision.entry_price * 0.003  # 0.3% for metals
+            elif base_sym in ("US500.cash", "US100.cash", "US30.cash", "GER40.cash"):
+                min_sl_pct = decision.entry_price * 0.003  # 0.3% for indices
             else:
-                min_sl_pct = decision.entry_price * 0.001  # 0.1% for forex/indices
+                min_sl_pct = decision.entry_price * 0.0015  # 0.15% for forex (was 0.1%)
 
             min_sl = max(min_sl_atr, min_sl_pct)
 
@@ -769,6 +1204,60 @@ If the setup is not convincing, use "SKIP" for action."""
                     f"SL too tight: {sl_distance:.5f} < min({min_sl:.5f}). "
                     f"ATR={analysis.atr_m15:.5f}, min_atr={min_sl_atr:.5f}, min_pct={min_sl_pct:.5f}"
                 )
+
+        # SL placement validation: SL must be BEYOND liquidity, not sitting on it.
+        # Correct ICT placement: BUY SL below swing lows, SELL SL above swing highs.
+        # Wrong placement: SL at or above a swing low (BUY) / at or below a swing high (SELL)
+        # — that's right in the hunt zone where institutions sweep.
+        if analysis and analysis.atr_m15 > 0 and decision.sl_price > 0:
+            buffer = analysis.atr_m15 * 0.3  # small buffer for "at the level"
+            if decision.action == "BUY" and analysis.swing_lows:
+                for swing_low in analysis.swing_lows:
+                    # SL should be BELOW swing low. If SL is at or above it,
+                    # it's sitting in the liquidity pool — will get hunted.
+                    if decision.sl_price >= swing_low - buffer and decision.sl_price <= swing_low + buffer:
+                        # Auto-fix: push SL below the swing low instead of blocking
+                        new_sl = swing_low - buffer * 2
+                        print(
+                            f"  [{analysis.symbol}] SL LIQUIDITY FIX: {decision.sl_price:.5f} was AT swing low "
+                            f"{swing_low:.5f} — moved to {new_sl:.5f} (below hunt zone)",
+                            flush=True,
+                        )
+                        decision.sl_price = round(new_sl, 5)
+                        break
+            elif decision.action == "SELL" and analysis.swing_highs:
+                for swing_high in analysis.swing_highs:
+                    # SL should be ABOVE swing high. If SL is at or below it,
+                    # it's sitting in the liquidity pool — will get hunted.
+                    if decision.sl_price <= swing_high + buffer and decision.sl_price >= swing_high - buffer:
+                        # Auto-fix: push SL above the swing high instead of blocking
+                        new_sl = swing_high + buffer * 2
+                        print(
+                            f"  [{analysis.symbol}] SL LIQUIDITY FIX: {decision.sl_price:.5f} was AT swing high "
+                            f"{swing_high:.5f} — moved to {new_sl:.5f} (above hunt zone)",
+                            flush=True,
+                        )
+                        decision.sl_price = round(new_sl, 5)
+                        break
+
+        # Entry price must be close to current market price (we execute at market).
+        # When Claude returns an FVG CE entry, it may be far from market price
+        # (meaning "wait for pullback"). Since we don't support limit orders yet,
+        # use market price instead of blocking the trade entirely.
+        if analysis and analysis.current_price > 0:
+            entry_dist_pct = abs(decision.entry_price - analysis.current_price) / analysis.current_price
+            if entry_dist_pct > 0.005:  # 0.5% max distance
+                # Instead of blocking, use current market price as entry
+                print(
+                    f"  [{analysis.symbol}] Entry adjusted: Claude FVG CE {decision.entry_price:.5f} "
+                    f"is {entry_dist_pct:.2%} from market {analysis.current_price:.5f} — using market price",
+                    flush=True,
+                )
+                decision.entry_price = analysis.current_price
+                # Recalculate R:R with new entry
+                rr = decision.risk_reward_ratio
+                if rr > 0 and rr < self.min_rr:
+                    return f"R:R {rr:.1f} below minimum {self.min_rr} after entry adjustment"
 
         return None
 

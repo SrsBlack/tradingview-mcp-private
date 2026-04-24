@@ -44,5 +44,17 @@
     }
   },
   "multi_timeframe_rule": "HTF dictates direction. LTF provides entry timing. A CHoCH on M15 means nothing if H4 is strongly bullish — it's just a pullback, not a reversal.",
-  "common_mistake": "Trading every BOS/CHoCH without HTF context. A M5 CHoCH inside a H1 bullish orderblock is a BUYING opportunity."
+  "common_mistake": "Trading every BOS/CHoCH without HTF context. A M5 CHoCH inside a H1 bullish orderblock is a BUYING opportunity.",
+  "trading_rules": {
+    "rule_1": "HTF structure ALWAYS overrides LTF. An M15 CHoCH against H4 trend is a pullback entry, not a reversal.",
+    "rule_2": "BOS confirms trend — trade WITH it. CHoCH suggests reversal — wait for displacement + FVG before fading.",
+    "rule_3": "A single CHoCH against 4+ BOS events in the same direction = noise, not reversal. Require BOS majority to flip bias.",
+    "rule_4": "MSS on LTF (M5/M15) after HTF CHoCH = highest-conviction entry timing.",
+    "rule_5": "Structure score 20+/30 = strong trend. Score 10-19 = developing. Below 10 = choppy (reduce size or skip)."
+  },
+  "bridge_integration": {
+    "detection": "detect_swings() + classify_structure() + get_current_bias(). Stricter bias requires BOS majority — single CHoCH against dominant trend returns NEUTRAL.",
+    "prompt_display": "structure_score (0-30) in SCORE BREAKDOWN. Grade derived from total score including structure.",
+    "score_impact": "Structure is the largest single component (30/100 max). Strong structure = foundation for high-grade trades."
+  }
 }

@@ -60,6 +60,9 @@ SYMBOL_MAP: dict[str, str] = {
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
     "USDJPY": "USDJPY",
+    "EURJPY": "EURJPY",
+    "GBPJPY": "GBPJPY",
+    "USDCAD": "USDCAD",
     "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD",
     # Gold / commodities
@@ -83,6 +86,7 @@ SYMBOL_MAP: dict[str, str] = {
     "GER40":  "GER40",
     "FDAX1!": "GER40",
     "DAX":    "GER40",
+    "GER40.cash": "GER40",
     # Crypto
     "BTCUSD":  "BTCUSD",
     "ETHUSD":  "ETHUSD",
@@ -97,6 +101,9 @@ TV_TO_FTMO: dict[str, str] = {
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
     "USDJPY": "USDJPY",
+    "EURJPY": "EURJPY",
+    "GBPJPY": "GBPJPY",
+    "USDCAD": "USDCAD",
     "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD",
     "XAUUSD": "XAUUSD",
@@ -144,6 +151,9 @@ SMT_PAIRS: dict[str, str] = {
     "EURUSD": "GBPUSD",
     "GBPUSD": "EURUSD",
     "USDJPY": "EURUSD",
+    "EURJPY": "USDJPY",
+    "GBPJPY": "USDJPY",
+    "USDCAD": "UKOIL",
     "AUDUSD": "NZDUSD",
     "NZDUSD": "AUDUSD",
     "XAUUSD": "XAGUSD",
@@ -186,6 +196,9 @@ PRICE_RANGES: dict[str, tuple[float, float]] = {
     "EURUSD":  (0.80,   1.60),     # EUR/USD never outside 0.82–1.60 in modern history
     "GBPUSD":  (1.00,   2.00),     # GBP/USD realistic range
     "USDJPY":  (70,     200),      # USD/JPY realistic range
+    "EURJPY":  (90,     220),      # EUR/JPY realistic range
+    "GBPJPY":  (120,    260),      # GBP/JPY (the "dragon") realistic range
+    "USDCAD":  (0.90,   1.80),     # USD/CAD realistic range
     "AUDUSD":  (0.50,   1.10),     # AUD/USD realistic range
     "NZDUSD":  (0.40,   1.00),     # NZD/USD realistic range
     "YM1!":    (10_000, 50_000),   # Dow futures; ATH ~45k

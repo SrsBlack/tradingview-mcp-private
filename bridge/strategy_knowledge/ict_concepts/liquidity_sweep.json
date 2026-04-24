@@ -17,5 +17,17 @@
   ],
   "confirmation": "Sweep is confirmed when price takes the level AND returns inside the prior range. If it keeps going → legitimate breakout, not a sweep.",
   "chain_after_sweep": "Confirmed sweep → expect displacement → displacement creates FVG + OB → enter retracement into FVG/OB. This chain is THE core ICT trade.",
-  "SL_connection": "The sweep extreme (the wick beyond the liquidity level) becomes your SL reference. If price returns beyond this point, your thesis is wrong."
+  "SL_connection": "The sweep extreme (the wick beyond the liquidity level) becomes your SL reference. If price returns beyond this point, your thesis is wrong.",
+  "trading_rules": {
+    "rule_1": "A sweep is ONLY confirmed when price returns inside the prior range. If it keeps going = breakout, not sweep.",
+    "rule_2": "Sweep + SMT divergence = 90%+ confidence it's manipulation (correlated asset didn't make a new extreme).",
+    "rule_3": "The sweep wick extreme = your SL reference. If price returns beyond this point, the thesis is invalidated.",
+    "rule_4": "Multiple sweeps of the same level = the level is exhausted. Don't expect another sweep of an already-swept level.",
+    "rule_5": "Sweep without subsequent displacement = failed manipulation attempt. Wait for displacement to confirm."
+  },
+  "bridge_integration": {
+    "detection": "scan_sweeps() checks recent 64 bars for wicks through liquidity levels that close back inside range.",
+    "prompt_display": "sweep_detected flag + confluence factors. Combined with displacement_confirmed for full manipulation chain.",
+    "score_impact": "Sweep detected adds to liquidity score. Sweep + displacement + FVG = complete ICT trade chain."
+  }
 }

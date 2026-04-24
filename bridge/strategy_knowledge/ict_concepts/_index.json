@@ -329,5 +329,43 @@
     "entry_models",
     "risk_management",
     "common_mistakes"
-  ]
+  ],
+  "computed_concepts": {
+    "_note": "Concepts marked here are auto-computed by the bridge from market data and injected into analysis. No manual identification required.",
+    "IPDA": {
+      "computed": true,
+      "source": "H4 OHLCV data, 20/40/60-day lookback ranges",
+      "fields": ["ipda_ranges (dict of label→{high,low,mid,pct})"]
+    },
+    "quarterly_shifts": {
+      "computed": true,
+      "source": "H4 weekly close groupings, 12-week lookback",
+      "fields": ["quarterly_shift (dict of direction, strength)"]
+    },
+    "opening_gaps": {
+      "computed": true,
+      "source": "M15/H1 session boundaries for NDOG; weekly groups for NWOG",
+      "fields": ["nwog_count", "ndog_count"]
+    },
+    "session_levels": {
+      "computed": true,
+      "source": "H1/H4 data: PDH/PDL, PWH/PWL, PMH/PML, daily/weekly/monthly/quarterly opens",
+      "fields": ["key_opens (dict of label→price)", "current_price"]
+    },
+    "displacement": {
+      "computed": true,
+      "source": "Sweep + FVG detection on current timeframe",
+      "fields": ["displacement_confirmed (bool)"]
+    },
+    "liquidity_sweep": {
+      "computed": true,
+      "source": "scan_sweeps() on recent 64 bars",
+      "fields": ["sweep_detected (bool)", "confluence_factors"]
+    },
+    "premium_discount": {
+      "computed": true,
+      "source": "Dealing range midpoint vs current price",
+      "fields": ["pd_zone (premium/discount/equilibrium)", "pd_aligned (bool)"]
+    }
+  }
 }

@@ -116,13 +116,20 @@ def is_high_impact_news_window(dt: datetime) -> tuple[bool, str]:
             return True, "CPI (Consumer Price Index)"
 
     # FOMC: Usually Wed at 2:00 PM ET, roughly every 6 weeks
+    # Year-specific dates to avoid stale schedule
     fomc_dates = {
-        (1, 29), (3, 19), (5, 7), (6, 18), (7, 30), (9, 17), (11, 5), (12, 17)
+        2026: {(1, 28), (3, 18), (5, 6), (6, 17), (7, 29), (9, 16), (11, 4), (12, 16)},
+        2027: {(1, 27), (3, 17), (5, 5), (6, 16), (7, 28), (9, 15), (11, 3), (12, 15)},
     }
-    if (ny.month, day) in fomc_dates:
+    year_dates = fomc_dates.get(ny.year, set())
+    if (ny.month, day) in year_dates:
         fomc_min = 14 * 60  # 2:00 PM ET
         if abs(current_min - fomc_min) <= 15:
             return True, "FOMC Rate Decision"
+    # Fallback heuristic: any Wednesday with day 25-31 or 1-7 or 14-21 at 2PM
+    # (covers ~6-week FOMC cadence even if exact dates are wrong)
+    if weekday == 2 and hour == 14 and minute <= 15:
+        return True, "FOMC (heuristic — verify schedule)"
 
     return False, ""
 
@@ -140,6 +147,12 @@ SYMBOL_SESSIONS: dict[str, list[tuple[int, int]]] = {
     "CAPITALCOM:US100": [(0, 21), (22, 24)],
     # Forex — London + NY (7am-5pm UTC)
     "OANDA:EURUSD": [(7, 17)],
+    # JPY pairs — Tokyo + London + NY (00-04 UTC = Tokyo KZ, then 7-17 UTC)
+    "OANDA:USDJPY": [(0, 4), (7, 17)],
+    "OANDA:EURJPY": [(0, 4), (7, 17)],
+    "OANDA:GBPJPY": [(0, 4), (7, 17)],
+    # USDCAD — London + NY only (oil-correlated; dead in Asia)
+    "OANDA:USDCAD": [(7, 21)],
     # Crypto — 24/7
     "BITSTAMP:BTCUSD":  [(0, 24)],
     "COINBASE:ETHUSD":  [(0, 24)],

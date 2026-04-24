@@ -289,10 +289,16 @@ class TVClient:
         return bars
 
     def health_check(self) -> bool:
-        """Quick connectivity check — returns True if TradingView is responsive."""
+        """Quick connectivity check — returns True if TradingView CDP is responsive.
+
+        Uses 'status' instead of 'quote' because quote fails when the chart
+        is on a closed-market symbol (e.g. GER40 after European close).
+        A failed quote does NOT mean TradingView is disconnected — it means
+        the current symbol has no live data. CDP status is the correct check.
+        """
         try:
-            result = self._run(["quote"], timeout=10)
-            return isinstance(result, dict) and float(result.get("last", 0)) > 0
+            result = self._run(["status"], timeout=10)
+            return isinstance(result, dict) and result.get("cdp_connected", False)
         except Exception:
             return False
 

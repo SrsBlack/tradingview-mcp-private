@@ -119,6 +119,57 @@ class PaperExecutor:
             pass
 
     # ------------------------------------------------------------------
+    # Opposite-direction helpers
+    # ------------------------------------------------------------------
+
+    def find_opposite_positions(self, symbol: str, new_direction: str) -> list[tuple[int, Any]]:
+        """Find open positions on the same symbol with the opposite direction."""
+        result = []
+        with self._positions_lock:
+            for ticket, pos in self.open_positions.items():
+                if pos.symbol == symbol and pos.direction != new_direction:
+                    result.append((ticket, pos))
+        return result
+
+    def close_position_by_ticket(self, ticket: int, reason: str = "SIGNAL_FLIP") -> dict | None:
+        """Close a specific position by ticket. Returns close event dict or None."""
+        with self._positions_lock:
+            pos = self.open_positions.get(ticket)
+        if pos is None:
+            return None
+
+        pnl = pos.floating_pnl
+        r_mult = pos.r_multiple
+        closed_at = datetime.now(timezone.utc).isoformat()
+
+        with self._positions_lock:
+            self.open_positions.pop(ticket, None)
+
+        self.balance += pnl
+        self.peak_balance = max(self.peak_balance, self.balance)
+        if pnl >= 0:
+            self.wins += 1
+            self.consecutive_losses = 0
+        else:
+            self.losses += 1
+            self.consecutive_losses += 1
+
+        return {
+            "ticket": ticket, "symbol": pos.symbol,
+            "direction": pos.direction,
+            "entry_price": pos.entry_price,
+            "exit_price": pos.current_price,
+            "actual_trigger_price": pos.current_price,
+            "pnl": round(pnl, 2), "r_multiple": round(r_mult, 2),
+            "reason": reason, "balance": round(self.balance, 2),
+            "opened_at": pos.opened_at, "closed_at": closed_at,
+            "sl_price": pos.sl_price, "tp_price": pos.tp_price,
+            "tp2_price": pos.tp2_price, "lot_size": pos.lot_size,
+            "ict_grade": pos.ict_grade, "ict_score": pos.ict_score,
+            "trailing_sl": pos.trailing_sl, "tp1_hit": pos.tp1_hit,
+        }
+
+    # ------------------------------------------------------------------
     # Open position
     # ------------------------------------------------------------------
 
@@ -152,11 +203,8 @@ class PaperExecutor:
                                 "message": f"Duplicate: already {pos.direction} {decision.symbol} "
                                            f"@ {pos.entry_price:.4f} (new entry {decision.entry_price:.4f} "
                                            f"within 0.5%)"}
-                # Also block opposite direction on same symbol (already exposed)
-                elif pos.symbol == decision.symbol:
-                    return {"success": False, "ticket": 0,
-                            "message": f"Already have {pos.direction} position on {decision.symbol} "
-                                       f"— close it before reversing"}
+                # Opposite direction is now handled by analysis_pipeline
+                # via close_position_by_ticket before calling open_position
 
         ticket = self._next_ticket
         self._next_ticket += 1

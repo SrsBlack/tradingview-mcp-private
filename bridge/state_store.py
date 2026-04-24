@@ -69,9 +69,16 @@ class StateStore:
 
     def save(self, executor: Any, mode: str) -> None:
         """Snapshot executor state to disk with atomic write."""
+        # Acquire positions lock to avoid "dictionary changed size" during iteration
+        lock = getattr(executor, '_positions_lock', None)
         positions = []
-        for pos in executor.open_positions.values():
-            positions.append(pos.to_dict())
+        if lock:
+            with lock:
+                for pos in executor.open_positions.values():
+                    positions.append(pos.to_dict())
+        else:
+            for pos in executor.open_positions.values():
+                positions.append(pos.to_dict())
 
         state = {
             "saved_at": datetime.now(timezone.utc).isoformat(),
@@ -223,6 +230,27 @@ class StateStore:
                     current_price=p["entry_price"],
                 )
                 executor.open_positions[pos.ticket] = pos
+
+                # CRITICAL: For live mode, also populate the underlying
+                # LiveExecutor's open_tickets dict. Without this, modify_sl()
+                # and close_position() silently return False for state-restored
+                # positions (they check open_tickets, not open_positions).
+                if mode == "live" and hasattr(executor, "_live") and hasattr(executor._live, "open_tickets"):
+                    from bridge.config import tv_to_ftmo_symbol
+                    ftmo_sym = tv_to_ftmo_symbol(p["symbol"])
+                    executor._live.open_tickets[pos.ticket] = {
+                        "symbol": ftmo_sym,
+                        "tv_symbol": p["symbol"],
+                        "direction": p["direction"],
+                        "entry_price": p["entry_price"],
+                        "sl_price": p["sl_price"],
+                        "tp_price": p["tp_price"],
+                        "tp2_price": p.get("tp2_price", 0.0),
+                        "tp1_hit": p.get("tp1_hit", False),
+                        "lot_size": p["lot_size"],
+                        "opened_at": p.get("opened_at", ""),
+                    }
+
                 # Advance ticket counter past restored tickets
                 if hasattr(executor, "_next_ticket"):
                     executor._next_ticket = max(executor._next_ticket, pos.ticket + 1)

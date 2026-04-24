@@ -21,5 +21,17 @@
     "Occurs at start of distribution phase"
   ],
   "critical_chain": "Without displacement, there is no FVG, no OB, and no OTE. Displacement is the PROOF of institutional entry. Everything in layers 4-5 depends on displacement having occurred.",
-  "what_it_proves": "That the liquidity_sweep was manipulation (not breakout). That institutions have committed to the new direction. That the OB and FVG created are valid entry zones."
+  "what_it_proves": "That the liquidity_sweep was manipulation (not breakout). That institutions have committed to the new direction. That the OB and FVG created are valid entry zones.",
+  "trading_rules": {
+    "rule_1": "Displacement MUST create at least one FVG — if no FVG formed, the move is not true displacement",
+    "rule_2": "Displacement candles should have 70%+ body (minimal wicks) — large wicks suggest indecision, not commitment",
+    "rule_3": "Displacement after a confirmed sweep = highest-confidence signal. Displacement without prior sweep = lower confidence (could be news spike).",
+    "rule_4": "The last opposing candle before displacement = the Order Block entry zone. This is your pullback entry level.",
+    "rule_5": "If displacement breaks structure (BOS/CHoCH), it confirms the new direction. Without structure break, it may be a false move within the range."
+  },
+  "bridge_integration": {
+    "detection": "Tracked via displacement_confirmed flag. Requires sweep + FVG in opposite direction = proven manipulation.",
+    "prompt_display": "Shows as 'CONFIRMED (sweep + FVG reversal)' or 'NOT CONFIRMED' in Claude prompt.",
+    "score_impact": "Displacement confirmed = highest-confidence setup. Without it, OB and FVG entries are lower probability."
+  }
 }

@@ -17,3 +17,5 @@ __pycache__/
 logs/
 .omc/state/
 *.db
+bridge_safety_state.json
+safety-check-log.json

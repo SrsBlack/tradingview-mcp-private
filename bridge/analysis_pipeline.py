@@ -82,6 +82,18 @@ class AnalysisPipeline:
         if self._check_kill_switch(symbol):
             return
 
+        # Daily trade limit — no more new trades if cap reached
+        if hasattr(self.executor, 'is_daily_trade_limit_reached'):
+            if self.executor.is_daily_trade_limit_reached():
+                print(f"  [{symbol}] Daily trade limit reached — skipping", flush=True)
+                return
+
+        # Global loss cooldown — pause ALL trading after any loss
+        if hasattr(self.executor, 'is_on_global_loss_cooldown'):
+            if self.executor.is_on_global_loss_cooldown():
+                print(f"  [{symbol}] Global loss cooldown active — skipping", flush=True)
+                return
+
         # Per-symbol loss cooldown — skip if this symbol recently hit SL
         if hasattr(self.executor, 'is_symbol_on_loss_cooldown'):
             if self.executor.is_symbol_on_loss_cooldown(symbol):
@@ -92,6 +104,19 @@ class AnalysisPipeline:
         analysis, ea_signals = self._run_ict_analysis(symbol)
         if analysis is None:
             return
+
+        # News blackout hard gate — no trading during high-impact events
+        if analysis.news_blackout:
+            print(
+                f"  [{symbol}] NEWS BLACKOUT: {analysis.news_event} "
+                f"({analysis.news_minutes}min) — skipping",
+                flush=True,
+            )
+            return
+
+        # Record Grade A signal for dynamic daily trade limit
+        if analysis.grade == "A" and hasattr(self.executor, 'record_grade_a_signal'):
+            self.executor.record_grade_a_signal()
 
         # EA ensemble override for low-grade ICT signals
         self._apply_ea_override(symbol, analysis, ea_signals)
@@ -117,7 +142,7 @@ class AnalysisPipeline:
             return
 
         # Execute live trade
-        self._execute_live(symbol, decision)
+        self._execute_live(symbol, decision, analysis)
 
     def _check_kill_switch(self, symbol: str) -> bool:
         """Returns True if kill switch is active (skip this symbol)."""
@@ -185,7 +210,7 @@ class AnalysisPipeline:
             f"struct={analysis.structure_score:.0f} ob={analysis.ob_score:.0f} fvg={analysis.fvg_score:.0f} "
             f"sess={analysis.session_score:.0f} ote={analysis.ote_score:.0f} smt={analysis.smt_score:.0f} "
             f"sweep={'Y' if analysis.sweep_detected else 'N'} disp={'Y' if analysis.displacement_confirmed else 'N'} "
-            f"pd={analysis.pd_zone or '?'}{'Y' if analysis.pd_aligned else 'N'} kz={'Y' if analysis.is_kill_zone else 'N'}",
+            f"pd={analysis.pd_zone or '?'}({'aligned' if analysis.pd_aligned else 'misaligned'}) kz={'Y' if analysis.is_kill_zone else 'N'}",
             flush=True,
         )
 
@@ -209,10 +234,14 @@ class AnalysisPipeline:
                 # REMOVED: Grade override bypasses ICT quality gates
 
     def _apply_backtest_confidence(self, symbol: str, analysis: SymbolAnalysis) -> float:
-        """Apply backtest confidence multiplier and re-grade. Returns the multiplier."""
+        """Apply backtest confidence multiplier and re-grade. Returns the multiplier.
+
+        Cap: backtest boost cannot promote more than 1 grade (e.g., C->B ok, D->B blocked).
+        """
         bt_confidence = get_backtest_confidence(symbol, self._knowledge)
         if bt_confidence != 1.0 and analysis.total_score > 0:
             original_score = analysis.total_score
+            original_grade = analysis.grade
             analysis.total_score = min(100, analysis.total_score * bt_confidence)
             if bt_confidence > 1.0:
                 analysis.confluence_factors.append(
@@ -223,6 +252,15 @@ class AnalysisPipeline:
                     f"MT5_undertested({bt_confidence}x, {original_score:.0f}->{analysis.total_score:.0f})"
                 )
             self._regrade(analysis)
+            # Cap: never promote more than 1 grade level via backtest
+            grade_order = {"A": 0, "B": 1, "C": 2, "D": 3, "INVALID": 4}
+            orig_rank = grade_order.get(original_grade, 4)
+            new_rank = grade_order.get(analysis.grade, 4)
+            if orig_rank - new_rank > 1:
+                # Clamp to 1 grade above original
+                clamped = {4: "D", 3: "C", 2: "B", 1: "A", 0: "A"}
+                analysis.grade = clamped.get(orig_rank - 1, original_grade)
+                analysis.confluence_factors.append(f"grade_cap({original_grade}->{analysis.grade}, max 1 promotion)")
         return bt_confidence
 
     def _apply_score_decay(self, symbol: str, analysis: SymbolAnalysis) -> None:
@@ -245,7 +283,7 @@ class AnalysisPipeline:
             else:
                 decay_threshold = 0.1  # 0.1% for forex/indices
 
-            if adverse_move_pct > (decay_threshold / 2):
+            if adverse_move_pct > decay_threshold:
                 decay_factor = min(adverse_move_pct / decay_threshold * 0.03, 0.20)
                 original_score = analysis.total_score
                 analysis.total_score *= (1.0 - decay_factor)
@@ -367,7 +405,7 @@ class AnalysisPipeline:
             return True
         return False
 
-    def _execute_live(self, symbol: str, decision: TradeDecision) -> None:
+    def _execute_live(self, symbol: str, decision: TradeDecision, analysis: SymbolAnalysis | None = None) -> None:
         """Apply risk gates and execute the trade if approved."""
         if not decision.is_trade:
             return
@@ -377,6 +415,25 @@ class AnalysisPipeline:
         if is_friday_close_window(now_utc()):
             print(f"  [{symbol}] BLOCKED: Friday close window — no new positions (weekend gap risk)", flush=True)
             return
+
+        # No-trade window hard gate (rules.json)
+        from zoneinfo import ZoneInfo
+        et_now = now_utc().astimezone(ZoneInfo("America/New_York"))
+        current_min = et_now.hour * 60 + et_now.minute
+        time_filters = self._rules.get("time_filters", {})
+        for ntw in time_filters.get("no_trade_windows", []):
+            if "et_start" in ntw:
+                s_h, s_m = map(int, ntw["et_start"].split(":"))
+                e_h, e_m = map(int, ntw["et_end"].split(":"))
+                start_min = s_h * 60 + s_m
+                end_min = e_h * 60 + e_m
+                if start_min > end_min:
+                    in_window = current_min >= start_min or current_min <= end_min
+                else:
+                    in_window = start_min <= current_min <= end_min
+                if in_window:
+                    print(f"  [{symbol}] BLOCKED: no-trade window '{ntw['name']}' — {ntw['reason']}", flush=True)
+                    return
 
         # Per-symbol minimum grade gate (fallback to global default "B")
         profile = self._rules.get("symbol_profiles", {}).get(symbol, {})
@@ -399,14 +456,74 @@ class AnalysisPipeline:
             print(f"  [{symbol}] Risk override: {decision.risk_pct:.1%} -> {risk_override:.1%} (per-symbol limit)", flush=True)
             decision.risk_pct = risk_override
 
-        # Correlation gate
-        corr_ok, corr_reason = self.risk_bridge.check_correlation(
+        # Correlation gate (with scaling — allows 5th position at 50% size)
+        from bridge.risk_bridge import check_correlation_with_scaling
+        corr_ok, corr_mult, corr_reason = check_correlation_with_scaling(
             decision.symbol, decision.action, self.executor.open_positions
         )
         if not corr_ok:
             print(f"  [{symbol}] BLOCKED (live): {corr_reason}", flush=True)
             self.session.log_decision(decision.to_dict())
             return
+        if corr_mult < 1.0:
+            original_risk = decision.risk_pct
+            decision.risk_pct *= corr_mult
+            print(f"  [{symbol}] Correlation scaling: {original_risk:.4f} -> {decision.risk_pct:.4f} ({corr_mult}x — {corr_reason})", flush=True)
+
+        # Entry staleness check — reject if price moved AGAINST our direction
+        # past the entry point (we'd be chasing with SL basically at current price).
+        # Price moving IN our direction is fine (we enter at a better price).
+        if analysis and analysis.current_price > 0 and decision.entry_price > 0 and decision.sl_price > 0:
+            sl_dist = abs(decision.entry_price - decision.sl_price)
+            if sl_dist > 0:
+                if decision.action == "BUY":
+                    # For buys, bad = price ran UP past our entry (chasing)
+                    overshoot = (analysis.current_price - decision.entry_price) / sl_dist
+                else:
+                    # For sells, bad = price ran DOWN past our entry (chasing)
+                    overshoot = (decision.entry_price - analysis.current_price) / sl_dist
+                # Only block if price moved AGAINST us (overshoot > 0 means chasing)
+                # and by more than 0.5x SL distance
+                if overshoot > 0.5:
+                    # But first: adjust entry to current price if within 2x SL
+                    if overshoot <= 2.0:
+                        print(
+                            f"  [{symbol}] Entry adjusted to market: {decision.entry_price:.5f} -> {analysis.current_price:.5f} "
+                            f"(price moved {overshoot:.1f}x SL in our direction)",
+                            flush=True,
+                        )
+                        decision.entry_price = analysis.current_price
+                    else:
+                        print(
+                            f"  [{symbol}] BLOCKED: Entry stale — price moved {overshoot:.1f}x SL distance past entry "
+                            f"(entry={decision.entry_price:.5f}, current={analysis.current_price:.5f}, SL dist={sl_dist:.5f})",
+                            flush=True,
+                        )
+                        return
+
+        # Apply VIX risk multiplier (reduces size during high volatility)
+        vix_mult = getattr(analysis, 'vix_risk_multiplier', 1.0) if analysis else 1.0
+        if vix_mult < 1.0:
+            original_risk = decision.risk_pct
+            decision.risk_pct *= vix_mult
+            print(f"  [{symbol}] VIX risk adjustment: {original_risk:.4f} -> {decision.risk_pct:.4f} ({vix_mult}x)", flush=True)
+
+        # Apply account heat multiplier (reduces size after winning streaks)
+        heat_mult = 1.0
+        if hasattr(self.executor, 'get_heat_multiplier'):
+            heat_mult = self.executor.get_heat_multiplier()
+            if heat_mult < 1.0:
+                original_risk = decision.risk_pct
+                decision.risk_pct *= heat_mult
+                print(f"  [{symbol}] Heat adjustment: {original_risk:.4f} -> {decision.risk_pct:.4f} ({heat_mult}x)", flush=True)
+
+        # Apply symbol cooldown risk multiplier (half-size after 1 loss on symbol)
+        if hasattr(self.executor, 'get_symbol_cooldown_risk_multiplier'):
+            cooldown_mult = self.executor.get_symbol_cooldown_risk_multiplier(symbol)
+            if cooldown_mult < 1.0:
+                original_risk = decision.risk_pct
+                decision.risk_pct *= cooldown_mult
+                print(f"  [{symbol}] Cooldown risk reduction: {original_risk:.4f} -> {decision.risk_pct:.4f} ({cooldown_mult}x)", flush=True)
 
         # Risk gate: FTMO compliance + position sizing
         approved, lot_size, risk_msg = self.risk_bridge.check_trade(
@@ -427,8 +544,72 @@ class AnalysisPipeline:
 
         print(f"  [{symbol}] Risk: {risk_msg}", flush=True)
 
+        # Signal flip: close opposite-direction positions before opening new one
+        # SAFETY 1: never flip against HTF bias (a M15 CHoCH shouldn't override H4 trend)
+        # SAFETY 2: never flip a winning position (R >= 1.0 or TP1 already hit)
+        if hasattr(self.executor, 'find_opposite_positions'):
+            # Check HTF bias alignment before flipping
+            htf_bias = None
+            if analysis and analysis.htf_analysis:
+                htf_bias = analysis.htf_analysis.bias  # "BULLISH", "BEARISH", "NEUTRAL"
+            if htf_bias and htf_bias != "NEUTRAL":
+                flip_aligns_htf = (
+                    (htf_bias == "BULLISH" and decision.action == "BUY") or
+                    (htf_bias == "BEARISH" and decision.action == "SELL")
+                )
+                if not flip_aligns_htf:
+                    print(
+                        f"  [{symbol}] SIGNAL FLIP BLOCKED: new {decision.action} opposes HTF bias ({htf_bias}) "
+                        f"— keeping existing position, skipping counter-trend flip",
+                        flush=True,
+                    )
+                    return  # Don't flip AND don't open the counter-trend trade
+
+            opposites = self.executor.find_opposite_positions(decision.symbol, decision.action)
+            for opp_ticket, opp_pos in opposites:
+                r_mult = getattr(opp_pos, 'r_multiple', 0.0)
+                tp1_hit = getattr(opp_pos, 'tp1_hit', False)
+                if r_mult >= 1.0 or tp1_hit:
+                    print(
+                        f"  [{symbol}] SIGNAL FLIP BLOCKED: #{opp_ticket} {opp_pos.direction} "
+                        f"is winning (r={r_mult:.2f}, tp1_hit={tp1_hit}) — keeping position",
+                        flush=True,
+                    )
+                    continue
+                print(
+                    f"  [{symbol}] SIGNAL FLIP: closing #{opp_ticket} {opp_pos.direction} "
+                    f"(PnL={opp_pos.floating_pnl:+.2f}, r={r_mult:.2f}) to flip to {decision.action}",
+                    flush=True,
+                )
+                event = self.executor.close_position_by_ticket(opp_ticket, reason="SIGNAL_FLIP")
+                if event:
+                    self.session.log_trade({"event": "CLOSE", **event})
+                    self.state_store.save(self.executor, self.mode)
+                    self.drawings.remove(opp_ticket)
+
+        # If Claude set entry at FVG CE (not current market price), check if it's
+        # a reasonable limit-style entry. If current price is already past the FVG
+        # entry by more than 50% of SL distance, the FVG fill was missed — log it.
+        if decision.entry_price > 0 and analysis and getattr(analysis, 'fvg_entry_price', 0) > 0:
+            fvg_entry = analysis.fvg_entry_price
+            sl_dist = abs(decision.entry_price - decision.sl_price)
+            if sl_dist > 0:
+                if decision.action == "BUY":
+                    overshoot = (analysis.current_price - fvg_entry) / sl_dist
+                else:
+                    overshoot = (fvg_entry - analysis.current_price) / sl_dist
+                if overshoot > 0.5:
+                    print(
+                        f"  [{symbol}] INFO: FVG entry at {fvg_entry:.5f} missed — "
+                        f"price already {overshoot:.1f}x SL past zone. Using Claude's entry.",
+                        flush=True,
+                    )
+
         result = self.executor.open_position(decision, lot_size=lot_size)
         if result["success"]:
+            # Increment daily trade counter
+            if hasattr(self.executor, 'increment_daily_trade_count'):
+                self.executor.increment_daily_trade_count()
             # Set cooldown after successful live execution
             self.cooldown.decisions[symbol] = time.time()
             print(f"  [{symbol}] OPENED: {result['message']}", flush=True)
@@ -467,21 +648,30 @@ class AnalysisPipeline:
                     print(f"  [{symbol}] Chart: {len(entity_ids)} lines drawn (IDs: {entity_ids})", flush=True)
             except Exception:
                 pass
-            # Send alert
+            # Send alert — use threading since we're in a threadpool worker
             try:
-                _loop = asyncio.get_running_loop()
-                _loop.call_soon_threadsafe(asyncio.ensure_future,
-                    self.alerts.send_trade_open(
-                        symbol=decision.symbol, direction=decision.action,
-                        entry_price=decision.entry_price, sl_price=decision.sl_price,
-                        tp_price=decision.tp_price, tp2_price=decision.tp2_price,
-                        lot_size=lot_size, grade=decision.grade, score=decision.ict_score,
-                        confidence=decision.confidence, reasoning=decision.reasoning,
-                        ticket=result["ticket"], mode=self.mode,
-                    )
-                )
-            except RuntimeError:
-                pass
+                import threading
+
+                def _send_alert():
+                    loop = asyncio.new_event_loop()
+                    try:
+                        loop.run_until_complete(self.alerts.send_trade_open(
+                            symbol=decision.symbol, direction=decision.action,
+                            entry_price=decision.entry_price, sl_price=decision.sl_price,
+                            tp_price=decision.tp_price, tp2_price=decision.tp2_price,
+                            lot_size=lot_size, grade=decision.grade, score=decision.ict_score,
+                            confidence=decision.confidence, reasoning=decision.reasoning,
+                            ticket=result["ticket"], mode=self.mode,
+                        ))
+                    except Exception as e:
+                        print(f"  [{symbol}] Alert send error: {e}", flush=True)
+                    finally:
+                        loop.close()
+
+                t = threading.Thread(target=_send_alert, daemon=True)
+                t.start()
+            except Exception as e:
+                print(f"  [{symbol}] Alert thread error: {e}", flush=True)
         else:
             print(f"  [{symbol}] Rejected: {result['message']}", flush=True)
 

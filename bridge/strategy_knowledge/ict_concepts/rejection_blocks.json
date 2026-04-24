@@ -17,5 +17,10 @@
   "definition_detail": "A candle where the wick is >60% of the total range. The wick zone (from wick tip to body edge) is the rejection block.",
   "bullish_rejection": "Long lower wick at support. The wick zone below the body = demand zone. Enter on retest of this zone.",
   "bearish_rejection": "Long upper wick at resistance. The wick zone above the body = supply zone. Enter on retest.",
-  "quality": "Rejection blocks at PDH/PDL, OB zones, or FVG boundaries are highest quality. Random rejection blocks are less significant."
+  "quality": "Rejection blocks at PDH/PDL, OB zones, or FVG boundaries are highest quality. Random rejection blocks are less significant.",
+  "bridge_integration": {
+    "detection": "Identified from candles where wick > 60% of total range at key session levels (PDH/PDL/PWH/PWL/OB boundaries).",
+    "prompt_display": "Rejection block confluence factor added when detected at key level. Wick zone high/low shown as entry reference.",
+    "score_impact": "Rejection block at key session level = +3 to entry zone score. Stacked with OB or FVG = high-conviction entry."
+  }
 }

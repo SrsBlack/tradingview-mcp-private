@@ -19,7 +19,7 @@ class TradeDecision:
     tp_price: float = 0.0
     tp2_price: float = 0.0
     partial_close_pct: float = 0.5
-    trade_type: str = "intraday"  # "swing" or "intraday"
+    trade_type: str = "intraday"  # "scalp", "intraday", or "swing"
     confidence: int = 0       # 0-100
     risk_pct: float = 0.0     # e.g., 0.01 = 1%
     reasoning: str = ""

@@ -1,9 +1,13 @@
 """
-Strategy Engine — runs trading-ai-v2's 37 strategies on TradingView chart data.
+Strategy Engine — runs trading-ai-v2's 37 strategies on OHLCV data.
 
 Loads all EA (33) + ICT (4) strategies via their respective engines,
-feeds them BarEvents built from TradingView OHLCV DataFrames, and
-returns AggregatedSignalEvents after cluster voting.
+feeds them BarEvents built from OHLCV DataFrames, and returns
+AggregatedSignalEvents after cluster voting.
+
+Data source (aligned with ict_pipeline):
+  PRIMARY:  MT5 via bridge.mt5_data.MT5DataCollector (no chart switching).
+  FALLBACK: TradingView Desktop via CDP if MT5 is unavailable / returns no data.
 
 Usage:
     from bridge.strategy_engine import StrategyEngine
@@ -92,6 +96,18 @@ class StrategyEngine:
         self._ea_engine = None
         self._ict_engine = None
         self._data_store: dict[str, dict[str, pd.DataFrame]] = {}
+
+        # MT5 data collector — primary source (matches ict_pipeline behaviour)
+        try:
+            from bridge.mt5_data import MT5DataCollector
+            self._mt5_data: Any = MT5DataCollector(self.config)
+            self._use_mt5 = True
+            print("[ENGINE] Using MT5 for OHLCV data (primary)", flush=True)
+        except Exception as e:
+            self._mt5_data = None
+            self._use_mt5 = False
+            print(f"[ENGINE] MT5 collector unavailable, TradingView fallback only: {e}", flush=True)
+
         self._init_engines()
 
     def _init_engines(self) -> None:
@@ -122,7 +138,10 @@ class StrategyEngine:
         timeframes: list[str] | None = None,
     ) -> dict[str, pd.DataFrame]:
         """
-        Collect OHLCV data from TradingView for a symbol across timeframes.
+        Collect OHLCV data for a symbol across timeframes.
+
+        Primary path: MT5 (no chart switching).
+        Fallback:     TradingView Desktop via CDP.
 
         Args:
             symbol: TradingView symbol (e.g., "BTCUSD")
@@ -135,6 +154,37 @@ class StrategyEngine:
         counts = self.config.bar_counts
         result: dict[str, pd.DataFrame] = {}
 
+        # --- Primary: MT5 direct fetch -------------------------------------
+        if self._use_mt5 and self._mt5_data is not None:
+            # MT5 collector exposes labels W1/D1/H4/H1/M15; map to TV resolution strings
+            tv_to_mt5_label = {
+                "240": "H4", "60": "H1", "15": "M15",
+                "D": "D1", "W": "W1",
+            }
+            try:
+                mt5_dfs = self._mt5_data.collect_data(symbol)
+                for tv_tf in timeframes:
+                    label = tv_to_mt5_label.get(tv_tf)
+                    if label is None:
+                        continue  # M5/M1/M30 not in MT5 default collect; fall through
+                    df = mt5_dfs.get(label)
+                    if df is not None and not df.empty:
+                        from bridge.config import price_in_range
+                        last_close = float(df["close"].iloc[-1])
+                        if not price_in_range(symbol, last_close):
+                            logger.warning(f"[ENGINE] {symbol} {tv_tf}: MT5 price {last_close:.4f} fails range check — skipping")
+                            continue
+                        result[tv_tf] = df
+            except Exception as e:
+                logger.warning(f"[ENGINE] MT5 collect_data failed for {symbol}: {e}")
+
+            # If MT5 covered all requested timeframes (or all that it can cover), we're done.
+            # Only fall through to TV when we got zero usable frames.
+            if result:
+                return result
+
+        # --- Fallback: TradingView chart switching -------------------------
+        logger.info(f"[ENGINE] MT5 returned no data for {symbol} — falling back to TradingView")
         # Hold exclusive chart access for the entire switch+collect sequence
         with self.tv_client.chart_session():
             try:

@@ -3,7 +3,7 @@ Live Executor — wraps trading-ai-v2's MT5Executor for real trade execution.
 
 Safety gates:
 - Magic number 99002 for bridge signals
-- Max 2 positions from bridge (separate from EA's 10-position limit)
+- Max 10 positions from bridge (configurable via BRIDGE_MAX_POSITIONS)
 - Kill switch: 3 consecutive losses -> pause + alert
 - Spread guard (inherited from MT5Executor)
 - Double confirmation for first live trade of session
@@ -36,7 +36,7 @@ from core.events import ExecutionEvent
 # ---------------------------------------------------------------------------
 
 BRIDGE_MAGIC = 99002
-BRIDGE_MAX_POSITIONS = 2
+BRIDGE_MAX_POSITIONS = 3
 BRIDGE_KILL_SWITCH_LOSSES = 3
 BRIDGE_STRATEGY_NAME = "ICT_Bridge"
 
@@ -143,13 +143,19 @@ class LiveExecutor:
         # Build ExecutionEvent
         direction = Direction.BULLISH if decision.action == "BUY" else Direction.BEARISH
 
+        # For two-tier TP trades (tp2_price > 0), do NOT set TP on MT5.
+        # MT5's server-side TP would close 100% of the position at TP1,
+        # preventing the bridge from doing a 50% partial close + TP2 runner.
+        # SL stays on MT5 as crash protection; TP is managed by the bridge.
+        mt5_tp = 0.0 if decision.tp2_price > 0 else decision.tp_price
+
         event = ExecutionEvent(
             symbol=ftmo_symbol,
             direction=direction,
             lot_size=normalized_lots,
             entry_price=decision.entry_price,
             sl_price=decision.sl_price,
-            tp_price=decision.tp_price,
+            tp_price=mt5_tp,
             ticket=0,
             signal_id=f"bridge_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
             engine=EngineName.ICT,
@@ -161,7 +167,8 @@ class LiveExecutor:
 
         if result.success:
             self.open_tickets[result.ticket] = {
-                "symbol": decision.symbol,
+                "symbol": ftmo_symbol,  # MT5/FTMO-side symbol for modify/close calls
+                "tv_symbol": decision.symbol,
                 "direction": decision.action,
                 "entry_price": result.fill_price,
                 "sl_price": decision.sl_price,
@@ -238,8 +245,8 @@ class LiveExecutor:
                         flush=True,
                     )
 
-            # Check TP is set
-            if mt5_tp == 0:
+            # Check TP is set (expected to be 0 for two-tier TP trades — bridge manages TP)
+            if mt5_tp == 0 and decision.tp2_price <= 0:
                 print(
                     f"[SL_VERIFY] WARNING: #{ticket} has NO TP set on MT5! "
                     f"Expected TP={decision.tp_price:.5f}",
@@ -256,8 +263,12 @@ class LiveExecutor:
     # ------------------------------------------------------------------
 
     async def close_position(self, ticket: int, pnl: float = 0.0) -> bool:
-        """Close a position and update stats."""
-        info = self.open_tickets.pop(ticket, None)
+        """Close a position and update stats.
+
+        IMPORTANT: open_tickets is only removed AFTER a confirmed MT5 close
+        to prevent ghost positions (position open on broker but invisible to bridge).
+        """
+        info = self.open_tickets.get(ticket)
         if info is None:
             return False
 
@@ -267,22 +278,40 @@ class LiveExecutor:
             lot_size=info["lot_size"],
         )
 
-        # Update win/loss tracking
-        if pnl >= 0:
-            self.wins += 1
-            self.consecutive_losses = 0
-        else:
-            self.losses += 1
-            self.consecutive_losses += 1
+        if result:
+            # Only remove after confirmed close
+            self.open_tickets.pop(ticket, None)
 
-        # Kill switch check
-        if self.consecutive_losses >= BRIDGE_KILL_SWITCH_LOSSES:
-            self._kill_switch = True
-            print(
-                f"[LIVE] KILL SWITCH ACTIVATED: {self.consecutive_losses} consecutive losses. "
-                f"Call reset_kill_switch() after review.",
-                flush=True,
-            )
+            # Update win/loss tracking
+            if pnl >= 0:
+                self.wins += 1
+                self.consecutive_losses = 0
+            else:
+                self.losses += 1
+                self.consecutive_losses += 1
+
+            # Kill switch check
+            if self.consecutive_losses >= BRIDGE_KILL_SWITCH_LOSSES:
+                self._kill_switch = True
+                print(
+                    f"[LIVE] KILL SWITCH ACTIVATED: {self.consecutive_losses} consecutive losses. "
+                    f"Call reset_kill_switch() after review.",
+                    flush=True,
+                )
+        else:
+            # MT5 close failed — check if position still exists on broker
+            try:
+                import MetaTrader5 as mt5
+                pos = mt5.positions_get(ticket=ticket)
+                if not pos:
+                    # Position gone broker-side (server SL/TP fired) — safe to remove
+                    self.open_tickets.pop(ticket, None)
+                    print(f"  [CLOSE] #{ticket} already closed broker-side — removed from tracking", flush=True)
+                    return True
+                else:
+                    print(f"  [CLOSE] WARNING: #{ticket} close failed but still open on MT5!", flush=True)
+            except Exception:
+                pass
 
         return result
 
@@ -312,23 +341,100 @@ class LiveExecutor:
         return result
 
     async def modify_sl(self, ticket: int, new_sl: float) -> bool:
-        """Update stop loss on an open position (for trailing stops)."""
-        from core.events import PositionUpdateEvent
+        """Update stop loss on an open position (for trailing stops).
 
-        info = self.open_tickets.get(ticket)
-        if info is None:
+        Uses direct mt5.order_send() path (not core.events) because the
+        PositionUpdateEvent layer was returning False silently during
+        live trailing — a symptom that direct-path is more reliable
+        for a single SLTP modify with no state machine around it.
+
+        Logging: emits [MT5_SL] for every attempt (success or fail) with enough
+        detail to diagnose the ticket #100040-style "silent drift" where the
+        bridge thought it was trailing but MT5 still held the original SL.
+        """
+        try:
+            import MetaTrader5 as mt5
+        except ImportError:
+            print(f"  [MT5_SL] #{ticket} FAIL: MetaTrader5 not available", flush=True)
             return False
 
-        update = PositionUpdateEvent(
-            ticket=ticket,
-            symbol=info["symbol"],
-            new_sl=new_sl,
-            new_tp=info["tp_price"],
-        )
-        result = await self.mt5.modify_position(update)
-        if result:
+        info = self.open_tickets.get(ticket)
+        old_sl = info.get("sl_price") if info else None
+
+        # Always query broker first — this is the authoritative source.
+        # Don't gate on open_tickets, because post-restart open_tickets can be
+        # empty while MT5 still holds our positions. Previously this was a
+        # silent failure path that masked trailing SL desync.
+        positions = mt5.positions_get(ticket=ticket)
+        if not positions:
+            err = mt5.last_error()
+            print(
+                f"  [MT5_SL] #{ticket} FAIL: position not found on broker "
+                f"(may have just closed); last_error={err}",
+                flush=True,
+            )
+            return False
+
+        pos = positions[0]
+        # Prefer broker's TP if info is missing (restart case)
+        tp = (info.get("tp_price") if info else 0.0) or pos.tp or 0.0
+
+        # No-op guard — avoid churn if SL already at target (within 1 point)
+        if info is not None and abs(pos.sl - float(new_sl)) < 1e-6:
+            return True
+
+        if info is None:
+            # Adopt: register the broker's view into open_tickets so future
+            # modify/partial calls don't hit this same silent-fail path.
+            self.open_tickets[ticket] = {
+                "symbol":     pos.symbol,
+                "entry_price": pos.price_open,
+                "sl_price":   pos.sl,
+                "tp_price":   pos.tp,
+                "lot_size":   pos.volume,
+                "tp1_hit":    False,
+                "direction":  "BUY" if pos.type == 0 else "SELL",
+                "adopted":    True,
+            }
+            print(
+                f"  [MT5_SL] #{ticket} adopted from broker "
+                f"(sym={pos.symbol} sl={pos.sl} tp={pos.tp} vol={pos.volume})",
+                flush=True,
+            )
+            info = self.open_tickets[ticket]
+            old_sl = pos.sl
+
+        request = {
+            "action":   mt5.TRADE_ACTION_SLTP,
+            "position": ticket,
+            "symbol":   pos.symbol,      # use authoritative broker symbol
+            "sl":       float(new_sl),
+            "tp":       float(tp),
+        }
+        result = mt5.order_send(request)
+        if result is None:
+            err = mt5.last_error()
+            print(
+                f"  [MT5_SL] #{ticket} {pos.symbol} FAIL: order_send returned None "
+                f"(old_sl={old_sl} -> new_sl={new_sl}); last_error={err}",
+                flush=True,
+            )
+            return False
+
+        if result.retcode == mt5.TRADE_RETCODE_DONE:
             info["sl_price"] = new_sl
-        return result
+            print(
+                f"  [MT5_SL] #{ticket} {pos.symbol} OK: {old_sl} -> {new_sl}",
+                flush=True,
+            )
+            return True
+
+        print(
+            f"  [MT5_SL] #{ticket} {pos.symbol} REJECT: retcode={result.retcode} "
+            f"comment={result.comment!r} old_sl={old_sl} new_sl={new_sl} tp={tp}",
+            flush=True,
+        )
+        return False
 
     # ------------------------------------------------------------------
     # Volume normalization

@@ -19,5 +19,19 @@
     "60_day": "Long-term reference. Quarterly cycle boundary. When price reaches 60-day extremes, watch for quarterly_shift."
   },
   "time_and_price": "IPDA integrates TIME with PRICE — specific price levels become active at specific times. A 40-day range midpoint has highest significance during NY kill zone, not Asian session.",
-  "how_to_use": "Before daily analysis, check where price sits within 20/40/60-day ranges. If near a range extreme = high-probability reversal zone. If near midpoint = equilibrium, expect accumulation."
+  "how_to_use": "Before daily analysis, check where price sits within 20/40/60-day ranges. If near a range extreme = high-probability reversal zone. If near midpoint = equilibrium, expect accumulation.",
+  "bridge_integration": {
+    "auto_calculation": "IPDA 20/40/60-day ranges computed from H4 data. Each range includes high, low, midpoint, and price percentile position.",
+    "extreme_detection": "Price at >90% or <10% of any IPDA range = high-probability reversal zone. Auto-injected into concept chain.",
+    "bias_framework": "Price above IPDA midpoint = bullish bias for that timeframe. Below = bearish. 20d for intraday, 40d for swing, 60d for position.",
+    "score_impact": "Price at IPDA extreme + sweep + displacement = highest-conviction reversal setup. Price at midpoint = equilibrium (reduce size, expect chop).",
+    "tp_targeting": "IPDA range midpoints and extremes serve as DOL targets. 20d midpoint for intraday TP, 40d extreme for swing TP."
+  },
+  "trading_rules": {
+    "rule_1": "At IPDA 20-day extreme: look for intraday reversal setups (Silver Bullet, OTE entries)",
+    "rule_2": "At IPDA 40-day extreme: look for swing reversal with HTF displacement confirmation",
+    "rule_3": "At IPDA 60-day extreme: potential quarterly shift — highest significance macro level",
+    "rule_4": "Price between 40-60% of any range = equilibrium zone. Reduce conviction, expect range-bound action.",
+    "rule_5": "IPDA ranges are NESTED — 20d range moves within 40d range, which moves within 60d range. All three must be considered."
+  }
 }

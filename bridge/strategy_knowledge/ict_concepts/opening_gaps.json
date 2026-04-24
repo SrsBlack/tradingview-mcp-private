@@ -76,9 +76,10 @@
   },
 
   "bridge_integration": {
-    "auto_calculation": "Compute NWOG from Friday close / Sunday open prices; NDOG from daily session boundaries",
-    "level_injection": "Add NWOG CE, NDOG CE as session_levels for DOL targeting",
-    "score_impact": "Price at NWOG/NDOG CE = +5 to ICT score (high-probability reaction zone)",
-    "bias_filter": "Price position relative to NWOG CE informs daily_bias direction"
+    "ndog_computation": "Computed from M15/H1 data: gap between 5 PM NY close and 6 PM NY open. Count of active NDOGs passed to analysis.",
+    "nwog_computation": "Computed from weekly groups: gap between last bar of previous week and first bar of current week. Count of active NWOGs passed to analysis.",
+    "level_injection": "NDOG and NWOG counts appear in advanced_factors. Claude receives gap counts to assess fill probability.",
+    "score_impact": "Active NWOG/NDOG adds confluence for trades targeting gap fill. Price at gap CE = +5 to ICT score.",
+    "bias_filter": "Price above NWOG = bullish weekly bias. Price below = bearish. Unfilled gap = magnet until filled."
   }
 }

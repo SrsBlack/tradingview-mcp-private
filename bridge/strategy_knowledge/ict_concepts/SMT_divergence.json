@@ -77,5 +77,11 @@
     "2. Comparing different timeframes across the two instruments. Always use matching timeframes.",
     "3. Treating every minor divergence as SMT — the concept requires swing-level structural disagreement, not tick-level or 1-minute noise."
   ],
-  "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence."
+  "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence.",
+  "bridge_integration": {
+    "detection": "detect_smt_divergence() checks correlated pairs defined in SMT_PAIRS. Compares swing highs/lows on matching timeframes.",
+    "prompt_display": "smt_score (0-8) in SCORE BREAKDOWN. Concept card injected when smt_score > 0.",
+    "score_impact": "SMT adds up to 8 points. Sweep + SMT synergy adds +8 bonus via cross_correlations. SMT is the confirmation that makes a sweep trade highest-conviction.",
+    "pairs_computed": "BTC/ETH, EUR/GBP, XAU/XAG, US500/US100 — defined in SMT_PAIRS config."
+  }
 }

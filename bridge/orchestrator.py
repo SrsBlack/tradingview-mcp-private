@@ -76,13 +76,27 @@ class Orchestrator:
         # --- Core components ---
         self.pipeline = ICTPipeline()
         self.decision_maker = ClaudeDecisionMaker()
-        self.paper_shadow = PaperExecutor(initial_balance=initial_balance)
+
+        # Paper shadow is legacy (from TradingView-paper era). Disabled by default
+        # now that all execution goes through MT5. Re-enable with BRIDGE_PAPER_SHADOW=1.
+        # When disabled, all downstream `paper_shadow is executor` guards short-circuit.
+        import os
+        self._paper_shadow_enabled = os.environ.get("BRIDGE_PAPER_SHADOW", "0") == "1"
+
         if mode == "live":
             self.executor = LiveExecutorAdapter(initial_balance=initial_balance)
             print("[ORCH] Mode: LIVE — trades will be sent to MT5", flush=True)
-            print("[ORCH] Shadow paper executor running in parallel for audit", flush=True)
+            if self._paper_shadow_enabled:
+                self.paper_shadow = PaperExecutor(initial_balance=initial_balance)
+                print("[ORCH] Shadow paper executor running in parallel for audit", flush=True)
+            else:
+                # Sentinel: `paper_shadow is executor` → downstream paper checks disabled.
+                self.paper_shadow = self.executor
+                print("[ORCH] Paper shadow disabled (set BRIDGE_PAPER_SHADOW=1 to re-enable)", flush=True)
         else:
             self.executor = PaperExecutor(initial_balance=initial_balance)
+            # In paper mode, the executor IS the paper executor.
+            self.paper_shadow = self.executor
         self.session = SessionStore()
         self.state_store = StateStore()
         self.paper_state_store = StateStore(
@@ -304,14 +318,18 @@ class Orchestrator:
         now = now_utc()
         print(f"\n[CYCLE {self._cycle_count}] Starting analysis @ {now.strftime('%H:%M:%S')} UTC", flush=True)
 
+        skipped_session = []
         for symbol in self.symbols:
             if not symbol_is_active(symbol, now):
-                print(f"  [{symbol}] Outside session window — skipping", flush=True)
+                skipped_session.append(symbol.split(":")[-1])
                 continue
             try:
                 self.analysis.run(symbol)
             except Exception as e:
                 print(f"[CYCLE] {symbol} error: {e}", flush=True)
+
+        if skipped_session:
+            print(f"  [SESSION] Skipped {len(skipped_session)}: {', '.join(skipped_session)}", flush=True)
 
     # ------------------------------------------------------------------
     # Position loop

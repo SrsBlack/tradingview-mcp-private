@@ -92,6 +92,48 @@
       ],
       "effect": "When a 1.618 extension aligns with PWH/PWL or PMH/PML = very high-probability TP target.",
       "why": "Mathematical projection confirms institutional targeting. Two independent methods pointing to same price."
+    },
+    {
+      "combination": "Sweep + displacement + FVG (complete ICT chain)",
+      "concepts": ["liquidity_sweep", "displacement", "fair_value_gaps"],
+      "effect": "The FULL ICT trade chain is proven. Sweep (manipulation) -> displacement (commitment) -> FVG (entry zone). +7 to score.",
+      "why": "Each step confirms the previous. Sweep alone could be breakout. Sweep + displacement = not breakout. Sweep + displacement + FVG = institutional entry zone proven."
+    },
+    {
+      "combination": "Judas swing + kill zone",
+      "concepts": ["judas_swing", "sessions_and_kill_zones"],
+      "effect": "Session manipulation confirmed — the false move at session open created the reversal opportunity. +6 to score.",
+      "why": "Judas swing is the manipulation phase of PO3 at the session level. In a kill zone = highest-probability reversal window."
+    },
+    {
+      "combination": "Silver bullet + FVG",
+      "concepts": ["silver_bullet", "fair_value_gaps"],
+      "effect": "Time-specific FVG entry — the 10-11 AM or 2-3 PM window with a fresh FVG. +5 to score.",
+      "why": "Silver Bullet is a TIME filter. FVG is a PRICE filter. Together = precision entry."
+    },
+    {
+      "combination": "NWOG + sweep",
+      "concepts": ["opening_gaps", "liquidity_sweep"],
+      "effect": "Weekly gap fill with manipulation trigger. Price seeks the NWOG CE and swept liquidity above/below it. +4 to score.",
+      "why": "NWOG CE is the highest-probability reaction level of the week. A sweep at the gap boundary confirms institutional intent to fill."
+    },
+    {
+      "combination": "IPDA extreme + sweep",
+      "concepts": ["IPDA", "liquidity_sweep"],
+      "effect": "Price at 20/40/60-day range extreme WITH a confirmed sweep = macro reversal zone with trigger. +6 to score.",
+      "why": "IPDA extreme = institutional delivery range boundary. Sweep at this level = stop hunt before macro reversal."
+    },
+    {
+      "combination": "Quarterly shift alignment",
+      "concepts": ["quarterly_shifts", "trade_direction"],
+      "effect": "Trade aligned with confirmed quarterly shift (3+ weeks). Macro tailwind. +5 to score.",
+      "why": "Quarterly shift is the largest-scale directional signal. Trading WITH it = 15-20% higher win rate historically."
+    },
+    {
+      "combination": "Macro time + displacement",
+      "concepts": ["sessions_and_kill_zones", "displacement"],
+      "effect": "Algorithmic spike at ICT macro time (3:15, 9:50, 10:50, 1:50, 2:50) with displacement = institutional algorithm firing. +3 to score.",
+      "why": "Macro times are when institutional algorithms execute. Displacement at these times = not random volatility."
     }
   ],
   "gates": [
@@ -136,6 +178,21 @@
         "volume_profile",
         "draw_on_liquidity"
       ]
+    },
+    {
+      "gate": "Quarterly shift opposes trade direction",
+      "rule": "A confirmed quarterly shift (3+ weeks) opposing the trade direction = major macro headwind. Auto-downgrade by 1 grade. Counter-quarterly trades should use 50% risk.",
+      "concepts": ["quarterly_shifts", "trade_direction"]
+    },
+    {
+      "gate": "Sweep without structure change",
+      "rule": "Sweep occurred but no BOS/CHoCH followed (no displacement, weak structure). The sweep may be a breakout, not manipulation. Reduce confidence — wait for structure confirmation.",
+      "concepts": ["liquidity_sweep", "displacement", "market_structure"]
+    },
+    {
+      "gate": "FVG in wrong premium/discount zone",
+      "rule": "An FVG in the wrong zone (bullish FVG in premium, bearish FVG in discount) has reduced fill probability. The zone alignment gates the FVG quality.",
+      "concepts": ["fair_value_gaps", "premium_discount"]
     }
   ]
 }

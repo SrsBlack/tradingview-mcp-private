@@ -38,19 +38,34 @@ class _DirectTelegramSender:
         self.enabled = True
 
     async def send_raw(self, message: str) -> None:
+        """Send a Telegram message.
+
+        Tries Markdown first for pretty formatting; falls back to plain text
+        if Telegram rejects the parse (common when reasoning contains
+        unbalanced parens/underscores/brackets that Markdown treats as
+        entity delimiters).
+        """
         import urllib.request
         import urllib.parse
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        data = urllib.parse.urlencode({
-            "chat_id": self.chat_id,
-            "text": message,
-            "parse_mode": "Markdown",
-        }).encode()
-        try:
-            req = urllib.request.Request(url, data=data)
-            urllib.request.urlopen(req, timeout=10)
-        except Exception:
-            pass  # Don't let Telegram failures affect trading
+
+        # Attempt 1: Markdown (pretty)
+        for parse_mode in ("Markdown", None):
+            payload = {"chat_id": self.chat_id, "text": message}
+            if parse_mode:
+                payload["parse_mode"] = parse_mode
+            data = urllib.parse.urlencode(payload).encode()
+            try:
+                req = urllib.request.Request(url, data=data)
+                urllib.request.urlopen(req, timeout=10)
+                return  # success
+            except urllib.error.HTTPError as exc:
+                # 400 "Can't parse entities" → retry without parse_mode
+                if exc.code == 400 and parse_mode is not None:
+                    continue
+                return  # non-parse error — swallow, trading must not break
+            except Exception:
+                return
 
 
 # ---------------------------------------------------------------------------
