@@ -1120,19 +1120,30 @@ Max allowed risk_pct for this call: {max_risk:.4f}"""
 
     # IPDA-extreme fade phrases. Selling at a multi-day high or buying at a
     # multi-day low without HTF bias confirmation is the classic "catch a
-    # falling knife / short the top" trap. Backtest caught 1 losing SELL
-    # (EURJPY 2026-04-24 -$474 on MT5), 0 false positives.
+    # falling knife / short the top" trap.
+    #
+    # Extended 2026-04-24 after GBPJPY SELL entry slipped through: Claude writes
+    # "IPDA 20/40/60d high" (no "extreme") when placing SL at the multi-day high
+    # level. Same trap pattern as the EURJPY loss — SL sits ON the level, so the
+    # slightest liquidity grab sweeps it out. The expanded phrase list captures
+    # both forms. Re-backtested: still zero false positives on 17-trade history.
     _IPDA_HIGH_EXTREME_PHRASES: tuple[str, ...] = (
+        # With "extreme"
         "ipda 20/40/60d high extreme", "ipda 20/40/60 high extreme",
         "ipda 20d high extreme", "ipda 40d high extreme", "ipda 60d high extreme",
-        "at 20d high", "at 40d high", "at 60d high",
-        "multi-day high extreme", "ipda high extreme", "at ipda high",
+        "multi-day high extreme", "ipda high extreme",
+        # Without "extreme" — Claude often just names the level factually
+        "ipda 20/40/60d high", "ipda 20/40/60 high",
+        "ipda 20d high", "ipda 40d high", "ipda 60d high",
+        "at ipda high", "at 20d high", "at 40d high", "at 60d high",
     )
     _IPDA_LOW_EXTREME_PHRASES: tuple[str, ...] = (
         "ipda 20/40/60d low extreme", "ipda 20/40/60 low extreme",
         "ipda 20d low extreme", "ipda 40d low extreme", "ipda 60d low extreme",
-        "at 20d low", "at 40d low", "at 60d low",
-        "multi-day low extreme", "ipda low extreme", "at ipda low",
+        "multi-day low extreme", "ipda low extreme",
+        "ipda 20/40/60d low", "ipda 20/40/60 low",
+        "ipda 20d low", "ipda 40d low", "ipda 60d low",
+        "at ipda low", "at 20d low", "at 40d low", "at 60d low",
     )
 
     def _check_opposing_sweep(self, decision: TradeDecision, reasoning: str) -> str | None:
