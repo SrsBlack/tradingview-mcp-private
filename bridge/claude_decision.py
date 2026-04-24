@@ -1070,7 +1070,9 @@ Max allowed risk_pct for this call: {max_risk:.4f}"""
     # loser signal is Claude's *self-downgrade* language plus specific
     # disqualifiers (outside-kill-zone, PO3-accumulation, score-decay).
     _REASONING_HARD_GATE_PHRASES: tuple[str, ...] = (
-        # Self-downgrade — Claude admits the trade isn't really Grade A
+        # Self-downgrade — Claude admits the trade isn't really Grade A.
+        # This is the bulletproof signal: if Claude says it's actually B/C,
+        # it IS B/C, and the ICT model says Grade C/D = don't trade.
         "reduce conviction to grade b",
         "reduce conviction to grade c",
         "reduce conviction to b/c",
@@ -1079,17 +1081,81 @@ Max allowed risk_pct for this call: {max_risk:.4f}"""
         "reduced conviction to b/c",
         "b/c threshold",
         "grade b/c execution",
-        # PO3 accumulation — not yet in distribution phase = directional trade is early
+        # PO3 accumulation — trade is early, price hasn't started directional move.
+        # "distribution not yet started" is specific enough to be safe.
         "distribution not yet started",
         "not yet distributed",
-        "accumulation phase",
-        # Kill-zone absence — ICT 2022 says don't trade without institutional flow
-        "no active kill zone",
-        "outside kill zone",
-        "kill zone inactive",
-        # Score decay — entry price drifted, setup is stale
+        # Score decay — entry price drifted away from the FVG/OB, setup is stale.
         "score decay",
+        # REMOVED after 17-trade backtest (blocked winners):
+        #   "accumulation phase"  — blocked BTC BUY +$485 (phase was accurate observation, not disqualifying)
+        #   "no active kill zone" — blocked ETH SELL +$159 (kill zone absence is contextual)
+        #   "outside kill zone"   — (same reasoning; move to contextual scoring instead)
+        #   "kill zone inactive"  — (same reasoning)
+        # The three removed phrases catch too many winners to be worth the loss prevention.
+        # Opposing-sweep and IPDA-extreme gates (below) cover the kill-zone-absence cases more precisely.
     )
+
+    # Opposing-sweep phrases. After a sweep of a low, price typically reverses UP
+    # to seek upside liquidity — so a SELL after a low sweep is fading the
+    # reversal. Same logic inverted for sweep-of-high + BUY.
+    # Backtest (Apr 19-24, 17 matched trades): caught 2 losers (SOL -$35,
+    # ETH -$174), 0 false positives, +$210 net.
+    _SWEPT_LOW_PHRASES: tuple[str, ...] = (
+        "sweep of low", "sweep of asian low", "sweep of pdl", "sweep of pwl",
+        "sweep of pml", "sweep of lo.l", "sweep of d_low", "sweep of session low",
+        "swept low", "swept the low", "swept pdl", "swept pwl", "swept asian low",
+        "liquidity sweep of low", "liq sweep of low", "sweep of equal lows",
+        "sweep of lol", "sweep of london low",
+        "sweep of d_open+pdl", "sweep of pdl+",
+    )
+    _SWEPT_HIGH_PHRASES: tuple[str, ...] = (
+        "sweep of high", "sweep of asian high", "sweep of pdh", "sweep of pwh",
+        "sweep of pmh", "sweep of lo.h", "sweep of d_high", "sweep of session high",
+        "swept high", "swept the high", "swept pdh", "swept pwh", "swept asian high",
+        "liquidity sweep of high", "liq sweep of high", "sweep of equal highs",
+        "sweep of loh", "sweep of london high",
+        "sweep of d_open+pdh", "sweep of pdh+",
+    )
+
+    # IPDA-extreme fade phrases. Selling at a multi-day high or buying at a
+    # multi-day low without HTF bias confirmation is the classic "catch a
+    # falling knife / short the top" trap. Backtest caught 1 losing SELL
+    # (EURJPY 2026-04-24 -$474 on MT5), 0 false positives.
+    _IPDA_HIGH_EXTREME_PHRASES: tuple[str, ...] = (
+        "ipda 20/40/60d high extreme", "ipda 20/40/60 high extreme",
+        "ipda 20d high extreme", "ipda 40d high extreme", "ipda 60d high extreme",
+        "at 20d high", "at 40d high", "at 60d high",
+        "multi-day high extreme", "ipda high extreme", "at ipda high",
+    )
+    _IPDA_LOW_EXTREME_PHRASES: tuple[str, ...] = (
+        "ipda 20/40/60d low extreme", "ipda 20/40/60 low extreme",
+        "ipda 20d low extreme", "ipda 40d low extreme", "ipda 60d low extreme",
+        "at 20d low", "at 40d low", "at 60d low",
+        "multi-day low extreme", "ipda low extreme", "at ipda low",
+    )
+
+    def _check_opposing_sweep(self, decision: TradeDecision, reasoning: str) -> str | None:
+        """Return rejection reason if trade direction fades a recent sweep."""
+        side = decision.action
+        swept_low = any(p in reasoning for p in self._SWEPT_LOW_PHRASES)
+        swept_high = any(p in reasoning for p in self._SWEPT_HIGH_PHRASES)
+        if side == "BUY" and swept_high and not swept_low:
+            return "BUY after sweep of high (fading reversal — price seeks downside next)"
+        if side == "SELL" and swept_low and not swept_high:
+            return "SELL after sweep of low (fading reversal — price seeks upside next)"
+        return None
+
+    def _check_ipda_extreme_fade(self, decision: TradeDecision, reasoning: str) -> str | None:
+        """Return rejection reason if trade fades an IPDA 20/40/60d extreme."""
+        side = decision.action
+        at_high = any(p in reasoning for p in self._IPDA_HIGH_EXTREME_PHRASES)
+        at_low = any(p in reasoning for p in self._IPDA_LOW_EXTREME_PHRASES)
+        if side == "SELL" and at_high:
+            return "SELL at IPDA high extreme (shorting multi-day top)"
+        if side == "BUY" and at_low:
+            return "BUY at IPDA low extreme (catching multi-day bottom)"
+        return None
 
     def _post_gate(self, decision: TradeDecision, analysis: SymbolAnalysis | None = None) -> str | None:
         """
@@ -1104,15 +1170,37 @@ Max allowed risk_pct for this call: {max_risk:.4f}"""
         # (MTF conflict, zone conflict, outside kill zone, etc.) and says
         # "conviction reduced to B/C". Honor Claude's own words — reject.
         reasoning_lower = (decision.reasoning or "").lower()
+        sym = analysis.symbol if analysis else "?"
         for phrase in self._REASONING_HARD_GATE_PHRASES:
             if phrase in reasoning_lower:
-                sym = analysis.symbol if analysis else "?"
                 print(
                     f"  [{sym}] REASONING GATE: Claude's reasoning contains '{phrase}' "
                     f"(Grade {decision.grade}). Rejecting — honor stated violation.",
                     flush=True,
                 )
                 return f"Reasoning admits gate violation: '{phrase}'"
+
+        # Opposing-sweep gate: after a low sweep, price seeks upside — SELL fights
+        # the reversal. After a high sweep, price seeks downside — BUY fights it.
+        sweep_reject = self._check_opposing_sweep(decision, reasoning_lower)
+        if sweep_reject:
+            print(
+                f"  [{sym}] OPPOSING-SWEEP GATE: {sweep_reject} "
+                f"(Grade {decision.grade}). Rejecting.",
+                flush=True,
+            )
+            return f"Opposing-sweep: {sweep_reject}"
+
+        # IPDA-extreme-fade gate: trying to short a multi-day high or buy a
+        # multi-day low against momentum. Backtest caught EURJPY 2026-04-24 loss.
+        ipda_reject = self._check_ipda_extreme_fade(decision, reasoning_lower)
+        if ipda_reject:
+            print(
+                f"  [{sym}] IPDA-EXTREME GATE: {ipda_reject} "
+                f"(Grade {decision.grade}). Rejecting.",
+                flush=True,
+            )
+            return f"IPDA-extreme fade: {ipda_reject}"
 
         # Check R:R
         rr = decision.risk_reward_ratio
