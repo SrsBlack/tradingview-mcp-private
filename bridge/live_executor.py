@@ -3,7 +3,7 @@ Live Executor — wraps trading-ai-v2's MT5Executor for real trade execution.
 
 Safety gates:
 - Magic number 99002 for bridge signals
-- Max 10 positions from bridge (configurable via BRIDGE_MAX_POSITIONS)
+- Max 5 positions from bridge (configurable via BRIDGE_MAX_POSITIONS); risk-on/risk-off sub-cap of 4 enforced in risk_bridge.py
 - Kill switch: 3 consecutive losses -> pause + alert
 - Spread guard (inherited from MT5Executor)
 - Double confirmation for first live trade of session
@@ -36,7 +36,7 @@ from core.events import ExecutionEvent
 # ---------------------------------------------------------------------------
 
 BRIDGE_MAGIC = 99002
-BRIDGE_MAX_POSITIONS = 3
+BRIDGE_MAX_POSITIONS = 5
 BRIDGE_KILL_SWITCH_LOSSES = 3
 BRIDGE_STRATEGY_NAME = "ICT_Bridge"
 

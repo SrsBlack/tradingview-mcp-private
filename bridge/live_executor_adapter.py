@@ -19,7 +19,7 @@ from typing import Any
 
 from bridge.config import get_bridge_config, BridgeConfig
 from bridge.decision_types import TradeDecision, PaperPosition
-from bridge.live_executor import LiveExecutor
+from bridge.live_executor import LiveExecutor, BRIDGE_MAX_POSITIONS
 
 # Expected slippage per asset class (conservative estimates)
 _EXPECTED_SLIPPAGE: dict[str, float] = {
@@ -48,7 +48,7 @@ class LiveExecutorAdapter:
     """
 
     def __init__(self, initial_balance: float = 100_000.0):
-        self._live = LiveExecutor(max_positions=3)
+        self._live = LiveExecutor(max_positions=BRIDGE_MAX_POSITIONS)
         self._live.confirm_session()  # auto-confirm for fully autonomous mode
         self._config = get_bridge_config()  # for TV->MT5 symbol name translation
         self._mt5_connector = None
