@@ -1087,18 +1087,6 @@ Max allowed risk_pct for this call: {max_risk:.4f}"""
         "not yet distributed",
         # Score decay — entry price drifted away from the FVG/OB, setup is stale.
         "score decay",
-        # SOL trade 2026-04-25 (closed manually -$132): Claude wrote "Asian
-        # session (0.7x multiplier, no kill zone)" without "active". Original
-        # gate had "no active kill zone" / "outside kill zone" but those were
-        # removed earlier as they caught winners. The shorter "no kill zone"
-        # variant is rarer and only fired on losers in 19-trade backtest.
-        "no kill zone",
-        # Self-flag — Claude explicitly tagging the setup as broken.
-        "critically impaired",
-        # Weak structure marker — displacement happened but no follow-through
-        # CHoCH/BOS to confirm the new direction. Bridge tags this internally.
-        "displacement-no-structure",
-        "displacement no structure",
         # REMOVED after 17-trade backtest (blocked winners):
         #   "accumulation phase"  — blocked BTC BUY +$485 (phase was accurate observation, not disqualifying)
         #   "no active kill zone" — blocked ETH SELL +$159 (kill zone absence is contextual)
