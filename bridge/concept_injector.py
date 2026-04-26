@@ -256,6 +256,10 @@ def _select_relevant_concepts(a: Any) -> list[tuple[str, str]]:
     if "turtle" in confluence or "turtle" in adv_factors:
         picks.append(("turtle_soup", "Sweep+reversal = stops harvested at swing failure"))
 
+    # CRT — single-bar sweep+reversal (micro candle range theory)
+    if "crt" in adv_factors:
+        picks.append(("CRT_candle_range_theory", "Single-bar sweep of prior-bar extreme + close back inside — target = opposite extreme"))
+
     # Unicorn / Venom — advanced reversal models
     if "unicorn" in confluence or "unicorn" in adv_factors:
         picks.append(("unicorn_model", "Breaker + FVG overlap = high-conviction reversal"))

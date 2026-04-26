@@ -373,10 +373,10 @@ def check_kb_schema() -> list[tuple[str, str]]:
     """ICT concept cards conform to SCHEMA.md.
 
     Required fields per SCHEMA.md: id, layer, definition, depends_on,
-    feeds_into, bridge_integration. Cards may use a stub for bridge_integration
-    (counted but not flagged FAIL). Spelling drift (bridge_usage,
-    common_mistake singular) reported as FAIL since migration should have
-    fixed all of those.
+    feeds_into, bridge_integration. As of 2026-04-26 (commit 58adb41) Track 2
+    closed and the backlog is empty — '[NOT YET DEFINED' stubs are now FAIL,
+    not WARN. Spelling drift (bridge_usage, common_mistake singular) is also
+    FAIL since the schema migration should have fixed all of those.
     """
     import json
     kb_dir = REPO_ROOT / "bridge" / "strategy_knowledge" / "ict_concepts"
@@ -427,10 +427,18 @@ def check_kb_schema() -> list[tuple[str, str]]:
                 f"{card_path.name}: id={data['id']!r} doesn't match filename"
             ))
 
-        # Count stubs (not a fail; just visibility into backlog progress)
+        # Stubs are FAIL (Track 2 closed 2026-04-26 commit 58adb41 — backlog empty).
+        # Reintroducing a [NOT YET DEFINED marker means a card was added or
+        # regressed without real bridge_integration text. Either fill it in
+        # or remove the card.
         bi = data.get("bridge_integration", "")
         if isinstance(bi, str) and STUB_MARKER in bi:
             stub_count += 1
+            findings.append(failed(
+                f"{card_path.name}: bridge_integration is a stub "
+                f"('[NOT YET DEFINED' marker present). Fill in real text or "
+                f"remove the card. See SCHEMA.md and INTEGRATION_BACKLOG.md."
+            ))
 
     # _index.json catalogues all on-disk cards (walks dependency graph + sections + concepts)
     idx_path = kb_dir / "_index.json"
