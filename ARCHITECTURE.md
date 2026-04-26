@@ -47,7 +47,7 @@
 tradingview-mcp-jackson/
 ├── auto_trade.py                  # Entry point — `python auto_trade.py --mode live`
 ├── bridge/                        # The Python trading system (29 .py files)
-├── strategy_knowledge/ict_concepts/  # 52 ICT concept cards (JSON)
+├── bridge/strategy_knowledge/ict_concepts/  # 52 ICT concept cards (JSON)
 ├── rules.json                     # Watchlist + per-symbol risk overrides
 ├── bridge_safety_state.json       # Restart-safe runtime state
 ├── archive/                       # Stale 2026-04-08 planning docs
@@ -181,8 +181,8 @@ MT5 is primary because TradingView Desktop has symbol-drift issues when switchin
 | File | Purpose |
 |------|---------|
 | `bridge/ict_pipeline.py` | 5-TF analysis (W1/D1/H4/H1/M15). Calls `analysis.structure`, `analysis.fvg`, `analysis.liquidity`, `analysis.order_blocks`, `analysis.sessions`, `analysis.smt`. Produces `SymbolAnalysis` dataclass. |
-| `bridge/synergy_scorer.py` | 15 confluence synergies + 8 gates. Source of truth: `strategy_knowledge/ict_concepts/cross_correlations.json`. Outputs total_score 0-100 + grade. |
-| `bridge/concept_injector.py` | Loads 52 ICT concept cards from `strategy_knowledge/ict_concepts/`. Selects up to 8 relevant concepts per signal (1800 char cap) for Claude prompt. |
+| `bridge/synergy_scorer.py` | 15 confluence synergies + 8 gates. Source of truth: `bridge/strategy_knowledge/ict_concepts/cross_correlations.json`. Outputs total_score 0-100 + grade. |
+| `bridge/concept_injector.py` | Loads 52 ICT concept cards from `bridge/strategy_knowledge/ict_concepts/`. Selects up to 8 relevant concepts per signal (1800 char cap) for Claude prompt. |
 | `bridge/intermarket.py` | DXY / US10Y / VIX analysis from MT5. Synthetic DXY from EURUSD if no DXY. Conflict gate, VIX risk multiplier. |
 | `bridge/economic_calendar.py` | Forex Factory live feed + static schedule. News blackout gate. |
 | `bridge/strategy_engine.py` | EA cluster + ICT 4-strategy engine via trading-ai-v2. MT5 primary, TV fallback. |
@@ -664,7 +664,7 @@ Output format: per-trade BLOCK/PASS with verdict; summary with money-saved / mon
 
 ```
 bridge/                29 .py files
-strategy_knowledge/    52 ICT concept JSON cards + cross_correlations.json
+bridge/strategy_knowledge/  52 ICT concept JSON cards + cross_correlations.json
 verify_*.py            3 backtest harnesses at repo root
 *.md                   6 docs at repo root + 4 in archive/
 ```
