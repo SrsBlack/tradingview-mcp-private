@@ -108,12 +108,27 @@ Three commits closed the M15-only CRT gap:
 
 Net effect: CRT moves from M15-single-bar to fractal D1/H4/M15 detection, the score formula correctly weights conviction by timeframe, and the +5 MultiTF_CRT synergy explicitly rewards the card's "fractal alignment" framing. CRT_candle_range_theory.json bridge_integration text rewritten with new file:line citations and decision rationale.
 
+## Completed 2026-04-26 (Weekly CRT + Wed-PO3 — multi-TF CRT followups A + C)
+
+Two commits closed two of the four findings above:
+
+- **`504d8a9` — feat(ict): weekly CRT detection (W1 tf_label, +5 score weight).** `bridge/ict_pipeline.py` step 8f calls `_detect_crt_mtf(df_w1[:-1], lookback=1, tf_label="W1")` before the existing D1/H4 calls; aggregation loop iterates `("W1", "D1", "H4", "M15")`. `_CRT_TF_WEIGHTS` adds `"crt_w1": 5.0` (one notch above D1=+4 because weekly CRT is institutional swing-trade reversal at PWH/PWL). `concept_injector.py` adds a W1 hint branch ahead of D1. `scripts/bench_multi_tf_crt.py` now resamples to W1 too — gate passes: avg_mean=+0.12, max|symbol_mean|=0.17 at baseline=0; +0.00 at baseline>=3 (cap binds). Total score still capped at +10.
+- **`057694c` — feat(ict): Wednesday-PO3 manipulation gate (sweep Mon-Tue range).** Day-specific detector reusing `_detect_crt_mtf` with a 3-bar `[Mon, Tue, Wed_live]` window and `tf_label="WedPO3"`, gated on `df_d1.index[-1].weekday() == 2`. Wed daily bar IS the sweep, so the live (unfinished) bar is intentionally included. Factor emits as `CRT_WedPO3(N)` at +3.0 weight (rare but high-conviction; equivalent to H4 swing-tradable). Concept injector priority chain reordered to `W1 > D1 > WedPO3 > H4 > M15`.
+
+Net effect: CRT now spans the full institutional fractal — weekly swing reversal at the top, Wednesday manipulation as a day-specific gate, daily/H4/M15 filling the intraday tiers. Two of the four open findings (#1 weekly, #3 Wed-PO3) closed; #2 session-candle-as-CRT and #4 counter-D1-CRT gate remain.
+
 ### Findings surfaced during multi-TF CRT (NOT yet acted on)
 
-1. **Weekly CRT not detected** — PWH/PWL sweep+reversal at the W1 level would fit the same `detect_crt(df_weekly[:-1], lookback=1, tf_label="W1")` pattern. Defer because weekly bars are slow to form, signal is rare, and Phase 4 already covers the highest-conviction case (D1+H4).
+1. ~~**Weekly CRT not detected**~~ — **RESOLVED 2026-04-26 (commit `504d8a9`)**. `_detect_crt_mtf(df_w1[:-1], lookback=1, tf_label="W1")` runs in step 8f before D1; `crt_w1=+5.0` weight (highest tier) + W1 hint in concept_injector. Bench gate passes (avg_mean=+0.12, max|symbol_mean|=0.17 across 1260 cycles).
 2. **Session-candle-as-CRT not detected** — Asian/London/NY explicit fractal (Asian range = accum, London = manip, NY = distrib) is captured implicitly via SessionInfo + KILL ZONE GATE but no `detect_session_crt` engine exists.
-3. **Mon/Wed/Thu daily PO3 not enforced** — the card's "Wednesday is the manipulation day" framing isn't gated. Could become a soft +2 confluence factor on Wednesday closes that sweep Monday's range, but needs evidence basis first.
+3. ~~**Mon/Wed/Thu daily PO3 not enforced**~~ — **RESOLVED 2026-04-26 (commit `057694c`)**. `_detect_crt_mtf(df_d1.iloc[-3:], lookback=1, tf_label="WedPO3")` runs only when `df_d1.index[-1].weekday() == 2`. Emits `CRT_WedPO3(N)` factor at +3.0 weight + dedicated injector hint. Day-restricted (~14% of trading days) so no separate bench gate needed.
 4. **No D1-CRT counter-trend gate** — counter-D1-CRT trades (e.g. shorting after a bullish D1 CRT) are not blocked. Bigger behavioral change; defer until a backtest shows asymmetry.
+
+### Findings still open after Followup A + C (2026-04-26)
+
+1. **Session-candle-as-CRT** (#2 above) — still unimplemented. Needs new `detect_session_crt` since session candles aren't time-equispaced bars; would emit `SessionCRT_LBuy(N)` / `SessionCRT_LSell(N)` factors with a `SessionCRT+KillZone` synergy. Save for a session where trading-ai-v2's working tree is clean.
+2. **MultiTF_CRT_W1_D1 super-synergy** — would fire when both `crt_w1` AND `crt_d1` present (~1% of cycles); deferred until backtest can confirm it's not flat inflation.
+3. **Counter-D1-CRT trade gate** (#4 above) — behavioral change, needs explicit backtest evidence.
 
 ---
 
