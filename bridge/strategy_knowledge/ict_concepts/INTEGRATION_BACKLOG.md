@@ -23,17 +23,11 @@ When this backlog is empty, tighten the lint to reject `[NOT YET DEFINED` marker
 
 ---
 
-## Stubs to fill in (13 cards as of 2026-04-26)
+## Stubs to fill in (8 cards as of 2026-04-26)
 
 Suggested priority order: high-impact concepts first, since these get injected into Claude prompts most often.
 
-### High priority — concepts that already drive scoring
-
-| Card | Layer | Why high priority |
-|------|-------|-------------------|
-| `market_structure` (already filled? confirm) | 1 | Pre-trade bias depends on this. **Verify it's not in the stub list — if it is, prioritize.** |
-| `session_levels` | 1 | PDH/PDL/PWH/PWL — used as DOL targets |
-| `judas_swing` | 3 | Manipulation phase detection |
+> **Note (2026-04-26):** `market_structure` was incorrectly listed as a stub in earlier versions of this backlog. Its `bridge_integration` is a dict (see SCHEMA.md — string is preferred but dict was the legacy shape) with `detection`/`prompt_display`/`score_impact` keys; it was never counted as a stub by the lint. If a future cleanup wants to normalize it to a string-form like the other cards, that's a separate doc task and does not affect Track 2.
 
 ### Completed 2026-04-26 (Track 2 batch 1)
 
@@ -43,23 +37,28 @@ Suggested priority order: high-impact concepts first, since these get injected i
 - `power_of_three_and_AMD` — already integrated. detect_po3_phase per cycle; advanced_factor 'PO3_<phase>'; always-injected concept; Wyckoff/PO3 alignment synergy +4. Daily/weekly PO3 patterns informational only.
 - `sessions_and_kill_zones` — already integrated. SessionInfo at start of each cycle; 10-pt scoring; KILL ZONE GATE hard pre-gate with crypto/JPY-Tokyo/Grade-A-displacement exceptions; phrase gates removed (caught winner).
 
-### Medium priority — meta-cards
+### Completed 2026-04-26 (Track 2 batch 2)
 
-| Card | Layer | Why medium |
-|------|-------|------------|
-| `common_mistakes` | section | Lists what to avoid; useful but not directly executed |
-| `conflict_resolution` | section | Priority rules; informational reference |
-| `market_maker_model` | composite | High-level framework; informational |
+- `dealing_range` — already integrated. M15 + H4 ranges from detect_swings (last-3 highs/lows); drives ZONE GATE (hard SKIP), HTF Zone Check (Grade A→B), OTE zone, Fibonacci TP. Nested H1 range NOT computed (only M15/H4).
+- `session_levels` — already integrated. PDH/PDL/PWH/PWL/PMH/PML/Asian range/key opens via build_liquidity_map; sweep significance filter; DOL pre-filter; reasoning post-gate phrase tuples for opposing-sweep enforcement.
+- `judas_swing` — already integrated. detect_judas_swing per cycle (uses asian_range + daily_bias); has_judas_swing + judas_direction populated; Judas+KZ synergy +6; Wyckoff/PO3 alignment +4. NOT a hard gate — prompt-context only.
+- `common_mistakes` — informational only. Meta-card NOT loaded by claude_decision or concept_injector. All 6 mistakes are enforced ELSEWHERE by dedicated code paths (ZONE GATE, HTF Alignment, displacement-required, ATR floor, DOL pre-filter, OB-without-displacement gate). Card serves as human-readable index.
+- `conflict_resolution` — partially integrated. File IS loaded by claude_decision.py:291 but `rules` array is NOT iterated; only 2 hardcoded conflict checks fire (Asian-displacement, OB-no-displacement). Remaining 12 rules are surfaced indirectly via dedicated code paths or are real gaps (rules 5/11/13 + BPR aspect of 12 not enforced).
+
+### High priority — composite frameworks
+
+| Card | Layer | Why high priority |
+|------|-------|-------------------|
+| `market_maker_model` | composite | High-level framework; synergy_scorer Wyckoff/PO3 alignment uses MM_ factor — verify integration |
 | `stop_raid_displacement_retracement` | composite | Atomic ICT pattern; useful for prompt-shaping |
 
 ### Lower priority — narrower concepts
 
 | Card | Layer | Why lower |
 |------|-------|-----------|
-| `CISD` | 3 | Pre-CHoCH detection; may not have a current bridge gate |
+| `CISD` | 3 | Pre-CHoCH detection; verify has_cisd + 'CISD + PO3' synergy integration |
 | `CRT_candle_range_theory` | 3 | Micro structure theory; supports other concepts |
-| `dealing_range` | 1 | Used implicitly in P/D zone logic |
-| `fibonacci_extensions` | 5 | Used in TP target setting |
+| `fibonacci_extensions` | 5 | Used in TP target setting (fib_tp_levels) |
 | `liquidity_void` | 4 | Niche zone type; verify if bridge detects it |
 | `market_philosophy` | 0 | Foundational; mostly informational |
 | `volume_profile` | 5 | May be aspirational; verify against current code |
