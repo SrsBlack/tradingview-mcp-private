@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from bridge.decision_types import TradeDecision, PaperPosition, ClosedPosition
+from bridge.live_executor import BRIDGE_MAX_POSITIONS
 
 
 # ---------------------------------------------------------------------------
@@ -44,7 +45,7 @@ class PaperExecutor:
     def __init__(
         self,
         initial_balance: float = 100_000.0,
-        max_positions: int = 3,
+        max_positions: int = BRIDGE_MAX_POSITIONS,  # single source of truth
         log_dir: Path | None = None,
     ):
         self.balance = initial_balance
