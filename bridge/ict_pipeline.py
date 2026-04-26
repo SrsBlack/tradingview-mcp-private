@@ -1229,8 +1229,28 @@ class ICTPipeline:
 
             # Advanced concepts (CRT, Unicorn, CISD, etc.) add up to +10 points
             # as confluence evidence — they don't replace the core score.
+            #
+            # Per-TF CRT weighting (validated by scripts/bench_multi_tf_crt.py):
+            #   CRT_D1 = +4 (major reversal), CRT_H4 = +3 (swing-tradable),
+            #   CRT_M15 = +2 (intrabar). All other advanced_factors stay at +2.5.
+            #   Total still capped at +10. Backtest across 5 symbols / 1260 cycles
+            #   showed mean delta vs old formula is +0.0 when baseline >=3 factors
+            #   (cap binds either way) and +1.48 when baseline=0 — both within the
+            #   <=2.0 gate. Cycles where the cap binds are unaffected.
             if result.advanced_factors:
-                bonus = min(len(result.advanced_factors) * 2.5, 10.0)
+                _CRT_TF_WEIGHTS = {"crt_d1": 4.0, "crt_h4": 3.0, "crt_m15": 2.0}
+                bonus = 0.0
+                for f in result.advanced_factors:
+                    fl = f.lower()
+                    matched = False
+                    for prefix, w in _CRT_TF_WEIGHTS.items():
+                        if fl.startswith(prefix):
+                            bonus += w
+                            matched = True
+                            break
+                    if not matched:
+                        bonus += 2.5
+                bonus = min(bonus, 10.0)
                 result.total_score = min(100, result.total_score + bonus)
                 result.confluence_factors.extend(result.advanced_factors)
                 result.confluence_factors.append(f"adv_bonus(+{bonus:.0f})")
