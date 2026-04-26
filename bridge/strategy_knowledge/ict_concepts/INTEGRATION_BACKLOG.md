@@ -23,7 +23,7 @@ When this backlog is empty, tighten the lint to reject `[NOT YET DEFINED` marker
 
 ---
 
-## Stubs to fill in (8 cards as of 2026-04-26)
+## Stubs to fill in (3 cards as of 2026-04-26)
 
 Suggested priority order: high-impact concepts first, since these get injected into Claude prompts most often.
 
@@ -45,23 +45,27 @@ Suggested priority order: high-impact concepts first, since these get injected i
 - `common_mistakes` — informational only. Meta-card NOT loaded by claude_decision or concept_injector. All 6 mistakes are enforced ELSEWHERE by dedicated code paths (ZONE GATE, HTF Alignment, displacement-required, ATR floor, DOL pre-filter, OB-without-displacement gate). Card serves as human-readable index.
 - `conflict_resolution` — partially integrated. File IS loaded by claude_decision.py:291 but `rules` array is NOT iterated; only 2 hardcoded conflict checks fire (Asian-displacement, OB-no-displacement). Remaining 12 rules are surfaced indirectly via dedicated code paths or are real gaps (rules 5/11/13 + BPR aspect of 12 not enforced).
 
-### High priority — composite frameworks
+### Completed 2026-04-26 (Track 2 batch 3)
 
-| Card | Layer | Why high priority |
-|------|-------|-------------------|
-| `market_maker_model` | composite | High-level framework; synergy_scorer Wyckoff/PO3 alignment uses MM_ factor — verify integration |
-| `stop_raid_displacement_retracement` | composite | Atomic ICT pattern; useful for prompt-shaping |
+- `market_maker_model` — already integrated. detect_market_maker_model on M15 (ict_pipeline.py:929) emits MM_MMBM/MM_MMSM advanced_factor at confidence >= 0.6 (75% if distribution close passed, 50% rejected at gate); +2.5 to advanced_bonus and feeds Wyckoff/PO3 synergy +4 (synergy_scorer.py:322-327, 461-466). Code emits MMBM/MMSM only — LRSM/AMD/IPDA-cycle/weekly-profile types from the card are NOT detected as separate types. Concept_injector surfaces it on 'mm_'/'mmbm'/'mmsm' adv_factors. The card's 7-step buy/sell workflow is implemented across the full pipeline (HTF→PD→PO3→sweep→displacement→OTE→DOL) but the MM_<type> factor is just one piece of confluence within that pipeline, not the orchestrator.
+- `stop_raid_displacement_retracement` — partially integrated as a chained pattern, not a single detector. Step 1 = significance-filtered sweep (ict_pipeline.py:529-553); Step 2 = displacement_confirmed flag (ict_pipeline.py:558-575: significant sweep + reversal-direction FVG after sweep bar); Step 3 = OB+FVG-stack > FVG-in-OTE > plain-FVG priority sort for fvg_entry_price (ict_pipeline.py:875-911). Composite +7 synergy 'Sweep + displacement + FVG' at synergy_scorer.py:389-394. Anti-step-1-chase enforced by reasoning post-gates (claude_decision.py:1099-1149). Anti-step-2-chase NOT explicitly gated — relies on entry-price = retracement-anchor structurally. SRDR-completion is NOT a hard gate (Grade A/B can clear without all three steps); enforcement is via SCORING + the OB-without-displacement -4 gate.
+- `CISD` — already integrated. detect_cisd on M15 last 20 bars (ict_pipeline.py:727-729, max_age_bars=20) sets has_cisd; 'CISD' inserted at front of advanced_factors (line 1124); +2.5 advanced bonus; feeds 'CISD + PO3 phase transition' +5 synergy at synergy_scorer.py:370-375 (NY/overlap session only); contributes to swing trade-type classification (claude_decision.py:351-358). Concept-injector adds CISD pick on has_cisd or 'cisd' substring. NOT structurally linked to OB list (CISD candle is NOT promoted to an OB). HTF-required-for-CISD rule from card is implicitly enforced by the broader HTF Alignment Gate, not CISD-specific code. CISD-aware sizing reduction (card recommends reduced size when no CHoCH yet) is NOT enforced.
+- `fibonacci_extensions` — already integrated. fib_tp_levels = [1.272, 1.618, 2.0, 2.618] computed from H4 dealing range when available else M15 (ict_pipeline.py:1044-1054). Drives DOL pre-filter HARD GATE for Grade C/D (claude_decision.py:657-684, 4×ATR rule, Grade A/B exempt). Prompt 'Fib Extension TPs' line at claude_decision.py:877-880. Synergy 'Fib + Equal Levels' +3 at synergy_scorer.py:382-387. Concept-injector inline TP1/TP2 hint at concept_injector.py:221-223. 1.0 (basic TP1) is NOT computed — only the four extension levels. Bridge does NOT auto-snap final TP to a fib level; fibs are advisory (prompt + DOL filter) and Claude's JSON decision determines the executed TP.
+- `volume_profile` — ASPIRATIONAL in the bridge. Real bucketed POC/VAH/VAL/HVN/LVN engine exists at trading-ai-v2/analysis/volume_profile.py but is NOT imported by bridge/ict_pipeline.py. No SymbolAnalysis field carries volume-profile coordinates; no prompt line conveys POC/VAH/VAL; concept_injector has no trigger for the card. Only volume-profile-themed signal is the 'OB+HVN' proxy synergy (+3, synergy_scorer.py:264-280, 449-454) which approximates HVN via FVG_stack OR HiddenOB advanced_factors — the docstring explicitly states 'we don't have tick-level volume profile.' Cross-validation rules in cross_correlations.json/conflict_resolution.json reference fields the bridge does not compute and are documentation only.
 
-### Lower priority — narrower concepts
+### Findings surfaced during batch 3 (NOT yet acted on)
 
-| Card | Layer | Why lower |
-|------|-------|-----------|
-| `CISD` | 3 | Pre-CHoCH detection; verify has_cisd + 'CISD + PO3' synergy integration |
-| `CRT_candle_range_theory` | 3 | Micro structure theory; supports other concepts |
-| `fibonacci_extensions` | 5 | Used in TP target setting (fib_tp_levels) |
-| `liquidity_void` | 4 | Niche zone type; verify if bridge detects it |
-| `market_philosophy` | 0 | Foundational; mostly informational |
-| `volume_profile` | 5 | May be aspirational; verify against current code |
+1. **`volume_profile` real wiring opportunity** — analysis.volume_profile already exists in trading-ai-v2; importing it in bridge/ict_pipeline.py (build_volume_profile on M15 session window) and replacing the FVG_stack/HiddenOB proxy in synergy_scorer._ob_at_high_volume with real 'OB overlaps HVN bucket' would convert ~5 cross_correlations rules from documentation-only into actual graded signals. Tracked as a separate code task — do not bundle with stub-fill commits.
+2. **CISD candle → OB promotion** — card claims 'the CISD candle IS an order block' but has_cisd and ob_score are independent fields. No path promotes a CISD candle into the OB list. Open design question: should detect_order_blocks pick up CISD candles, or should CISD set a synthetic OB? Tracked as a future code change.
+3. **CISD-aware sizing reduction** — card recommends reduced size for CISD-only entries (no CHoCH confirmation yet). Sizing logic in risk_bridge / live_executor_adapter is ATR-based and structure-agnostic. If CISD-only entries should be downsized, that belongs in sizing — not in stub-fill commits.
+4. **SRDR-completion hard gate** — currently not enforced; a Grade A/B trade can clear pre-gates without sweep_detected AND/OR displacement_confirmed AND/OR a valid FVG. If atomic SRDR completion should be a hard requirement (it is for the card's 'core 3-step ICT trade pattern'), a new pre-gate would be needed. Tracked as a future code change.
+5. **MMM 7-step orchestration** — market_maker_model card defines a 7-step workflow but the bridge enforces those steps via 7+ INDEPENDENT gates that don't know about each other. Could consolidate into an explicit MMM-completion check. Tracked as design question.
+
+### Remaining 3 stubs (final batch)
+
+- `CRT_candle_range_theory` (Layer 3 — micro structure theory)
+- `liquidity_void` (Layer 4 — verify if bridge detects voids)
+- `market_philosophy` (Layer 0 — foundational, mostly informational)
 
 ---
 
