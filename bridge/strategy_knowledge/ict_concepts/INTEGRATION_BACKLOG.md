@@ -23,7 +23,9 @@ When this backlog is empty, tighten the lint to reject `[NOT YET DEFINED` marker
 
 ---
 
-## Stubs to fill in (3 cards as of 2026-04-26)
+## Stubs to fill in (0 cards as of 2026-04-26 — Track 2 COMPLETE)
+
+> All 18 stubs have been filled across 4 batches. The backlog is empty. Next step (separate small commit): tighten `scripts/lint_memory.py::check_kb_schema()` to FAIL (not just warn) on `[NOT YET DEFINED` markers so future regressions are blocked.
 
 Suggested priority order: high-impact concepts first, since these get injected into Claude prompts most often.
 
@@ -61,11 +63,17 @@ Suggested priority order: high-impact concepts first, since these get injected i
 4. **SRDR-completion hard gate** — currently not enforced; a Grade A/B trade can clear pre-gates without sweep_detected AND/OR displacement_confirmed AND/OR a valid FVG. If atomic SRDR completion should be a hard requirement (it is for the card's 'core 3-step ICT trade pattern'), a new pre-gate would be needed. Tracked as a future code change.
 5. **MMM 7-step orchestration** — market_maker_model card defines a 7-step workflow but the bridge enforces those steps via 7+ INDEPENDENT gates that don't know about each other. Could consolidate into an explicit MMM-completion check. Tracked as design question.
 
-### Remaining 3 stubs (final batch)
+### Completed 2026-04-26 (Track 2 batch 4 — FINAL)
 
-- `CRT_candle_range_theory` (Layer 3 — micro structure theory)
-- `liquidity_void` (Layer 4 — verify if bridge detects voids)
-- `market_philosophy` (Layer 0 — foundational, mostly informational)
+- `CRT_candle_range_theory` — partially integrated. detect_crt (Desktop/trading-ai-v2/analysis/ict/advanced.py:232) runs on M15 with lookback=1, bullish/bearish single-bar CRT (wick beyond prior-bar extreme + close back inside). Hits surface as 'CRT(N)' in advanced_factors (ict_pipeline.py:815-816), contribute +2.5 (capped at +10) to total_score (ict_pipeline.py:1126-1132), render into the Claude prompt's 'Advanced ICT' line (claude_decision.py:884-886). NOT a hard gate, NO dedicated synergy in synergy_scorer.py, concept_injector.py:162-279 has NO trigger for the CRT card. Higher-level CRT framing (daily/weekly/session-fractal, weekly-PO3 Mon=accum/Wed=manip/Thu=distrib, candle-anatomy-as-PO3, session-candle-as-CRT) is captured implicitly via PDH/PDL/PWH/PWL in build_liquidity_map + SessionInfo + KILL ZONE GATE + daily_bias PO3, but no separate engine treats prior daily/weekly candles as CRT ranges with explicit BSL/SSL/equilibrium fields.
+- `liquidity_void` — NOT INTEGRATED. Grep for 'void' across bridge/*.py and Desktop/trading-ai-v2/**/*.py returns no detection/scoring/gating/prompt-injection matches. Root cause: void detection requires volume-profile data and the bridge does not import analysis.volume_profile (per volume_profile.json's bridge_integration). Closest proxy is _ob_at_high_volume in synergy_scorer.py:264-280 ('OB+HVN' +3 synergy at line 449-454), which approximates HVN via FVG_stack OR HiddenOB advanced_factors — explicitly noted in the docstring as 'we don't have tick-level volume profile.' Cross-validation rules in cross_correlations.json that mention voids reference fields the bridge does not compute and are documentation only. The card's full toolkit (void-as-draw, void-as-TP, SL-on-the-other-side-of-an-unfilled-void, 5-session partial-fill window, stale-void priority decay, FVG+void priority ranking) is informational only. Closing this gap is paired with the volume_profile wiring task (batch 3 finding #1).
+- `market_philosophy` — INFORMATIONAL ONLY by design. Grep for 'philosophy' across bridge/*.py returns no matches; concept_injector.py has no trigger that loads this card; no scoring weight, no synergy, no gate references it. Listed in _index.json layer_0_macro and referenced as a depends_on by quarterly_shifts.json + time_price_theory.json so the BFS walker COULD pull it in transitively, but the _MAX_CONCEPTS=8 cap and priority order mean operationally it almost never reaches Claude. Its 5 core_trading_rules ARE enforced operationally in concrete gates: rule_1 (trade FROM liquidity) = DOL pre-filter at claude_decision.py:657-684; rule_2 (draw determines direction) = HTF Alignment Gate + daily_bias; rule_3 (manipulation precedes distribution) = sweep+displacement prerequisites at ict_pipeline.py:558-575 + SRDR composite synergy; rule_4 (time validates price) = KILL ZONE GATE; rule_5 (HTF controls) = HTF Zone Check + HTF FVG obstacle gate. Treat as durable design documentation; do NOT add an injector trigger or 'philosophy passes' factor.
+
+### Findings surfaced during batch 4 (NOT yet acted on)
+
+1. **CRT injector trigger missing** — concept_injector.py:240-279 has triggers for `cisd`, `breaker`, `turtle`, `unicorn`, `venom`, `mm_/mmbm/mmsm` advanced_factors, but NO trigger for `crt` despite `CRT(N)` being the most commonly-emitted advanced_factor on M15. Adding `if "crt" in adv_factors: picks.append(("CRT_candle_range_theory", "Single-bar sweep+reversal — micro CRT setup"))` would surface the methodology to Claude when it fires. Tracked as a future small change.
+2. **CRT lookback is hardcoded to 1** — only single-bar CRTs are detected. The card's daily/weekly/session-fractal applications would need separate calls with `lookback={N for daily, M for weekly}` against the relevant-timeframe df. Open design question whether the M15-lookback=1 detector is sufficient or if multi-timeframe CRT detection is needed.
+3. **Volume-profile wiring is the prerequisite for liquidity_void** — see batch 3 finding #1. The two cards' integration status is paired; both unblock together when build_volume_profile is wired into ict_pipeline.
 
 ---
 
