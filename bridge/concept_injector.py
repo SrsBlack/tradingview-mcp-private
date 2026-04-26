@@ -257,8 +257,9 @@ def _select_relevant_concepts(a: Any) -> list[tuple[str, str]]:
         picks.append(("turtle_soup", "Sweep+reversal = stops harvested at swing failure"))
 
     # CRT — multi-TF sweep+reversal (Candle Range Theory). Hint is differentiated
-    # by highest TF firing: W1 = institutional swing reversal, D1 = major reversal,
-    # H4 = swing-tradable, M15 = intrabar.
+    # by strongest signal: W1 = institutional swing reversal, D1 = major reversal,
+    # WedPO3 = Wednesday manipulation gate, H4 = swing-tradable, M15 = intrabar.
+    # Priority: W1 > D1 > WedPO3 > H4 > M15 (matches score weights).
     if "crt_w1" in adv_factors:
         picks.append((
             "CRT_candle_range_theory",
@@ -270,6 +271,12 @@ def _select_relevant_concepts(a: Any) -> list[tuple[str, str]]:
             "CRT_candle_range_theory",
             "Daily CRT — sweep of prior-day extreme + close back inside daily range. "
             "Major reversal signal; target = opposite daily extreme.",
+        ))
+    elif "crt_wedpo3" in adv_factors:
+        picks.append((
+            "CRT_candle_range_theory",
+            "Wednesday-PO3 — Wed swept Mon-Tue range and closed back inside. "
+            "Institutional manipulation day; Thursday distribution likely opposite direction.",
         ))
     elif "crt_h4" in adv_factors:
         picks.append((

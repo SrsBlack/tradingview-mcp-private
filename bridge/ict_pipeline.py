@@ -895,6 +895,9 @@ class ICTPipeline:
                     # (default tf_label="M15"). Add W1, D1 and H4 setups by calling detect_crt
                     # explicitly on the higher-TF dataframes already collected at step 1.
                     # W1 = institutional swing-trade reversal (PWH/PWL sweep + close back inside).
+                    # Wed-PO3 = day-specific manipulation gate: if today's daily bar is
+                    # Wednesday and it sweeps the Mon-Tue range + closes back inside, emit
+                    # a "WedPO3" setup (Thursday distribution likely opposite direction).
                     try:
                         from analysis.ict.advanced import detect_crt as _detect_crt_mtf
                         df_w1_crt = df_w1.iloc[:-1] if df_w1 is not None and len(df_w1) > 5 else None
@@ -911,6 +914,15 @@ class ICTPipeline:
                             h4_setups = _detect_crt_mtf(df_htf_closed, lookback=1, tf_label="H4")
                             if h4_setups:
                                 adv.crt_setups.extend(h4_setups)
+                        # Wed-PO3: only fires on Wednesdays. Reuse detect_crt with a
+                        # 3-bar window [Mon, Tue, Wed_live]; with lookback=1 the sweep
+                        # candle is Wed, ref range is Mon-Tue. Wed daily bar IS the
+                        # sweep — use the live (unfinished) bar, not [:-1].
+                        if df_d1 is not None and len(df_d1) >= 3 and df_d1.index[-1].weekday() == 2:
+                            wed_window = df_d1.iloc[-3:]  # [Mon, Tue, Wed_live]
+                            wed_setups = _detect_crt_mtf(wed_window, lookback=1, tf_label="WedPO3")
+                            if wed_setups:
+                                adv.crt_setups.extend(wed_setups)
                     except Exception as e:
                         print(f"  [{symbol}] Multi-TF CRT detection error: {e}", flush=True)
 
@@ -920,7 +932,7 @@ class ICTPipeline:
                         for s in adv.crt_setups:
                             tf = getattr(s, "tf_label", "M15")
                             crt_by_tf[tf] = crt_by_tf.get(tf, 0) + 1
-                        for tf in ("W1", "D1", "H4", "M15"):
+                        for tf in ("W1", "D1", "H4", "M15", "WedPO3"):
                             n = crt_by_tf.get(tf, 0)
                             if n > 0:
                                 result.advanced_factors.append(f"CRT_{tf}({n})")
@@ -1237,15 +1249,20 @@ class ICTPipeline:
             # as confluence evidence — they don't replace the core score.
             #
             # Per-TF CRT weighting (validated by scripts/bench_multi_tf_crt.py):
-            #   CRT_W1 = +5 (institutional swing reversal at PWH/PWL),
-            #   CRT_D1 = +4 (major reversal), CRT_H4 = +3 (swing-tradable),
-            #   CRT_M15 = +2 (intrabar). All other advanced_factors stay at +2.5.
+            #   CRT_W1     = +5 (institutional swing reversal at PWH/PWL),
+            #   CRT_D1     = +4 (major reversal),
+            #   CRT_WedPO3 = +3 (Wednesday manipulation: sweep Mon-Tue range),
+            #   CRT_H4     = +3 (swing-tradable),
+            #   CRT_M15    = +2 (intrabar). All other advanced_factors stay at +2.5.
             #   Total still capped at +10. Backtest across 5 symbols / 1260 cycles
             #   showed mean delta vs old formula is +0.0 when baseline >=3 factors
             #   (cap binds either way) and +1.48 when baseline=0 — both within the
             #   <=2.0 gate. Cycles where the cap binds are unaffected.
             if result.advanced_factors:
-                _CRT_TF_WEIGHTS = {"crt_w1": 5.0, "crt_d1": 4.0, "crt_h4": 3.0, "crt_m15": 2.0}
+                _CRT_TF_WEIGHTS = {
+                    "crt_w1": 5.0, "crt_d1": 4.0, "crt_wedpo3": 3.0,
+                    "crt_h4": 3.0, "crt_m15": 2.0,
+                }
                 bonus = 0.0
                 for f in result.advanced_factors:
                     fl = f.lower()
