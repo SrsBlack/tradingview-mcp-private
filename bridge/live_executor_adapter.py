@@ -1034,7 +1034,15 @@ class LiveExecutorAdapter:
             return None
 
     def _get_h4_bias(self, ftmo_symbol: str) -> str:
-        """Query MT5 for H4 candles and determine bias. Returns BULLISH/BEARISH/NEUTRAL."""
+        """Query MT5 for H4 candles and determine bias. Returns BULLISH/BEARISH/NEUTRAL.
+
+        Requires a meaningful structural break before declaring direction:
+        recent extreme must move at least MIN_BIAS_BREAK_PCT (0.5%) vs prior extreme.
+        Without this, sub-tick differences during consolidation flip the bias
+        and kill valid trades (ETH 2026-04-26: +$38 closed at 0.34% lower-high
+        and 0.025% lower-low — basically a tie, called BEARISH).
+        """
+        MIN_BIAS_BREAK_PCT = 0.005  # 0.5% structural break required
         try:
             import MetaTrader5 as mt5
             rates = mt5.copy_rates_from_pos(ftmo_symbol, mt5.TIMEFRAME_H4, 0, 20)
@@ -1049,9 +1057,15 @@ class LiveExecutorAdapter:
             recent_low = min(lows[-5:])
             prev_low = min(lows[:5])
 
-            if recent_high > prev_high and recent_low > prev_low:
+            # Require meaningful break, not bar-arithmetic equality
+            high_break_up = recent_high > prev_high * (1 + MIN_BIAS_BREAK_PCT)
+            low_break_up = recent_low > prev_low * (1 + MIN_BIAS_BREAK_PCT)
+            high_break_dn = recent_high < prev_high * (1 - MIN_BIAS_BREAK_PCT)
+            low_break_dn = recent_low < prev_low * (1 - MIN_BIAS_BREAK_PCT)
+
+            if high_break_up and low_break_up:
                 return "BULLISH"
-            elif recent_high < prev_high and recent_low < prev_low:
+            elif high_break_dn and low_break_dn:
                 return "BEARISH"
             return "NEUTRAL"
         except Exception:
@@ -1092,8 +1106,12 @@ class LiveExecutorAdapter:
                 # Scalps are exempt — they don't need HTF alignment
                 if getattr(pos, 'trade_type', 'intraday') == "scalp":
                     continue
-                # Winners are exempt
-                if pos.r_multiple >= 1.0 or pos.tp1_hit:
+                # Profitable trades are exempt — HTF invalidation is for capping
+                # losses on losing trades, not realizing micro-gains on flat trades.
+                # ETH 2026-04-26: +$38 / +0.16R was killed by a near-zero H4 flip
+                # while still well above entry. Trades above breakeven get to either
+                # hit TP, trail to it, or get stopped at SL.
+                if pos.r_multiple >= 0.0 or pos.tp1_hit:
                     continue
 
                 ftmo_sym = tv_to_ftmo_symbol(pos.symbol.split(":")[-1])
