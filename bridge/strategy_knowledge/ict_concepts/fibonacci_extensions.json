@@ -14,6 +14,7 @@
     "optimal_trade_entry (OTE = retracement entry at 0.618-0.786. Extensions = TP targets at 1.272-2.618)",
     "dealing_range (extensions project BEYOND the current dealing range)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "levels": {
     "1.0": "Full extension — price reaches the opposite end of the measured swing. This is the basic TP1.",
     "1.272": "First extension — 27.2% beyond the swing. Common TP2 for moderate moves.",

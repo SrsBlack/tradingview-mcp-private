@@ -14,7 +14,7 @@
     "entry_models (gates: each mistake maps to a grade reduction or skip)",
     "risk_management (SL buffering rules)"
   ],
-
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "mistake_1_chasing": {
     "what": "Entering during manipulation instead of waiting for distribution retracement",
     "concepts_violated": [

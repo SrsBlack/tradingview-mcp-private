@@ -13,6 +13,7 @@
     "market_maker_model (SRDR is the core 3-step atom inside the full model)",
     "entry_models (SRDR completion = minimum viable ICT entry)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "composes": [
     "liquidity_sweep (step 1: the raid)",
     "displacement (step 2: institutional commitment)",

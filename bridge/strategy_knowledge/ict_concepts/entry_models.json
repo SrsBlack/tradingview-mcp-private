@@ -11,7 +11,19 @@
     "draw_on_liquidity (TP target viability)",
     "risk_management (grade → risk percentage)"
   ],
-
+  "feeds_into": [],
+  "bridge_integration": {
+    "ict_score_field": "TradeDecision.ict_score = total from weighted scorer + synergy",
+    "grade_field": "TradeDecision.grade set by bridge config grade_thresholds (A:80, B:65, C:50, D:35)",
+    "risk_pct_field": "TradeDecision.risk_pct derived from rules.json grade_risk_table → FTMO risk module",
+    "minimum_live_score": 45,
+    "paper_always": "All grades recorded in paper shadow for audit trail",
+    "tp_targeting": {
+      "bridge": "Uses draw_on_liquidity (DOL) — nearest unswept external liquidity",
+      "trading_ai_v2": "Uses HTF FVG/OB as TP targets",
+      "note": "Both are valid ICT approaches. DOL is the orthodox target; HTF FVG/OB is a conservative alternative."
+    }
+  },
   "scoring_weights": {
     "_description": "Config-driven weights (config.yaml). Must sum to 100. Liquidity is 0 because sweep is a gate, not a gradient.",
     "structure": {
@@ -52,7 +64,6 @@
       "required": false
     }
   },
-
   "synergy_bonuses": {
     "_description": "Additive bonuses for genuine ICT confluences. Capped at +5 total. Score capped at 100.",
     "ob_fvg_stacked": {
@@ -66,7 +77,6 @@
       "ict_basis": "Sweep + FVG = displacement confirmation. The sweep creates the imbalance, the FVG proves it."
     }
   },
-
   "sweep_direction_logic": {
     "_critical": "This is the most important directional logic in the system.",
     "definition": "sweep_direction = the direction price moved TO execute the sweep",
@@ -75,15 +85,42 @@
     "filter": "scorer uses `sweep_direction != trade_direction` — only opposite-direction sweeps count",
     "continuation_sweeps": "Intentionally excluded. Same-direction sweeps are trend-following, not ICT manipulation confirmation. Do NOT 'fix' the != filter to ==."
   },
-
   "score_to_grade_mapping": {
-    "grade_A": { "min_score": 80, "max_score": 100, "risk_pct": "1.0% (from rules.json)", "expected_win_rate": "65-75%", "description": "All components aligned — full conviction" },
-    "grade_B": { "min_score": 65, "max_score": 79, "risk_pct": "0.5% (from rules.json)", "expected_win_rate": "55-65%", "description": "Strong setup, missing 1-2 non-critical elements" },
-    "grade_C": { "min_score": 50, "max_score": 64, "risk_pct": "0.25% (from rules.json)", "expected_win_rate": "45-55%", "description": "Paper trade only unless exceptional context" },
-    "grade_D": { "min_score": 35, "max_score": 49, "risk_pct": "0%", "expected_win_rate": "<45%", "description": "Do not trade — insufficient confluence" },
-    "INVALID": { "min_score": 0, "max_score": 34, "risk_pct": "0%", "description": "Below minimum threshold" }
+    "grade_A": {
+      "min_score": 80,
+      "max_score": 100,
+      "risk_pct": "1.0% (from rules.json)",
+      "expected_win_rate": "65-75%",
+      "description": "All components aligned — full conviction"
+    },
+    "grade_B": {
+      "min_score": 65,
+      "max_score": 79,
+      "risk_pct": "0.5% (from rules.json)",
+      "expected_win_rate": "55-65%",
+      "description": "Strong setup, missing 1-2 non-critical elements"
+    },
+    "grade_C": {
+      "min_score": 50,
+      "max_score": 64,
+      "risk_pct": "0.25% (from rules.json)",
+      "expected_win_rate": "45-55%",
+      "description": "Paper trade only unless exceptional context"
+    },
+    "grade_D": {
+      "min_score": 35,
+      "max_score": 49,
+      "risk_pct": "0%",
+      "expected_win_rate": "<45%",
+      "description": "Do not trade — insufficient confluence"
+    },
+    "INVALID": {
+      "min_score": 0,
+      "max_score": 34,
+      "risk_pct": "0%",
+      "description": "Below minimum threshold"
+    }
   },
-
   "gates": {
     "_description": "Hard gates that block trades regardless of score. Code implements one; Claude prompt handles qualitative gates.",
     "code_gate": {
@@ -96,7 +133,6 @@
       "no_2R_target": "Draw-on-liquidity target < 2R = Claude should reduce position or skip"
     }
   },
-
   "grade_a_criteria": {
     "description": "Score >= 80. Sweep gate passed. Every scoring component contributing.",
     "component_checklist": {
@@ -130,18 +166,5 @@
   "grade_d_skip": {
     "description": "Score 35-49. Insufficient confluence for live trading.",
     "action": "Do not trade."
-  },
-
-  "bridge_integration": {
-    "ict_score_field": "TradeDecision.ict_score = total from weighted scorer + synergy",
-    "grade_field": "TradeDecision.grade set by bridge config grade_thresholds (A:80, B:65, C:50, D:35)",
-    "risk_pct_field": "TradeDecision.risk_pct derived from rules.json grade_risk_table → FTMO risk module",
-    "minimum_live_score": 45,
-    "paper_always": "All grades recorded in paper shadow for audit trail",
-    "tp_targeting": {
-      "bridge": "Uses draw_on_liquidity (DOL) — nearest unswept external liquidity",
-      "trading_ai_v2": "Uses HTF FVG/OB as TP targets",
-      "note": "Both are valid ICT approaches. DOL is the orthodox target; HTF FVG/OB is a conservative alternative."
-    }
   }
 }

@@ -17,6 +17,7 @@
     "entry_models (market maker model IS the Grade A trade template)",
     "ICT_2022_model (2022 model is a time-specific implementation of market maker model)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "composes": [
     "market_structure (step 1)",
     "premium_discount (step 2)",

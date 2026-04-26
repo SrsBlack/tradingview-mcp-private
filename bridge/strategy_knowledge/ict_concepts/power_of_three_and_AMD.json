@@ -15,6 +15,7 @@
     "market_maker_model (MMM is PO3 applied with premium/discount + structure)",
     "dealing_range (daily PO3 creates the daily dealing range)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "phases": {
     "accumulation": {
       "what": "Smart money builds positions. Sideways, choppy. Retail places breakout orders above/below.",

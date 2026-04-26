@@ -15,7 +15,7 @@
     "entry_models (conflict rules determine grade reductions)",
     "cross_correlations (synergies are the positive counterpart to conflicts)"
   ],
-
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "_purpose": "When concepts give contradictory signals, use these rules to resolve. Higher-layer concepts OVERRIDE lower-layer ones.",
   "rules": [
     {

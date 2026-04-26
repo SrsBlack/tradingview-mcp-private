@@ -15,6 +15,7 @@
     "power_of_three_and_AMD (manipulation phase sweeps these levels)",
     "order_pairing (PDH and PDL are a PAIRED set — sweep one, target the other)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "levels": {
     "PDH_PDL": {
       "definition": "Previous Day High / Previous Day Low",

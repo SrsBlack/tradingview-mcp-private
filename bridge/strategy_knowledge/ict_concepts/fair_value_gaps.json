@@ -18,6 +18,7 @@
     "displacement (FVG is the EVIDENCE of displacement)",
     "premium_discount (FVG in wrong zone is less reliable)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "bullish_FVG": "Gap between candle 1 high and candle 3 low. Below current price.",
   "bearish_FVG": "Gap between candle 1 low and candle 3 high. Above current price.",
   "consequent_encroachment": {

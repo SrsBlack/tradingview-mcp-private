@@ -15,6 +15,7 @@
     "dealing_range (range high/low are the primary liquidity levels)",
     "equal_highs_lows (engineered liquidity — a subset of liquidity)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "types": {
     "buy_side_liquidity_BSL": {
       "definition": "Stops from shorts + buy-stops from breakout traders sitting ABOVE swing highs, equal highs, resistance.",

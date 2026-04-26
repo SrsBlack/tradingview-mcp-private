@@ -369,6 +369,104 @@ def check_unpushed() -> list[tuple[str, str]]:
     return findings
 
 
+def check_kb_schema() -> list[tuple[str, str]]:
+    """ICT concept cards conform to SCHEMA.md.
+
+    Required fields per SCHEMA.md: id, layer, definition, depends_on,
+    feeds_into, bridge_integration. Cards may use a stub for bridge_integration
+    (counted but not flagged FAIL). Spelling drift (bridge_usage,
+    common_mistake singular) reported as FAIL since migration should have
+    fixed all of those.
+    """
+    import json
+    kb_dir = REPO_ROOT / "bridge" / "strategy_knowledge" / "ict_concepts"
+    if not kb_dir.exists():
+        return [warned(f"KB dir {kb_dir} not found — skipping")]
+
+    REQUIRED = ["id", "layer", "definition", "depends_on", "feeds_into", "bridge_integration"]
+    DEPRECATED = ["bridge_usage", "common_mistake"]
+    STUB_MARKER = "[NOT YET DEFINED"
+
+    findings = []
+    on_disk_cards: set[str] = set()
+    stub_count = 0
+    cards_checked = 0
+
+    for card_path in sorted(kb_dir.glob("*.json")):
+        if card_path.stem in ("_index", "cross_correlations"):
+            continue
+        on_disk_cards.add(card_path.stem)
+        cards_checked += 1
+        try:
+            data = json.loads(card_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            findings.append(failed(f"{card_path.name}: failed to parse JSON ({e})"))
+            continue
+        if not isinstance(data, dict):
+            findings.append(failed(f"{card_path.name}: root is not a dict"))
+            continue
+
+        # Required fields
+        for field in REQUIRED:
+            if field not in data:
+                findings.append(failed(
+                    f"{card_path.name}: missing required field '{field}' (per SCHEMA.md)"
+                ))
+
+        # Deprecated fields
+        for dep in DEPRECATED:
+            if dep in data:
+                target = "bridge_integration" if dep == "bridge_usage" else "common_mistakes"
+                findings.append(failed(
+                    f"{card_path.name}: deprecated field '{dep}' (rename to '{target}' — see SCHEMA.md)"
+                ))
+
+        # id matches filename
+        if data.get("id") and data["id"] != card_path.stem:
+            findings.append(warned(
+                f"{card_path.name}: id={data['id']!r} doesn't match filename"
+            ))
+
+        # Count stubs (not a fail; just visibility into backlog progress)
+        bi = data.get("bridge_integration", "")
+        if isinstance(bi, str) and STUB_MARKER in bi:
+            stub_count += 1
+
+    # _index.json catalogues all on-disk cards (walks dependency graph + sections + concepts)
+    idx_path = kb_dir / "_index.json"
+    if idx_path.exists():
+        try:
+            idx = json.loads(idx_path.read_text(encoding="utf-8"))
+            listed: set[str] = set()
+            def walk(o):
+                if isinstance(o, dict):
+                    for k, v in o.items():
+                        if k in ("concepts", "sections") and isinstance(v, list):
+                            for c in v:
+                                if isinstance(c, str):
+                                    listed.add(c)
+                        else:
+                            walk(v)
+                elif isinstance(o, list):
+                    for x in o: walk(x)
+            walk(idx)
+            orphans = on_disk_cards - listed
+            for o in sorted(orphans):
+                findings.append(failed(
+                    f"_index.json: card '{o}' on disk but not catalogued in dependency graph or sections"
+                ))
+        except Exception as e:
+            findings.append(failed(f"_index.json: parse error {e}"))
+
+    # Summary line — useful even when no fail
+    findings.append(warned(
+        f"KB stats: {cards_checked} cards, {stub_count} bridge_integration stubs "
+        f"(see INTEGRATION_BACKLOG.md to drain)"
+    ))
+
+    return findings
+
+
 # ----- main ------------------------------------------------------------------
 
 CHECKS = [
@@ -376,6 +474,7 @@ CHECKS = [
     ("doc file paths exist",       check_file_paths),
     ("swing lookback invariant",   check_lookback_invariant),
     ("position cap consistency",   check_position_cap_consistency),
+    ("KB schema conformance",      check_kb_schema),
     ("'pending' language stale?",  check_pending_language),
     ("verification dates fresh",   check_old_verifications),
     ("MEMORY.md links resolve",    check_memory_index_links),

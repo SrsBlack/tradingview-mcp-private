@@ -13,6 +13,7 @@
     "seasonal_tendencies (macro context layer that frames institutional intent)",
     "IPDA (the algorithmic delivery engine that executes this philosophy)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "retail_vs_institutional": {
     "the_core_asymmetry": "Retail traders trade WITH the crowd. Institutions trade AGAINST the crowd because they need the crowd's stop orders to fill their own large orders.",
     "retail_behavior": "Retail places stops at obvious swing highs (for shorts) and obvious swing lows (for longs). These stops cluster at technical levels that everyone can see on a chart.",

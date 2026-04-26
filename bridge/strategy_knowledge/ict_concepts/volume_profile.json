@@ -15,6 +15,7 @@
     "order_blocks (high volume at OB zones CONFIRMS institutional activity)",
     "fair_value_gaps (FVGs at low volume zones have highest fill probability)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "key_levels": {
     "POC": "Point of Control — the single price level with highest traded volume. Acts as strongest magnet. Price tends to return to POC.",
     "VAH": "Value Area High — upper boundary of the 70% volume zone. Acts as resistance.",

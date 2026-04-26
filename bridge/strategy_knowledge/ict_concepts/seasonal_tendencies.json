@@ -9,15 +9,37 @@
   "related_to": [
     "quarterly_shifts (seasonal patterns coincide with quarterly boundaries)"
   ],
+  "bridge_integration": {
+    "conviction_increase": "During historically strong months for the instrument being traded, add +5 confluence points to any setup that already passes the standard validation threshold.",
+    "conviction_decrease": "During summer doldrums (July-August) and September for equities, reduce position size by 25%. Seasonal headwinds reduce follow-through probability.",
+    "doldrum_filter": "Jul-Aug: Accept only A+ setups (highest confluence). Reject B and C grade setups. Lower activity = lower reliability of intraday patterns.",
+    "high_probability_windows": "During the best 6 months window (Nov-Apr for equities), lower the confluence threshold by 1 criterion. The seasonal tailwind compensates for slightly reduced technical confirmation.",
+    "quarterly_rebalancing_edge": "End of quarter months (March, June, September, December) — the last 2 weeks often see institutional rebalancing flows that create predictable mean-reversion moves. Add +5 points if setup aligns with expected rebalancing direction."
+  },
   "monthly_breakdown": {
     "EURUSD": {
-      "bullish_months": ["January", "March", "September"],
-      "bearish_months": ["June", "November"],
+      "bullish_months": [
+        "January",
+        "March",
+        "September"
+      ],
+      "bearish_months": [
+        "June",
+        "November"
+      ],
       "notes": "Jan: New year USD weakness. Mar: Quarter-end flows. Sep: European Q3 repatriation. Jun/Nov: Risk-off USD strength phases."
     },
     "XAUUSD": {
-      "strong_months": ["January", "February", "September", "October"],
-      "weak_months": ["June", "July"],
+      "strong_months": [
+        "January",
+        "February",
+        "September",
+        "October"
+      ],
+      "weak_months": [
+        "June",
+        "July"
+      ],
       "notes": "Jan-Feb: New year safe-haven demand, Chinese New Year buying. Sep-Oct: Pre-Q4 safe haven positioning. Jun-Jul: Summer risk-on reduces gold demand."
     },
     "US_indices": {
@@ -27,8 +49,14 @@
       "notes": "October can be volatile (capitulation lows before Q4 rally). April is often strong (tax refund season retail buying)."
     },
     "BTC_crypto": {
-      "strong_quarters": ["Q1 (Jan-Mar)", "Q4 (Oct-Dec)"],
-      "weak_quarters": ["Q2 (Apr-Jun)", "Q3 (Jul-Sep)"],
+      "strong_quarters": [
+        "Q1 (Jan-Mar)",
+        "Q4 (Oct-Dec)"
+      ],
+      "weak_quarters": [
+        "Q2 (Apr-Jun)",
+        "Q3 (Jul-Sep)"
+      ],
       "halving_exception": "Post-halving years (2013, 2017, 2021, 2025) see Q2-Q3 weakness replaced by extended bull phases. The halving cycle overrides seasonal tendencies.",
       "notes": "BTC January typically bullish (new year FOMO). September weakest historically. December sees year-end positioning."
     }
@@ -54,13 +82,6 @@
     "Q4_rally": "Oct-Dec: Institutional window dressing, holiday rally tendency",
     "NFP_week": "First Friday of month: increased volatility around Non-Farm Payrolls",
     "FOMC_drift": "Pre-FOMC drift upward is statistically documented in equities"
-  },
-  "bridge_usage": {
-    "conviction_increase": "During historically strong months for the instrument being traded, add +5 confluence points to any setup that already passes the standard validation threshold.",
-    "conviction_decrease": "During summer doldrums (July-August) and September for equities, reduce position size by 25%. Seasonal headwinds reduce follow-through probability.",
-    "doldrum_filter": "Jul-Aug: Accept only A+ setups (highest confluence). Reject B and C grade setups. Lower activity = lower reliability of intraday patterns.",
-    "high_probability_windows": "During the best 6 months window (Nov-Apr for equities), lower the confluence threshold by 1 criterion. The seasonal tailwind compensates for slightly reduced technical confirmation.",
-    "quarterly_rebalancing_edge": "End of quarter months (March, June, September, December) — the last 2 weeks often see institutional rebalancing flows that create predictable mean-reversion moves. Add +5 points if setup aligns with expected rebalancing direction."
   },
   "quarterly_shift_rules": {
     "definition": "Every 13 weeks (quarter end: March, June, September, December), institutional portfolios rebalance. This creates predictable price behavior.",

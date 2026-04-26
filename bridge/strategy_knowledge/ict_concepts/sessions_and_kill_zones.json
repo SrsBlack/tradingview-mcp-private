@@ -11,6 +11,7 @@
   "related_to": [
     "power_of_three_and_AMD (Asian=accumulation, London=manipulation, NY=distribution)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "kill_zones": {
     "asian": {
       "time": "8:00 PM - 12:00 AM ET",

@@ -29,6 +29,7 @@ For manual audits (logic claims, backtest numbers, runbook accuracy), follow [§
 | **File paths** | Every `bridge/*.py` etc. referenced in docs → `os.path.exists()` | File moved, renamed, or deleted |
 | **Cross-file invariants** | Defined invariants (e.g. "H4 lookback in ict_pipeline.py == in live_executor_adapter.py") | Values drifted between files |
 | **Position cap consistency** | `BRIDGE_MAX_POSITIONS` in code, default in PaperExecutor, count in rules.json human description | Drift between code and human-readable docs |
+| **KB schema conformance** | Every ICT concept card matches `bridge/strategy_knowledge/ict_concepts/SCHEMA.md` (required fields, no deprecated fields, no orphan files); reports stub count for INTEGRATION_BACKLOG progress | Card violates schema or new orphan exists; stub count = visible track-2 progress |
 | **Suspicious "pending" language** | Files with `proper fix pending`, `needs to be`, `TODO:` and last-modified > 14 days ago | Likely stale claim that something is undone when it's actually shipped |
 | **Old verification dates** | Memory entries with `verified <date>` or `as of <date>` > 30 days old | Claim may no longer be true; prompt re-verify |
 | **MEMORY.md broken links** | Every `./*.md` link in MEMORY.md → file exists | Renamed or deleted memory file |

@@ -13,6 +13,15 @@
     "power_of_three_and_AMD (CBDR IS pre-accumulation — the reset before Asian accumulation)",
     "asian_range (Asian range typically contains or extends CBDR)"
   ],
+  "bridge_integration": {
+    "trending_conviction": "CBDR width < 30% of ADR = tight range = compression = trending day expected. Assign higher conviction (+10 points) to directional trades.",
+    "ranging_conviction": "CBDR width > 60% of ADR = wide CBDR = already distributed = ranging day likely. Reduce position size, lower conviction.",
+    "sweep_direction": "Always confirm which side of CBDR was swept first (London manipulation). The sweep direction tells you which 1 SD projection is the false move and which is the real target.",
+    "adr_comparison": "ADR = Average Daily Range (20-day). CBR/ADR ratio is the key filter for day type classification."
+  },
+  "common_mistakes": [
+    "Using CBDR projections without confirming the sweep direction with London or NY price action. The projection alone does not tell you which direction — the SWEEP tells you direction, the SD levels tell you targets."
+  ],
   "time_window": {
     "start": "2:00 PM New York time",
     "end": "8:00 PM New York time",
@@ -49,12 +58,5 @@
     "trending_day": "If London breaks ABOVE CBDR High + 1 SD, the day is likely trending bullish. Look for continuation entries on pullbacks to 1 SD level.",
     "ranging_day": "If London/NY price remains CONTAINED within 1 SD of CBDR, a ranging day is expected. Fade extremes, target the opposite CBDR boundary.",
     "reversal_signal": "If price reaches 2 SD during London, expect mean reversion toward CBDR range during NY session."
-  },
-  "bridge_usage": {
-    "trending_conviction": "CBDR width < 30% of ADR = tight range = compression = trending day expected. Assign higher conviction (+10 points) to directional trades.",
-    "ranging_conviction": "CBDR width > 60% of ADR = wide CBDR = already distributed = ranging day likely. Reduce position size, lower conviction.",
-    "sweep_direction": "Always confirm which side of CBDR was swept first (London manipulation). The sweep direction tells you which 1 SD projection is the false move and which is the real target.",
-    "adr_comparison": "ADR = Average Daily Range (20-day). CBR/ADR ratio is the key filter for day type classification."
-  },
-  "common_mistake": "Using CBDR projections without confirming the sweep direction with London or NY price action. The projection alone does not tell you which direction — the SWEEP tells you direction, the SD levels tell you targets."
+  }
 }

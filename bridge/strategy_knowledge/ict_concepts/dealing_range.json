@@ -14,6 +14,7 @@
     "market_structure (structure creates the swings that bound the range)",
     "PO3 (daily dealing range follows the PO3 pattern)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "components": {
     "range_high": "The swing high — also BSL (buy-side liquidity target)",
     "range_low": "The swing low — also SSL (sell-side liquidity target)",

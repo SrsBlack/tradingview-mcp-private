@@ -14,6 +14,12 @@
     "power_of_three_and_AMD (judas swing IS the manipulation phase of PO3)",
     "turtle_soup (turtle soup can be the judas swing's reversal pattern)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
+  "common_mistakes": [
+    "1. Entering DURING the Judas swing in the direction of the initial move — waiting for reversal confirmation is mandatory.",
+    "2. Trading a Judas swing that goes against the HTF daily bias — Judas swings should fade toward the bias direction, not against it.",
+    "3. Calling every pullback or minor sweep a 'Judas swing' — the concept requires a session-open timing context and a specific identifiable level being swept."
+  ],
   "pattern": "First 30-60 minutes of London or NY: price makes convincing move in one direction, sweeps key level, then reverses.",
   "how_to_distinguish": [
     "Moderate volume (institutions trapping, not pushing)",
@@ -43,11 +49,6 @@
     "6. TP = opposite session level. If sweep was PDL, target PDH area. If sweep was Asian low, target Asian high or PDH."
   ],
   "rr_expectations": "Judas swing setups typically offer 3:1 to 5:1 R:R because entry is positioned near the structural extreme (the sweep low/high). This is among the highest R:R ICT setups when properly identified.",
-  "common_mistakes": [
-    "1. Entering DURING the Judas swing in the direction of the initial move — waiting for reversal confirmation is mandatory.",
-    "2. Trading a Judas swing that goes against the HTF daily bias — Judas swings should fade toward the bias direction, not against it.",
-    "3. Calling every pullback or minor sweep a 'Judas swing' — the concept requires a session-open timing context and a specific identifiable level being swept."
-  ],
   "session_specific_behavior": {
     "london": "London Judas tends to sweep Asian session levels (Asian high or Asian low). This is the most reliable Judas timing.",
     "new_york": "NY Judas tends to sweep London session levels or PDH/PDL. The 9:30–10:00 AM ET window is the primary NY Judas zone.",

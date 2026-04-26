@@ -14,6 +14,7 @@
     "power_of_three_and_AMD (each profile corresponds to a PO3 pattern)",
     "daily_bias (profile confirms or contradicts bias)"
   ],
+  "bridge_integration": "After 10:30 AM ET, classify the day profile. If delayed → only analyze setups during NY Silver Bullet window (10:00–11:00 AM ET). If ranging → reduce max open positions from 3 to 1 and require Grade A confluence minimum. Profile classification overrides default session entry logic.",
   "types": {
     "london_normal_buy": "London sweeps Asian low (takes SSL) → reverses bullish → NY continues bullish. Classic PO3: Asian=accumulation, London sweep=manipulation, NY=distribution up.",
     "london_normal_sell": "London sweeps Asian high (takes BSL) → reverses bearish → NY continues bearish. Mirror of buy day.",
@@ -60,6 +61,5 @@
     "ranging": "Avoid standard setups. If trading, micro-scalp only within established range. Do not attempt swing entries."
   },
   "failure_mode": "If a London Normal setup triggers but price reverses against the trade after the initial move, this becomes a 'whipsaw day'. The profile mislabeled, or manipulation extended. Do not re-enter in the same direction. Avoid the rest of the session or wait for next kill zone with fresh context.",
-  "bridge_usage": "After 10:30 AM ET, classify the day profile. If delayed → only analyze setups during NY Silver Bullet window (10:00–11:00 AM ET). If ranging → reduce max open positions from 3 to 1 and require Grade A confluence minimum. Profile classification overrides default session entry logic.",
   "connection_to_PO3": "The profile IS PO3 applied with session-specific timing. 'London Normal' = PO3 on time. 'London Delayed' = manipulation pushed to NY. 'Ranging' = no clear PO3 cycle = don't trade."
 }

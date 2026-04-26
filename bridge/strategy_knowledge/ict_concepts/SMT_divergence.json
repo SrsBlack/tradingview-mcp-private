@@ -13,6 +13,17 @@
     "liquidity_sweep (SMT validates the sweep)",
     "power_of_three_and_AMD (SMT confirms manipulation phase)"
   ],
+  "bridge_integration": {
+    "detection": "detect_smt_divergence() checks correlated pairs defined in SMT_PAIRS. Compares swing highs/lows on matching timeframes.",
+    "prompt_display": "smt_score (0-8) in SCORE BREAKDOWN. Concept card injected when smt_score > 0.",
+    "score_impact": "SMT adds up to 8 points. Sweep + SMT synergy adds +8 bonus via cross_correlations. SMT is the confirmation that makes a sweep trade highest-conviction.",
+    "pairs_computed": "BTC/ETH, EUR/GBP, XAU/XAG, US500/US100 — defined in SMT_PAIRS config."
+  },
+  "common_mistakes": [
+    "1. Using uncorrelated pairs as SMT. EURUSD vs XAUUSD is not a direct SMT pair — their correlation is indirect and context-dependent.",
+    "2. Comparing different timeframes across the two instruments. Always use matching timeframes.",
+    "3. Treating every minor divergence as SMT — the concept requires swing-level structural disagreement, not tick-level or 1-minute noise."
+  ],
   "how_it_works": "ES makes new low but NQ doesn't → smart money is not uniformly bearish → the low is likely manipulation.",
   "pairs": {
     "indices": "ES ↔ NQ (US500 ↔ US100)",
@@ -71,17 +82,5 @@
   },
   "timeframe_rule": "Use the same timeframe for both instruments when assessing SMT. M15 for intraday sessions, H4 for swing-level analysis. Do NOT compare M15 on one instrument with H1 on another — mismatched timeframes produce false divergences.",
   "session_validity": "SMT is valid for the current session only. A London session SMT does not carry into the NY session — each session resets the structural context. Reassess SMT at each session open.",
-  "bridge_usage": "When a liquidity sweep is detected on the primary symbol, check the correlated instrument for SMT divergence. If SMT is confirmed → add the appropriate confluence points to the setup grade. If correlated instrument data is unavailable → proceed without SMT but flag lower confidence in the signal. SMT confirmation can elevate a Grade B setup to Grade A when combined with other confluences.",
-  "common_mistakes": [
-    "1. Using uncorrelated pairs as SMT. EURUSD vs XAUUSD is not a direct SMT pair — their correlation is indirect and context-dependent.",
-    "2. Comparing different timeframes across the two instruments. Always use matching timeframes.",
-    "3. Treating every minor divergence as SMT — the concept requires swing-level structural disagreement, not tick-level or 1-minute noise."
-  ],
-  "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence.",
-  "bridge_integration": {
-    "detection": "detect_smt_divergence() checks correlated pairs defined in SMT_PAIRS. Compares swing highs/lows on matching timeframes.",
-    "prompt_display": "smt_score (0-8) in SCORE BREAKDOWN. Concept card injected when smt_score > 0.",
-    "score_impact": "SMT adds up to 8 points. Sweep + SMT synergy adds +8 bonus via cross_correlations. SMT is the confirmation that makes a sweep trade highest-conviction.",
-    "pairs_computed": "BTC/ETH, EUR/GBP, XAU/XAG, US500/US100 — defined in SMT_PAIRS config."
-  }
+  "role_in_chain": "SMT is the CONFIRMATION at layer 3. It answers: 'Was the sweep in step 5 really manipulation?' If SMT confirms → highest conviction. If no SMT data → still tradeable but lower confidence."
 }

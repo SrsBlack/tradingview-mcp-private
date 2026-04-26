@@ -13,6 +13,10 @@
     "power_of_three_and_AMD (daily candle PO3: open=accumulation, wick=manipulation, close=distribution)",
     "dealing_range (CRT IS dealing_range at candle level)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
+  "common_mistakes": [
+    "Expecting BOTH extremes to be swept in one session. The algorithm typically sweeps only ONE side per candle cycle. If the high is taken first, expect the low to be the target — do not wait for both sweeps before entering."
+  ],
   "fractal_application": {
     "definition": "Every timeframe's candle is a complete dealing range. CRT applies identically across all timeframes — the rules do not change, only the scale.",
     "daily_candle": "PDH = BSL target. PDL = SSL target. 50% = equilibrium for current day. Once one extreme is swept, the opposite extreme becomes the draw.",
@@ -53,6 +57,5 @@
     "example_bullish": "After PDH is swept (BSL taken with a wick above), price reverses. PDL becomes the SSL target (draw). Enter long on displacement after the PDH sweep.",
     "example_bearish": "After PDL is swept (SSL taken), PDH becomes the BSL target. Enter short on displacement after the PDL sweep."
   },
-  "common_mistake": "Expecting BOTH extremes to be swept in one session. The algorithm typically sweeps only ONE side per candle cycle. If the high is taken first, expect the low to be the target — do not wait for both sweeps before entering.",
   "connection": "CRT_candle_range_theory is dealing_range + liquidity + PO3 applied fractally to every single candle. It unifies these three concepts at the smallest scale."
 }

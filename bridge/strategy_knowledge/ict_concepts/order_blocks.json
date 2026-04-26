@@ -17,6 +17,7 @@
     "breaker_blocks (failed OB becomes breaker)",
     "premium_discount (OB must be in correct zone)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "bullish_OB": "Last bearish candle before strong bullish displacement. Body (not wicks) = the zone.",
   "bearish_OB": "Last bullish candle before strong bearish displacement. Body = the zone.",
   "quality_chain": {

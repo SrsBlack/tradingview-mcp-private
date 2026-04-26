@@ -7,14 +7,35 @@
     "draw_on_liquidity (TP targets are DOL levels)",
     "entry_models (grade determines risk percentage)"
   ],
-
+  "feeds_into": [],
+  "bridge_integration": {
+    "partial_close_pct": "Default 0.5 (50% at TP1). Configurable per trade in TradeDecision.",
+    "trailing_sl_field": "PaperPosition.trailing_sl updated by position_manager on each price check",
+    "kill_switch_threshold": "2% daily loss triggers KillSwitchState.triggered = True"
+  },
   "position_sizing": {
     "rule": "Risk fixed percentage per trade, adjusted by grade. NEVER fixed dollar amount.",
     "grade_risk_table": {
-      "grade_A": { "risk_pct": 1.0, "max_positions": 3, "note": "Full conviction — all layers aligned" },
-      "grade_B": { "risk_pct": 0.5, "max_positions": 2, "note": "Missing 1-2 non-critical elements" },
-      "grade_C": { "risk_pct": 0.25, "max_positions": 1, "note": "Paper only unless exceptional setup" },
-      "grade_D": { "risk_pct": 0, "max_positions": 0, "note": "Do not trade" }
+      "grade_A": {
+        "risk_pct": 1.0,
+        "max_positions": 3,
+        "note": "Full conviction — all layers aligned"
+      },
+      "grade_B": {
+        "risk_pct": 0.5,
+        "max_positions": 2,
+        "note": "Missing 1-2 non-critical elements"
+      },
+      "grade_C": {
+        "risk_pct": 0.25,
+        "max_positions": 1,
+        "note": "Paper only unless exceptional setup"
+      },
+      "grade_D": {
+        "risk_pct": 0,
+        "max_positions": 0,
+        "note": "Do not trade"
+      }
     },
     "lot_calculation": "lot_size = (balance * risk_pct) / (SL_distance_points * point_value)",
     "ftmo_rules": {
@@ -24,7 +45,6 @@
       "kill_switch": "Bridge auto-halts at 2% daily drawdown to protect FTMO limits"
     }
   },
-
   "stop_loss": {
     "placement": "Beyond the manipulation extreme (liquidity_sweep wick from step 5). Min 1.5x ATR from entry.",
     "connection": "SL is anchored to the liquidity_sweep event. If the sweep extreme is revisited, your thesis (that it was manipulation) is WRONG.",
@@ -36,7 +56,6 @@
       "crypto": "0.3-0.5% beyond structure"
     }
   },
-
   "take_profit": {
     "tp1": "draw_on_liquidity — nearest external liquidity. Partial close 50% here.",
     "tp2": "Next liquidity pool beyond TP1. Trail remaining 50%.",
@@ -46,7 +65,6 @@
       "swing": "TP1 must be >= 1.5R from entry (wider SL = needs less R)"
     }
   },
-
   "partial_close_rules": {
     "tp1_hit": {
       "action": "Close 50% of position at TP1",
@@ -62,20 +80,30 @@
       "note": "For swing trades, may hold 25% for TP3 (weekly DOL)"
     }
   },
-
   "trailing_stop_rules": {
     "method": "Structure-based trailing — NOT fixed pip/point trail",
     "sequence": [
-      { "trigger": "TP1 hit or +1R", "new_sl": "Breakeven (entry price)" },
-      { "trigger": "+1.5R", "new_sl": "+0.5R above entry" },
-      { "trigger": "+2R", "new_sl": "+1R above entry" },
-      { "trigger": "Each new +0.5R", "new_sl": "Previous R level" }
+      {
+        "trigger": "TP1 hit or +1R",
+        "new_sl": "Breakeven (entry price)"
+      },
+      {
+        "trigger": "+1.5R",
+        "new_sl": "+0.5R above entry"
+      },
+      {
+        "trigger": "+2R",
+        "new_sl": "+1R above entry"
+      },
+      {
+        "trigger": "Each new +0.5R",
+        "new_sl": "Previous R level"
+      }
     ],
     "structure_method": "Trail behind the most recent confirmed swing point (LTF for intraday, HTF for swing)",
     "never_widen": "Trailing SL only moves in favor — NEVER move SL back against direction",
     "time_based": "If position is +1R but stalling for 2+ hours during killzone, consider manual close"
   },
-
   "trade_management": {
     "breakeven": "After TP1 or 1R profit → move SL to breakeven.",
     "trailing": "After breakeven → trail 0.5R behind each new structure point.",
@@ -86,11 +114,5 @@
       "overnight_hold": "Only swing trades (4H+ timeframe) held overnight",
       "friday_rule": "Reduce position size by 50% on Fridays. Close all intraday by 3 PM ET."
     }
-  },
-
-  "bridge_integration": {
-    "partial_close_pct": "Default 0.5 (50% at TP1). Configurable per trade in TradeDecision.",
-    "trailing_sl_field": "PaperPosition.trailing_sl updated by position_manager on each price check",
-    "kill_switch_threshold": "2% daily loss triggers KillSwitchState.triggered = True"
   }
 }

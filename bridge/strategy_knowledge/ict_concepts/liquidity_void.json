@@ -14,6 +14,7 @@
     "fair_value_gaps (FVG = price gap, liquidity_void = volume gap — related but different)",
     "balanced_price_range (BPR fills voids)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "formation_conditions": {
     "primary_trigger": "Created by large single-candle moves — typically 3% or greater move on the timeframe being analyzed — accompanied by above-average volume on the displacement candle itself but ZERO volume through the gap zone.",
     "volume_signature": "The displacement candle shows 2x or greater average volume. The BODY of the candle (the void zone) shows near-zero volume on the volume profile — no orders were matched as price moved through that area.",

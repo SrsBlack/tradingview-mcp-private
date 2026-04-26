@@ -15,6 +15,7 @@
     "order_blocks (CISD candle = OB)",
     "power_of_three_and_AMD (CISD marks the transition from manipulation to distribution)"
   ],
+  "bridge_integration": "[NOT YET DEFINED — see INTEGRATION_BACKLOG.md]",
   "vs_CHoCH": "CHoCH requires a swing point to be broken. CISD fires BEFORE that — it detects the shift in candle delivery. CISD is the early warning; CHoCH is the confirmation.",
   "operational_trigger": {
     "definition": "CISD fires when all three conditions are met simultaneously:",
