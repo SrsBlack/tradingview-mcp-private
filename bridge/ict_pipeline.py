@@ -174,6 +174,14 @@ class SymbolAnalysis:
     # the legacy FVG_stack/HiddenOB proxy.
     ob_zones: list[tuple[float, float]] = field(default_factory=list)
 
+    # Liquidity voids — LVN zones (low_price, high_price) that have not been
+    # traversed by recent price action and now sit as magnets above/below the
+    # market. Voids ABOVE current price = bullish draw (price likely fills up).
+    # Voids BELOW current price = bearish draw (price likely fills down).
+    # Derived from vp_lvn_zones in step 8e7. Empty list when volume profile
+    # didn't run (df too short or all buckets had volume).
+    liquidity_voids: list[tuple[float, float]] = field(default_factory=list)
+
     # Optimal FVG entry zone (CE price for limit order targeting)
     fvg_entry_price: float = 0.0  # CE of nearest retracement FVG
     fvg_entry_zone: str = ""      # Description: "FVG 24160-24185, CE=24172"
@@ -291,6 +299,7 @@ class SymbolAnalysis:
                     "val": round(self.vp_val, 5) if self.vp_val else 0.0,
                     "hvn_count": len(self.vp_hvn_zones),
                     "lvn_count": len(self.vp_lvn_zones),
+                    "void_count": len(self.liquidity_voids),
                 },
             },
         }
@@ -838,6 +847,16 @@ class ICTPipeline:
                         result.vp_lvn_zones = [
                             (n.price - half, n.price + half) for n in vp.lvns
                         ]
+                        # Liquidity voids: LVN zones that sit clearly above or
+                        # below current price (so they act as magnets).
+                        # Zones that contain current price are already being
+                        # traversed and aren't useful "draw" targets.
+                        cp = result.current_price
+                        if cp > 0:
+                            result.liquidity_voids = [
+                                (lo, hi) for (lo, hi) in result.vp_lvn_zones
+                                if hi < cp or lo > cp
+                            ]
                 except Exception:
                     pass
 

@@ -260,6 +260,20 @@ def _select_relevant_concepts(a: Any) -> list[tuple[str, str]]:
     if "crt" in adv_factors:
         picks.append(("CRT_candle_range_theory", "Single-bar sweep of prior-bar extreme + close back inside — target = opposite extreme"))
 
+    # Liquidity voids — unfilled LVN zones above/below current price act as draws
+    voids = getattr(a, "liquidity_voids", None) or []
+    cp = getattr(a, "current_price", 0.0)
+    if voids and cp > 0:
+        above = sum(1 for (lo, hi) in voids if lo > cp)
+        below = sum(1 for (lo, hi) in voids if hi < cp)
+        if above and below:
+            hint = f"{above} void(s) above + {below} below — magnets for retracement"
+        elif above:
+            hint = f"{above} unfilled void(s) above — bullish draw target(s)"
+        else:
+            hint = f"{below} unfilled void(s) below — bearish draw target(s)"
+        picks.append(("liquidity_void", hint))
+
     # Unicorn / Venom — advanced reversal models
     if "unicorn" in confluence or "unicorn" in adv_factors:
         picks.append(("unicorn_model", "Breaker + FVG overlap = high-conviction reversal"))
