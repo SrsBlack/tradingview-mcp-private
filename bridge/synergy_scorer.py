@@ -262,22 +262,31 @@ def _has_near_sweep(a: Any) -> bool:
 
 
 def _ob_at_high_volume(a: Any) -> bool:
-    """Check if OB zone coincides with high-volume area.
+    """Check if any active OB price range overlaps an HVN bucket.
 
-    Uses ltf_analysis bar count as a proxy — if many bars formed
-    in the OB zone, volume was concentrated there (HVN).
-    This is an approximation since we don't have tick-level volume profile.
+    Uses real volume-profile data wired in 2026-04-26 (ict_pipeline.py step 8e7):
+    `ob_zones` carries active OB (bottom, top) ranges from get_active_obs, and
+    `vp_hvn_zones` carries High Volume Node (bottom, top) ranges derived from
+    bucket midpoints +/- bucket_width/2.
+
+    Two ranges overlap when bottom_a <= top_b AND top_a >= bottom_b. Any single
+    OB-HVN overlap fires the +3 'OB+HVN' synergy — institutional defense
+    confirmed by real bucketed volume, not the legacy FVG_stack/HiddenOB proxy.
+
+    Falls back to False if either list is empty (e.g. profile not built yet on
+    short df, or no active OBs).
     """
-    # Check if we have both OB and structure data
     if getattr(a, "ob_score", 0) < 10:
         return False
-    # Look for volume-related advanced factors
-    factors = getattr(a, "advanced_factors", []) or []
-    # If there's an FVG stack at the OB zone, that implies repeated institutional activity
-    has_stack = any("FVG_stack" in f for f in factors)
-    # If there's a hidden OB, that implies wick rejection at high-volume zone
-    has_hidden_ob = any("HiddenOB" in f for f in factors)
-    return has_stack or has_hidden_ob
+    ob_zones = getattr(a, "ob_zones", []) or []
+    hvn_zones = getattr(a, "vp_hvn_zones", []) or []
+    if not ob_zones or not hvn_zones:
+        return False
+    for ob_bot, ob_top in ob_zones:
+        for hvn_bot, hvn_top in hvn_zones:
+            if ob_bot <= hvn_top and ob_top >= hvn_bot:
+                return True
+    return False
 
 
 def _has_micro_smt(a: Any) -> bool:

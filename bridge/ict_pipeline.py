@@ -169,6 +169,11 @@ class SymbolAnalysis:
     vp_hvn_zones: list[tuple[float, float]] = field(default_factory=list)
     vp_lvn_zones: list[tuple[float, float]] = field(default_factory=list)
 
+    # Active OB zones on M15 — list of (bottom, top) tuples, exposed so
+    # synergy_scorer can do real OB-overlaps-HVN-bucket checks instead of
+    # the legacy FVG_stack/HiddenOB proxy.
+    ob_zones: list[tuple[float, float]] = field(default_factory=list)
+
     # Optimal FVG entry zone (CE price for limit order targeting)
     fvg_entry_price: float = 0.0  # CE of nearest retracement FVG
     fvg_entry_zone: str = ""      # Description: "FVG 24160-24185, CE=24172"
@@ -528,6 +533,15 @@ class ICTPipeline:
                     df_ob, fvgs=fvgs, swings=ltf_swings,
                     lookback=20, require_fvg=True, require_bos=False,
                 )
+                # Surface active OB price ranges for downstream synergy checks
+                # (OB-overlaps-HVN, etc). Stored as (bottom, top) tuples.
+                try:
+                    active_obs = get_active_obs(obs)
+                    result.ob_zones = [
+                        (float(ob.bottom), float(ob.top)) for ob in active_obs
+                    ]
+                except Exception:
+                    pass
 
             # -- Step 5: Liquidity detection --
             sweeps: list[LiquiditySweep] = []
