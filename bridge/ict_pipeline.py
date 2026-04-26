@@ -889,9 +889,35 @@ class ICTPipeline:
                         cbdr_range_pips=cbdr_pips,
                     )
                     result.advanced_score = adv.advanced_score
-                    # Add advanced findings as confluence factors
+
+                    # Multi-TF CRT detection: extend beyond M15-only to D1 + H4 fractal sweeps.
+                    # run_advanced_analysis() already populated adv.crt_setups with M15
+                    # (default tf_label="M15"). Add D1 and H4 setups by calling detect_crt
+                    # explicitly on the higher-TF dataframes already collected at step 1.
+                    try:
+                        from analysis.ict.advanced import detect_crt as _detect_crt_mtf
+                        df_d1_crt = df_d1.iloc[:-1] if df_d1 is not None and len(df_d1) > 5 else None
+                        if df_d1_crt is not None and len(df_d1_crt) >= 3:
+                            d1_setups = _detect_crt_mtf(df_d1_crt, lookback=1, tf_label="D1")
+                            if d1_setups:
+                                adv.crt_setups.extend(d1_setups)
+                        if df_htf_closed is not None and len(df_htf_closed) >= 3:
+                            h4_setups = _detect_crt_mtf(df_htf_closed, lookback=1, tf_label="H4")
+                            if h4_setups:
+                                adv.crt_setups.extend(h4_setups)
+                    except Exception as e:
+                        print(f"  [{symbol}] Multi-TF CRT detection error: {e}", flush=True)
+
+                    # Add advanced findings as confluence factors — CRT now per-TF
                     if adv.crt_setups:
-                        result.advanced_factors.append(f"CRT({len(adv.crt_setups)})")
+                        crt_by_tf: dict[str, int] = {}
+                        for s in adv.crt_setups:
+                            tf = getattr(s, "tf_label", "M15")
+                            crt_by_tf[tf] = crt_by_tf.get(tf, 0) + 1
+                        for tf in ("D1", "H4", "M15"):
+                            n = crt_by_tf.get(tf, 0)
+                            if n > 0:
+                                result.advanced_factors.append(f"CRT_{tf}({n})")
                     if adv.turtle_soups:
                         result.advanced_factors.append(f"TurtleSoup({len(adv.turtle_soups)})")
                     if adv.unicorn_zones:

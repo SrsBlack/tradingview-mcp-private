@@ -256,9 +256,26 @@ def _select_relevant_concepts(a: Any) -> list[tuple[str, str]]:
     if "turtle" in confluence or "turtle" in adv_factors:
         picks.append(("turtle_soup", "Sweep+reversal = stops harvested at swing failure"))
 
-    # CRT — single-bar sweep+reversal (micro candle range theory)
-    if "crt" in adv_factors:
-        picks.append(("CRT_candle_range_theory", "Single-bar sweep of prior-bar extreme + close back inside — target = opposite extreme"))
+    # CRT — multi-TF sweep+reversal (Candle Range Theory). Hint is differentiated
+    # by highest TF firing: D1 = major reversal, H4 = swing-tradable, M15 = intrabar.
+    if "crt_d1" in adv_factors:
+        picks.append((
+            "CRT_candle_range_theory",
+            "Daily CRT — sweep of prior-day extreme + close back inside daily range. "
+            "Major reversal signal; target = opposite daily extreme.",
+        ))
+    elif "crt_h4" in adv_factors:
+        picks.append((
+            "CRT_candle_range_theory",
+            "H4 CRT — sweep of prior-H4 extreme + close back inside. "
+            "Swing-tradable reversal; target = opposite H4 extreme.",
+        ))
+    elif "crt_m15" in adv_factors or "crt(" in adv_factors:
+        picks.append((
+            "CRT_candle_range_theory",
+            "M15 CRT — single-bar sweep of prior-bar extreme + close back inside. "
+            "Intrabar confluence; target = opposite extreme.",
+        ))
 
     # Liquidity voids — unfilled LVN zones above/below current price act as draws
     voids = getattr(a, "liquidity_voids", None) or []
