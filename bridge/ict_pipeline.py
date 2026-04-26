@@ -371,6 +371,10 @@ class ICTPipeline:
             df_htf_closed = df_htf.iloc[:-1] if (df_htf is not None and len(df_htf) > 20) else df_htf
             df_structure = df_htf_closed if (df_htf_closed is not None and len(df_htf_closed) >= 20) else df_primary
 
+            # H4 swing lookback = 5. KEEP IN SYNC with bridge/live_executor_adapter.py
+            # _get_tf_bias `tf_config["H4"]` — entry and exit must compute bias on
+            # identical swings, otherwise a trade entered as BULLISH can be killed
+            # as BEARISH 30 minutes later by a different lookback.
             swings = detect_swings(df_structure, lookback=5)
             labeled_swings, structure_events = classify_structure(swings, df=df_structure)
             htf_bias = get_current_bias(structure_events)
@@ -432,6 +436,8 @@ class ICTPipeline:
                     df_daily = _resample_ohlcv(df_htf_closed, 'D')  # fallback
 
                 if df_daily is not None and len(df_daily) >= 10:
+                    # D1 swing lookback = 3. KEEP IN SYNC with bridge/live_executor_adapter.py
+                    # _get_tf_bias `tf_config["D1"]`.
                     d1_swings = detect_swings(df_daily, lookback=3)
                     _, d1_events = classify_structure(d1_swings)
                     d1_bias = get_current_bias(d1_events)
@@ -448,6 +454,8 @@ class ICTPipeline:
                     df_weekly = _resample_ohlcv(df_htf_closed, 'W')  # fallback
 
                 if df_weekly is not None and len(df_weekly) >= 4:
+                    # W1 swing lookback = 2. KEEP IN SYNC with bridge/live_executor_adapter.py
+                    # _get_tf_bias `tf_config["W1"]`.
                     w1_swings = detect_swings(df_weekly, lookback=2)
                     _, w1_events = classify_structure(w1_swings)
                     w1_bias = get_current_bias(w1_events)

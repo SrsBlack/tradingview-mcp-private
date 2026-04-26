@@ -1054,7 +1054,14 @@ class LiveExecutorAdapter:
             from analysis.structure import detect_swings, classify_structure, get_current_bias
             from core.types import Direction
 
-            # Per-TF tuning matches ict_pipeline.py:435 (D1 lookback=3) and 451 (W1 lookback=2)
+            # Per-TF lookback values MUST stay in sync with bridge/ict_pipeline.py:
+            #   H4 lookback=5 (ict_pipeline.py around line 374)
+            #   D1 lookback=3 (around line 439)
+            #   W1 lookback=2 (around line 455)
+            # If you change any here, change it there too — entry and exit must
+            # compute bias on identical swings, otherwise a trade entered as
+            # BULLISH can be killed as BEARISH 30 minutes later by mismatched
+            # swing detection. (3-tuple = (mt5 timeframe enum, bar count, lookback))
             tf_config = {
                 "H4": (mt5.TIMEFRAME_H4, 100, 5),  # ~17 days
                 "D1": (mt5.TIMEFRAME_D1, 60,  3),  # ~2 months
