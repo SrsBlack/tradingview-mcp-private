@@ -23,7 +23,7 @@ When this backlog is empty, tighten the lint to reject `[NOT YET DEFINED` marker
 
 ---
 
-## Stubs to fill in (18 cards as of 2026-04-26)
+## Stubs to fill in (13 cards as of 2026-04-26)
 
 Suggested priority order: high-impact concepts first, since these get injected into Claude prompts most often.
 
@@ -31,14 +31,17 @@ Suggested priority order: high-impact concepts first, since these get injected i
 
 | Card | Layer | Why high priority |
 |------|-------|-------------------|
-| `fair_value_gaps` | 4 | Core entry zone concept; used in nearly every Grade A signal |
-| `order_blocks` | 4 | Same — second pillar of OB+FVG entry stacking |
-| `liquidity` | 1 | Foundational; sweeps drive every ICT setup |
 | `market_structure` (already filled? confirm) | 1 | Pre-trade bias depends on this. **Verify it's not in the stub list — if it is, prioritize.** |
-| `power_of_three_and_AMD` | 2 | Accumulation/manipulation/distribution timing — `claude_decision.py` references this |
-| `sessions_and_kill_zones` | 2 | Hard gate in pre-gate logic |
 | `session_levels` | 1 | PDH/PDL/PWH/PWL — used as DOL targets |
 | `judas_swing` | 3 | Manipulation phase detection |
+
+### Completed 2026-04-26 (Track 2 batch 1)
+
+- `fair_value_gaps` — already integrated. M15 detection drives 15-pt scoring; H4 closed-bar detection feeds HTF FVG obstacle gate (-5) + Claude prompt warning; D1 FVG advanced_factors; FVG-CE entry pricing.
+- `order_blocks` — already integrated. M15 detection with require_fvg=True (displacement enforcement); 15-pt scoring; OB+FVG synergy +10; HiddenOB → OB-at-HVN +3; breaker_blocks NOT detected in code (informational).
+- `liquidity` — already integrated. build_liquidity_map + scan_sweeps with significance filter; 20-pt scoring; DOL pre-filter (4x ATR rule) hard SKIP; equal levels + opposing-sweep post-gate.
+- `power_of_three_and_AMD` — already integrated. detect_po3_phase per cycle; advanced_factor 'PO3_<phase>'; always-injected concept; Wyckoff/PO3 alignment synergy +4. Daily/weekly PO3 patterns informational only.
+- `sessions_and_kill_zones` — already integrated. SessionInfo at start of each cycle; 10-pt scoring; KILL ZONE GATE hard pre-gate with crypto/JPY-Tokyo/Grade-A-displacement exceptions; phrase gates removed (caught winner).
 
 ### Medium priority — meta-cards
 
