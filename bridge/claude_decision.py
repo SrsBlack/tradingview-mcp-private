@@ -879,6 +879,16 @@ If the setup is not convincing, use "SKIP" for action."""
         if fib_tp:
             fib_line = f"\n- Fib Extension TPs: 1.272={fib_tp[0]:,.2f}, 1.618={fib_tp[1]:,.2f}, 2.0={fib_tp[2]:,.2f}, 2.618={fib_tp[3]:,.2f}"
 
+        # Volume profile (POC/VAH/VAL + node counts on M15)
+        vp_line = ""
+        vp_poc = getattr(a, "vp_poc", 0.0)
+        if vp_poc:
+            vp_vah = getattr(a, "vp_vah", 0.0)
+            vp_val = getattr(a, "vp_val", 0.0)
+            vp_hvn = len(getattr(a, "vp_hvn_zones", []) or [])
+            vp_lvn = len(getattr(a, "vp_lvn_zones", []) or [])
+            vp_line = f"\n- VolumeProfile: POC={vp_poc:,.2f} VA=[{vp_val:,.2f}-{vp_vah:,.2f}] HVNs={vp_hvn} LVNs={vp_lvn}"
+
         # Advanced ICT context
         adv_line = ""
         adv_factors = getattr(a, "advanced_factors", [])
@@ -986,7 +996,7 @@ If the setup is not convincing, use "SKIP" for action."""
 - Confluence: {', '.join(a.confluence_factors) if a.confluence_factors else 'None'}
 - Session: {a.session_type} | Kill Zone: {a.is_kill_zone} | Silver Bullet: {a.is_silver_bullet}
 - P/D Zone (M15): {a.pd_zone or 'unknown'} | Aligned: {a.pd_aligned}{htf_pd_line}
-- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}{fib_line}{adv_line}{judas_line}{asian_line}{opens_line}{ipda_line}{qshift_line}{htf_fvg_line}{pullback_line}{mtf_line}{fvg_entry_line}{intermarket_line}{news_line}
+- Displacement: {'CONFIRMED (sweep + FVG reversal)' if a.displacement_confirmed else 'NOT CONFIRMED'}{ea_line}{atr_line}{fib_line}{vp_line}{adv_line}{judas_line}{asian_line}{opens_line}{ipda_line}{qshift_line}{htf_fvg_line}{pullback_line}{mtf_line}{fvg_entry_line}{intermarket_line}{news_line}
 
 SCORE BREAKDOWN (sub-scores are additive \u2014 0 in one component does NOT disqualify):
 - Structure: {a.structure_score:.0f}/30{' (strong)' if a.structure_score >= 20 else ' (partial)' if a.structure_score >= 10 else ' (weak)'}

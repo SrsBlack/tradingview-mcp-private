@@ -67,6 +67,7 @@ from analysis.ict.scorer import score_ict_setup, ICTScoreBreakdown, get_pd_zone,
 from analysis.ict.core import detect_cisd, get_latest_cisd, detect_po3_phase, PO3Phase, detect_judas_swing, JudasSwing
 from analysis.ict.advanced import run_advanced_analysis, AdvancedAnalysis, detect_market_maker_model, detect_suspension_blocks, get_quarterly_bias
 from analysis.sessions import get_asian_range, get_ndog, get_cbdr, get_midnight_range, get_weekly_bias, is_seek_and_destroy
+from analysis.volume_profile import build_volume_profile
 from core.types import Direction, SignalGrade, FVGQuality
 
 
@@ -157,6 +158,16 @@ class SymbolAnalysis:
     cbdr_range: tuple[float, float] | None = None
     advanced_score: float = 0.0
     advanced_factors: list[str] = field(default_factory=list)
+
+    # Volume profile (POC/VAH/VAL/HVN/LVN on M15 — wired 2026-04-26).
+    # vp_hvn_zones / vp_lvn_zones are list of (low_price, high_price) tuples
+    # derived from VolumeNode midpoints +/- bucket_width/2 so overlap checks
+    # can use simple range arithmetic.
+    vp_poc: float = 0.0
+    vp_vah: float = 0.0
+    vp_val: float = 0.0
+    vp_hvn_zones: list[tuple[float, float]] = field(default_factory=list)
+    vp_lvn_zones: list[tuple[float, float]] = field(default_factory=list)
 
     # Optimal FVG entry zone (CE price for limit order targeting)
     fvg_entry_price: float = 0.0  # CE of nearest retracement FVG
@@ -269,6 +280,13 @@ class SymbolAnalysis:
                 "vix_risk_multiplier": self.vix_risk_multiplier,
                 "news_blackout": self.news_blackout,
                 "news_event": self.news_event,
+                "volume_profile": {
+                    "poc": round(self.vp_poc, 5) if self.vp_poc else 0.0,
+                    "vah": round(self.vp_vah, 5) if self.vp_vah else 0.0,
+                    "val": round(self.vp_val, 5) if self.vp_val else 0.0,
+                    "hvn_count": len(self.vp_hvn_zones),
+                    "lvn_count": len(self.vp_lvn_zones),
+                },
             },
         }
         if self.error:
@@ -779,6 +797,33 @@ class ICTPipeline:
                     cbdr_data = get_cbdr(df_primary)
                     if cbdr_data:
                         result.cbdr_range = cbdr_data
+                except Exception:
+                    pass
+
+            # -- Step 8e7: Volume profile (POC/VAH/VAL + HVN/LVN zones on M15).
+            # Window: last 96 M15 bars (~24h). 30 buckets = default.
+            # Zones are converted from bucket midpoints to (low, high) tuples
+            # using bucket_width = (price_max - price_min) / buckets so that
+            # overlap checks (OB-at-HVN, void-detection) use range arithmetic.
+            if df_primary is not None and len(df_primary) >= 20:
+                try:
+                    vp_window = df_primary.iloc[-96:] if len(df_primary) >= 96 else df_primary
+                    vp_buckets = 30
+                    vp = build_volume_profile(vp_window, buckets=vp_buckets)
+                    if vp is not None:
+                        vp_price_min = float(vp_window["low"].min())
+                        vp_price_max = float(vp_window["high"].max())
+                        vp_bucket_width = (vp_price_max - vp_price_min) / vp_buckets
+                        half = vp_bucket_width / 2.0
+                        result.vp_poc = vp.poc
+                        result.vp_vah = vp.vah
+                        result.vp_val = vp.val
+                        result.vp_hvn_zones = [
+                            (n.price - half, n.price + half) for n in vp.hvns
+                        ]
+                        result.vp_lvn_zones = [
+                            (n.price - half, n.price + half) for n in vp.lvns
+                        ]
                 except Exception:
                     pass
 
