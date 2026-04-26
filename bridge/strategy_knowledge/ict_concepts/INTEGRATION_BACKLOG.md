@@ -72,7 +72,7 @@ Suggested priority order: high-impact concepts first, since these get injected i
 ### Findings surfaced during batch 4 (NOT yet acted on)
 
 1. **CRT injector trigger missing** — concept_injector.py:240-279 has triggers for `cisd`, `breaker`, `turtle`, `unicorn`, `venom`, `mm_/mmbm/mmsm` advanced_factors, but NO trigger for `crt` despite `CRT(N)` being the most commonly-emitted advanced_factor on M15. Adding `if "crt" in adv_factors: picks.append(("CRT_candle_range_theory", "Single-bar sweep+reversal — micro CRT setup"))` would surface the methodology to Claude when it fires. **RESOLVED 2026-04-26 in commit c09ca81.**
-2. **CRT lookback is hardcoded to 1** — only single-bar CRTs are detected. The card's daily/weekly/session-fractal applications would need separate calls with `lookback={N for daily, M for weekly}` against the relevant-timeframe df. Open design question whether the M15-lookback=1 detector is sufficient or if multi-timeframe CRT detection is needed.
+2. **CRT lookback is hardcoded to 1** — only single-bar CRTs are detected. The card's daily/weekly/session-fractal applications would need separate calls with `lookback={N for daily, M for weekly}` against the relevant-timeframe df. Open design question whether the M15-lookback=1 detector is sufficient or if multi-timeframe CRT detection is needed. **RESOLVED 2026-04-26 in commits 82f8f51, 9c1be34, b32476a (see "Completed 2026-04-26 (multi-TF CRT)" section below).**
 3. **Volume-profile wiring is the prerequisite for liquidity_void** — see batch 3 finding #1. The two cards' integration status is paired; both unblock together when build_volume_profile is wired into ict_pipeline. **RESOLVED 2026-04-26 in commits ec29820, 7cb3319, a9f753d (see "Completed 2026-04-26 (volume-profile follow-up)" section below).**
 
 ---
@@ -95,6 +95,25 @@ Net effect: volume_profile.json bridge_integration moves from ASPIRATIONAL to RE
 4. **Value-area pct fixed at 70%** — not exposed as config. If different markets need different VA widths, plumb through.
 5. **Void-as-TP / SL-on-other-side-of-void NOT enforced** — voids surface as prompt context only, not as hard checks against entry/SL placement. Conservative first integration; tighten when there's evidence of misuse.
 6. **OB-at-LVN suspicion rule NOT yet enforced** — cross_correlations rule 'OB at LVN = reduce conviction' is still documentation. Could become a -2 anti-synergy alongside the +3 OB+HVN if backtests show the asymmetry.
+
+---
+
+## Completed 2026-04-26 (multi-TF CRT — Track 2 batch 4 finding #2)
+
+Three commits closed the M15-only CRT gap:
+
+- **`82f8f51` — feat(ict): multi-TF CRT detection (D1/H4/M15) with tf_label tagging.** `analysis.ict.advanced.detect_crt` (trading-ai-v2) gains a `tf_label: str = "M15"` parameter; `CRTSetup` gains a matching `tf_label` field. The bridge (`bridge/ict_pipeline.py` step 8f) now calls `detect_crt` explicitly on `df_d1[:-1]` and `df_htf_closed` using already-collected dataframes (no new fetches), appending tagged setups onto `adv.crt_setups`. Factor emission switches from generic `CRT(N)` to per-TF `CRT_D1(N)` / `CRT_H4(N)` / `CRT_M15(N)`. `concept_injector.py` differentiates hints by highest-TF firing — D1="major reversal", H4="swing-tradable", M15="intrabar". Note: the `analysis/ict/advanced.py` change lives in `trading-ai-v2` (still on initial commit baseline; the file has 245 unrelated uncommitted lines from prior sessions). The CRT changes are 5 small edits buried in that diff — kept on disk as untracked WIP. Runtime behavior is unaffected.
+- **`9c1be34` — feat(score): per-TF CRT weighting (D1=+4, H4=+3, M15=+2, cap=+10) — backtest-validated.** Replaces the flat +2.5/factor cap=+10 advanced-bonus formula with per-TF weighting for CRT factors. Other advanced_factors keep +2.5. Backtest harness (`scripts/bench_multi_tf_crt.py`, 1260 cycles across XAUUSD/EURUSD/GBPUSD/BTCUSD/ETHUSD): mean delta vs old formula is +0.00 when baseline >=3 non-CRT factors (cap binds either way) and +1.48 when baseline=0 — both within the +/-2.0 ship gate.
+- **`b32476a` — feat(synergy): MultiTF_CRT +5 when D1 and H4 CRT both fire.** New synergy in `synergy_scorer._SYNERGY_CHECKS` predicated on `_multi_tf_crt` (substring match on lowercased advanced_factors for "crt_d1" AND "crt_h4"). Backtest harness (`scripts/bench_multi_tf_synergy.py`, 1220 fresh-setup cycles) showed D1+H4 alignment fires in 7.3% of cycles — sweet spot for a +5 conviction premium (rare enough not to be flat inflation, common enough to actually trigger).
+
+Net effect: CRT moves from M15-single-bar to fractal D1/H4/M15 detection, the score formula correctly weights conviction by timeframe, and the +5 MultiTF_CRT synergy explicitly rewards the card's "fractal alignment" framing. CRT_candle_range_theory.json bridge_integration text rewritten with new file:line citations and decision rationale.
+
+### Findings surfaced during multi-TF CRT (NOT yet acted on)
+
+1. **Weekly CRT not detected** — PWH/PWL sweep+reversal at the W1 level would fit the same `detect_crt(df_weekly[:-1], lookback=1, tf_label="W1")` pattern. Defer because weekly bars are slow to form, signal is rare, and Phase 4 already covers the highest-conviction case (D1+H4).
+2. **Session-candle-as-CRT not detected** — Asian/London/NY explicit fractal (Asian range = accum, London = manip, NY = distrib) is captured implicitly via SessionInfo + KILL ZONE GATE but no `detect_session_crt` engine exists.
+3. **Mon/Wed/Thu daily PO3 not enforced** — the card's "Wednesday is the manipulation day" framing isn't gated. Could become a soft +2 confluence factor on Wednesday closes that sweep Monday's range, but needs evidence basis first.
+4. **No D1-CRT counter-trend gate** — counter-D1-CRT trades (e.g. shorting after a bullish D1 CRT) are not blocked. Bigger behavioral change; defer until a backtest shows asymmetry.
 
 ---
 
