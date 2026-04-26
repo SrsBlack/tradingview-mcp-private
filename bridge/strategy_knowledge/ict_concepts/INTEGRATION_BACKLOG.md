@@ -90,7 +90,7 @@ Net effect: volume_profile.json bridge_integration moves from ASPIRATIONAL to RE
 ### Findings surfaced during volume-profile follow-up (NOT yet acted on)
 
 1. **No POC/VAH/VAL proximity trigger** — concept_injector currently does not auto-inject the volume_profile card when current_price is within tolerance of POC/VAH/VAL. The prompt line gives Claude the coordinates; the methodological card is reachable only via dependency walker. If Claude is observed misinterpreting POC/VA dynamics, add an explicit trigger.
-2. **No caching** — build_volume_profile recomputes every cycle. Fast on 96 bars x 30 buckets but worth profiling if symbol count grows.
+2. ~~**No caching**~~ — **RESOLVED 2026-04-26 (perf-check, no commit).** Profiled `build_volume_profile` on the 7-symbol cached workload (96 M15 bars × 30 buckets, 1000 iters/symbol) via `scripts/bench_volume_profile_perf.py`; frozen output `scripts/bench_volume_profile_perf_2026-04-26.txt`. Per-call mean 56–61 µs, per-cycle aggregate 0.41 ms (p95 0.51 ms) — well under the 5 ms threshold from `project_kb_next_session_prompt.md`. Hot path is `pd.Series.min/max` reduction + the bucket-assignment loop; both negligible at this scale. Decision: NO caching needed at current symbol count. Re-profile if symbol count grows past ~50.
 3. **M15-only profile** — H1/H4 volume profiles would add HTF context for swing trades but aren't computed.
 4. **Value-area pct fixed at 70%** — not exposed as config. If different markets need different VA widths, plumb through.
 5. **Void-as-TP / SL-on-other-side-of-void NOT enforced** — voids surface as prompt context only, not as hard checks against entry/SL placement. Conservative first integration; tighten when there's evidence of misuse.

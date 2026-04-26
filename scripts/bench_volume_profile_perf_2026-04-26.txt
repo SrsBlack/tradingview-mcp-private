@@ -1,0 +1,58 @@
+========================================================================
+Volume profile perf bench
+  workload: 7 symbols x 96 M15 bars x 30 buckets, 1000 iters per symbol
+========================================================================
+  [load] BTCUSD: 96 bars
+  [load] ETHUSD: 96 bars
+  [load] EURUSD: 96 bars
+  [load] GBPUSD: 96 bars
+  [load] SOLUSD: 96 bars
+  [load] US500.cash: 96 bars
+  [load] XAUUSD: 96 bars
+
+symbol            mean_us     p50_us     p95_us     max_us
+--------------------------------------------------------
+BTCUSD              57.56      55.30      63.80     725.00
+ETHUSD              56.77      54.30      64.10     235.50
+EURUSD              64.49      55.40      99.60     290.30
+GBPUSD              58.74      55.20      90.60     228.10
+SOLUSD              57.93      55.90      66.30     185.30
+US500.cash          64.52      57.40      98.70     181.30
+XAUUSD              59.28      57.00      67.30     190.60
+--------------------------------------------------------
+CYCLE TOTAL        419.29                550.40           
+
+Per-cycle mean: 0.419 ms (p95: 0.550 ms)
+
+========================================================================
+cProfile (100 cycles aggregate)
+========================================================================
+         297002 function calls (294202 primitive calls) in 0.091 seconds
+
+   Ordered by: cumulative time
+   List reduced from 72 to 15 due to restriction <15>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.091    0.091 C:\Users\User\tradingview-mcp-jackson\scripts\bench_volume_profile_perf.py:76(aggregate_cycle)
+      700    0.041    0.000    0.091    0.000 C:\Users\User\Desktop\trading-ai-v2\analysis\volume_profile.py:60(build_volume_profile)
+     1400    0.001    0.000    0.019    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\generic.py:12362(_stat_function)
+     1400    0.001    0.000    0.017    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\series.py:6418(_reduce)
+     1400    0.001    0.000    0.015    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\nanops.py:111(f)
+     1400    0.001    0.000    0.014    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\nanops.py:389(new_func)
+     1400    0.001    0.000    0.014    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\nanops.py:1083(reduction)
+      700    0.000    0.000    0.010    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\series.py:6499(min)
+     2800    0.003    0.000    0.010    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\frame.py:4062(__getitem__)
+      700    0.000    0.000    0.010    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\generic.py:12381(min)
+      700    0.000    0.000    0.010    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\series.py:6509(max)
+      700    0.000    0.000    0.009    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\generic.py:12397(max)
+     1400    0.001    0.000    0.008    0.000 C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\site-packages\pandas\core\nanops.py:253(_get_values)
+    67200    0.006    0.000    0.006    0.000 {built-in method builtins.min}
+    67200    0.005    0.000    0.005    0.000 {built-in method builtins.max}
+
+
+
+========================================================================
+Decision
+========================================================================
+  cycle_mean = 0.419 ms < 5 ms threshold
+  -> NO caching needed. Document and close the finding.
