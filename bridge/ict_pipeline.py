@@ -890,12 +890,18 @@ class ICTPipeline:
                     )
                     result.advanced_score = adv.advanced_score
 
-                    # Multi-TF CRT detection: extend beyond M15-only to D1 + H4 fractal sweeps.
+                    # Multi-TF CRT detection: extend beyond M15-only to W1 + D1 + H4 fractal sweeps.
                     # run_advanced_analysis() already populated adv.crt_setups with M15
-                    # (default tf_label="M15"). Add D1 and H4 setups by calling detect_crt
+                    # (default tf_label="M15"). Add W1, D1 and H4 setups by calling detect_crt
                     # explicitly on the higher-TF dataframes already collected at step 1.
+                    # W1 = institutional swing-trade reversal (PWH/PWL sweep + close back inside).
                     try:
                         from analysis.ict.advanced import detect_crt as _detect_crt_mtf
+                        df_w1_crt = df_w1.iloc[:-1] if df_w1 is not None and len(df_w1) > 5 else None
+                        if df_w1_crt is not None and len(df_w1_crt) >= 3:
+                            w1_setups = _detect_crt_mtf(df_w1_crt, lookback=1, tf_label="W1")
+                            if w1_setups:
+                                adv.crt_setups.extend(w1_setups)
                         df_d1_crt = df_d1.iloc[:-1] if df_d1 is not None and len(df_d1) > 5 else None
                         if df_d1_crt is not None and len(df_d1_crt) >= 3:
                             d1_setups = _detect_crt_mtf(df_d1_crt, lookback=1, tf_label="D1")
@@ -914,7 +920,7 @@ class ICTPipeline:
                         for s in adv.crt_setups:
                             tf = getattr(s, "tf_label", "M15")
                             crt_by_tf[tf] = crt_by_tf.get(tf, 0) + 1
-                        for tf in ("D1", "H4", "M15"):
+                        for tf in ("W1", "D1", "H4", "M15"):
                             n = crt_by_tf.get(tf, 0)
                             if n > 0:
                                 result.advanced_factors.append(f"CRT_{tf}({n})")
@@ -1231,6 +1237,7 @@ class ICTPipeline:
             # as confluence evidence — they don't replace the core score.
             #
             # Per-TF CRT weighting (validated by scripts/bench_multi_tf_crt.py):
+            #   CRT_W1 = +5 (institutional swing reversal at PWH/PWL),
             #   CRT_D1 = +4 (major reversal), CRT_H4 = +3 (swing-tradable),
             #   CRT_M15 = +2 (intrabar). All other advanced_factors stay at +2.5.
             #   Total still capped at +10. Backtest across 5 symbols / 1260 cycles
@@ -1238,7 +1245,7 @@ class ICTPipeline:
             #   (cap binds either way) and +1.48 when baseline=0 — both within the
             #   <=2.0 gate. Cycles where the cap binds are unaffected.
             if result.advanced_factors:
-                _CRT_TF_WEIGHTS = {"crt_d1": 4.0, "crt_h4": 3.0, "crt_m15": 2.0}
+                _CRT_TF_WEIGHTS = {"crt_w1": 5.0, "crt_d1": 4.0, "crt_h4": 3.0, "crt_m15": 2.0}
                 bonus = 0.0
                 for f in result.advanced_factors:
                     fl = f.lower()

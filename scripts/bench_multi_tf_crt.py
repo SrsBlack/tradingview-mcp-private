@@ -73,8 +73,8 @@ def _score_old(n_advanced_factors: int) -> float:
 
 
 def _score_new(crt_by_tf: dict[str, int], n_other_factors: int) -> float:
-    """Per-TF weighted CRT (D1=4, H4=3, M15=2) + non-CRT factors at +2.5 each, cap=+10."""
-    weights = {"D1": 4.0, "H4": 3.0, "M15": 2.0}
+    """Per-TF weighted CRT (W1=5, D1=4, H4=3, M15=2) + non-CRT factors at +2.5 each, cap=+10."""
+    weights = {"W1": 5.0, "D1": 4.0, "H4": 3.0, "M15": 2.0}
     crt_bonus = 0.0
     for tf, n in crt_by_tf.items():
         if n > 0:
@@ -90,6 +90,7 @@ def _bench_symbol(sym: str) -> dict:
 
     df_h4 = _resample(df_m15, "4h")
     df_d1 = _resample(df_m15, "1D")
+    df_w1 = _resample(df_m15, "1W")
 
     cycles = 0
     fire_counts = Counter()  # how many cycles emit each TF combo
@@ -99,24 +100,27 @@ def _bench_symbol(sym: str) -> dict:
         m15_window = df_m15.iloc[end - WINDOW_M15: end]
         ts_end = m15_window.index[-1]
 
-        # H4 / D1 windows up through the same timestamp
+        # H4 / D1 / W1 windows up through the same timestamp
         h4_window = df_h4.loc[:ts_end].iloc[-50:]
         d1_window = df_d1.loc[:ts_end].iloc[-30:]
+        w1_window = df_w1.loc[:ts_end].iloc[-20:]
 
         if len(h4_window) < 3 or len(d1_window) < 3:
             continue
 
-        # Match bridge: H4 uses [:-1] closed bars; D1 uses [:-1] closed bars
+        # Match bridge: W1/D1/H4 all use [:-1] closed bars
+        w1_setups = detect_crt(w1_window.iloc[:-1], lookback=1, tf_label="W1") if len(w1_window) >= 3 else []
         d1_setups = detect_crt(d1_window.iloc[:-1], lookback=1, tf_label="D1")
         h4_setups = detect_crt(h4_window.iloc[:-1], lookback=1, tf_label="H4")
         m15_setups = detect_crt(m15_window, lookback=1, tf_label="M15")
 
         crt_by_tf = {
+            "W1": len(w1_setups),
             "D1": len(d1_setups),
             "H4": len(h4_setups),
             "M15": len(m15_setups),
         }
-        active = tuple(tf for tf in ("D1", "H4", "M15") if crt_by_tf[tf] > 0)
+        active = tuple(tf for tf in ("W1", "D1", "H4", "M15") if crt_by_tf[tf] > 0)
         fire_counts[active] += 1
         cycles += 1
 
