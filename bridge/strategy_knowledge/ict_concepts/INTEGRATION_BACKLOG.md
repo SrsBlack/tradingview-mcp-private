@@ -71,9 +71,30 @@ Suggested priority order: high-impact concepts first, since these get injected i
 
 ### Findings surfaced during batch 4 (NOT yet acted on)
 
-1. **CRT injector trigger missing** — concept_injector.py:240-279 has triggers for `cisd`, `breaker`, `turtle`, `unicorn`, `venom`, `mm_/mmbm/mmsm` advanced_factors, but NO trigger for `crt` despite `CRT(N)` being the most commonly-emitted advanced_factor on M15. Adding `if "crt" in adv_factors: picks.append(("CRT_candle_range_theory", "Single-bar sweep+reversal — micro CRT setup"))` would surface the methodology to Claude when it fires. Tracked as a future small change.
+1. **CRT injector trigger missing** — concept_injector.py:240-279 has triggers for `cisd`, `breaker`, `turtle`, `unicorn`, `venom`, `mm_/mmbm/mmsm` advanced_factors, but NO trigger for `crt` despite `CRT(N)` being the most commonly-emitted advanced_factor on M15. Adding `if "crt" in adv_factors: picks.append(("CRT_candle_range_theory", "Single-bar sweep+reversal — micro CRT setup"))` would surface the methodology to Claude when it fires. **RESOLVED 2026-04-26 in commit c09ca81.**
 2. **CRT lookback is hardcoded to 1** — only single-bar CRTs are detected. The card's daily/weekly/session-fractal applications would need separate calls with `lookback={N for daily, M for weekly}` against the relevant-timeframe df. Open design question whether the M15-lookback=1 detector is sufficient or if multi-timeframe CRT detection is needed.
-3. **Volume-profile wiring is the prerequisite for liquidity_void** — see batch 3 finding #1. The two cards' integration status is paired; both unblock together when build_volume_profile is wired into ict_pipeline.
+3. **Volume-profile wiring is the prerequisite for liquidity_void** — see batch 3 finding #1. The two cards' integration status is paired; both unblock together when build_volume_profile is wired into ict_pipeline. **RESOLVED 2026-04-26 in commits ec29820, 7cb3319, a9f753d (see "Completed 2026-04-26 (volume-profile follow-up)" section below).**
+
+---
+
+## Completed 2026-04-26 (volume-profile follow-up — Track 2 batch 3 finding #1 + batch 4 finding #3)
+
+Three sequential commits closed the volume-profile gap end-to-end:
+
+- **`ec29820` — feat(bridge): wire analysis.volume_profile into ict_pipeline + claude prompt.** Imports build_volume_profile from trading-ai-v2/analysis/volume_profile.py (previously unreferenced from the bridge). Adds five fields to SymbolAnalysis: vp_poc, vp_vah, vp_val, vp_hvn_zones, vp_lvn_zones. HVN/LVN zones stored as (low, high) tuples derived from VolumeNode midpoints +/- bucket_width/2 for clean range-overlap arithmetic downstream. New step 8e7 in ict_pipeline.py mirrors the cbdr_data block: builds the profile on the last ~96 M15 bars (24h) with 30 buckets. claude_decision._build_prompt gains a vp_line ("VolumeProfile: POC=X VA=[L-H] HVNs=N LVNs=M") interpolated next to fib_line.
+- **`7cb3319` — feat(synergy): OB+HVN uses real volume-profile bucket overlap (was FVG_stack proxy).** synergy_scorer._ob_at_high_volume rewritten to iterate ob_zones x vp_hvn_zones with standard range-overlap arithmetic; legacy FVG_stack/HiddenOB approximation deleted along with the "we don't have tick-level volume profile" docstring caveat. ob_score >= 10 gate preserved. ict_pipeline now exposes active OBs (post get_active_obs filter) on SymbolAnalysis.ob_zones immediately after order-block detection. Smoke-tested 6 cases (overlap / no-overlap / low ob_score / empty hvn / empty ob / boundary equality).
+- **`a9f753d` — feat(bridge): detect unfilled liquidity voids from volume-profile LVN zones.** Adds SymbolAnalysis.liquidity_voids — LVN zones that sit clearly above OR below current price (zones containing current price are excluded as already-being-traversed). concept_injector now triggers the liquidity_void card whenever liquidity_voids is non-empty, with directional hint distinguishing "N above (bullish draw)", "N below (bearish draw)", and "mixed magnets". First time the card has ever been auto-injected. Updates liquidity_void.json bridge_integration with new file:line citations replacing the previous "NOT INTEGRATED" text.
+
+Net effect: volume_profile.json bridge_integration moves from ASPIRATIONAL to REAL with file:line citations. liquidity_void.json bridge_integration moves from NOT INTEGRATED to REAL. The "OB+HVN" +3 synergy is now backed by actual bucketed volume data instead of a proxy. ~5 cross_correlations rules around volume coordinates that previously lived as documentation can now be enforced when written into code (next iteration). Lint stays at 0 stubs / 51 cards.
+
+### Findings surfaced during volume-profile follow-up (NOT yet acted on)
+
+1. **No POC/VAH/VAL proximity trigger** — concept_injector currently does not auto-inject the volume_profile card when current_price is within tolerance of POC/VAH/VAL. The prompt line gives Claude the coordinates; the methodological card is reachable only via dependency walker. If Claude is observed misinterpreting POC/VA dynamics, add an explicit trigger.
+2. **No caching** — build_volume_profile recomputes every cycle. Fast on 96 bars x 30 buckets but worth profiling if symbol count grows.
+3. **M15-only profile** — H1/H4 volume profiles would add HTF context for swing trades but aren't computed.
+4. **Value-area pct fixed at 70%** — not exposed as config. If different markets need different VA widths, plumb through.
+5. **Void-as-TP / SL-on-other-side-of-void NOT enforced** — voids surface as prompt context only, not as hard checks against entry/SL placement. Conservative first integration; tighten when there's evidence of misuse.
+6. **OB-at-LVN suspicion rule NOT yet enforced** — cross_correlations rule 'OB at LVN = reduce conviction' is still documentation. Could become a -2 anti-synergy alongside the +3 OB+HVN if backtests show the asymmetry.
 
 ---
 
