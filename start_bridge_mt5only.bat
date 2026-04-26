@@ -25,7 +25,12 @@ if exist "scripts\lint_memory.py" (
 )
 
 :loop
-python auto_trade.py --mode live %*
+REM Redirect both stdout and stderr to logs\trading.log (append mode) so the rich
+REM cycle output (CYCLE headers, per-symbol scoring, Decision/Reason lines) is
+REM visible to anyone tailing the file. Without this redirect, those prints go
+REM only to the cmd console window. ERRORLEVEL is preserved (unlike a `| tee`
+REM pipeline which would expose the tee exit code instead of python's).
+python auto_trade.py --mode live %* >> logs\trading.log 2>&1
 set EXITCODE=%ERRORLEVEL%
 echo.
 echo  [BRIDGE] Exited code %EXITCODE%.
