@@ -68,7 +68,7 @@ from analysis.ict.core import detect_cisd, get_latest_cisd, detect_po3_phase, PO
 from analysis.ict.advanced import run_advanced_analysis, AdvancedAnalysis, detect_market_maker_model, detect_suspension_blocks, get_quarterly_bias
 from analysis.sessions import get_asian_range, get_ndog, get_cbdr, get_midnight_range, get_weekly_bias, is_seek_and_destroy
 from analysis.volume_profile import build_volume_profile
-from core.types import Direction, SignalGrade, FVGQuality
+from core.types import Direction, SignalGrade, FVGQuality, SessionType
 
 
 # ---------------------------------------------------------------------------
@@ -923,6 +923,45 @@ class ICTPipeline:
                             wed_setups = _detect_crt_mtf(wed_window, lookback=1, tf_label="WedPO3")
                             if wed_setups:
                                 adv.crt_setups.extend(wed_setups)
+
+                        # SessionCRT: Asian/London/NY institutional fractal.
+                        # Asian = accumulation range. London = manipulation
+                        # (sweeps one Asian extreme + closes back inside).
+                        # NY = distribution toward the OPPOSITE Asian extreme.
+                        # Only fires while we're inside the NY window (the
+                        # distribution phase) — outside NY, the SessionCRT
+                        # is either pending (London still running) or stale
+                        # (NY already closed).
+                        try:
+                            if (
+                                df_primary is not None
+                                and len(df_primary) >= 8
+                                and session_info.session in (
+                                    SessionType.NY_OPEN,
+                                    SessionType.NY_AM,
+                                    SessionType.NY_PM,
+                                    SessionType.OVERLAP,
+                                )
+                            ):
+                                from analysis.ict.advanced import (
+                                    detect_session_crt as _detect_session_crt,
+                                )
+                                # Last ~96 M15 bars = 24h, enough to span yesterday's
+                                # Asian (20:00–24:00 NY prev day) + today's London
+                                # (02:00–10:00 NY).
+                                session_window = (
+                                    df_primary.iloc[-96:]
+                                    if len(df_primary) >= 96
+                                    else df_primary
+                                )
+                                session_setups = _detect_session_crt(session_window)
+                                if session_setups:
+                                    adv.crt_setups.extend(session_setups)
+                        except Exception as e:
+                            print(
+                                f"  [{symbol}] Session-CRT detection error: {e}",
+                                flush=True,
+                            )
                     except Exception as e:
                         print(f"  [{symbol}] Multi-TF CRT detection error: {e}", flush=True)
 
@@ -932,7 +971,7 @@ class ICTPipeline:
                         for s in adv.crt_setups:
                             tf = getattr(s, "tf_label", "M15")
                             crt_by_tf[tf] = crt_by_tf.get(tf, 0) + 1
-                        for tf in ("W1", "D1", "H4", "M15", "WedPO3"):
+                        for tf in ("W1", "D1", "H4", "M15", "WedPO3", "SessionCRT"):
                             n = crt_by_tf.get(tf, 0)
                             if n > 0:
                                 result.advanced_factors.append(f"CRT_{tf}({n})")
@@ -1248,20 +1287,24 @@ class ICTPipeline:
             # Advanced concepts (CRT, Unicorn, CISD, etc.) add up to +10 points
             # as confluence evidence — they don't replace the core score.
             #
-            # Per-TF CRT weighting (validated by scripts/bench_multi_tf_crt.py):
-            #   CRT_W1     = +5 (institutional swing reversal at PWH/PWL),
-            #   CRT_D1     = +4 (major reversal),
-            #   CRT_WedPO3 = +3 (Wednesday manipulation: sweep Mon-Tue range),
-            #   CRT_H4     = +3 (swing-tradable),
-            #   CRT_M15    = +2 (intrabar). All other advanced_factors stay at +2.5.
-            #   Total still capped at +10. Backtest across 5 symbols / 1260 cycles
-            #   showed mean delta vs old formula is +0.0 when baseline >=3 factors
-            #   (cap binds either way) and +1.48 when baseline=0 — both within the
-            #   <=2.0 gate. Cycles where the cap binds are unaffected.
+            # Per-TF CRT weighting (validated by scripts/bench_multi_tf_crt.py
+            # for W1/D1/H4/M15 and scripts/bench_session_crt.py for SessionCRT):
+            #   CRT_W1         = +5 (institutional swing reversal at PWH/PWL),
+            #   CRT_D1         = +4 (major reversal),
+            #   CRT_WedPO3     = +3 (Wednesday manipulation: sweep Mon-Tue range),
+            #   CRT_H4         = +3 (swing-tradable),
+            #   CRT_SessionCRT = +3 (session-bounded: London swept Asian + close
+            #                        back inside; NY targets opposite extreme),
+            #   CRT_M15        = +2 (intrabar). All other advanced_factors stay
+            #   at +2.5. Total still capped at +10. Backtest across 5 symbols /
+            #   1260 cycles showed mean delta vs old formula is +0.0 when
+            #   baseline >=3 factors (cap binds either way) and +1.48 when
+            #   baseline=0 — both within the <=2.0 gate. Cycles where the cap
+            #   binds are unaffected.
             if result.advanced_factors:
                 _CRT_TF_WEIGHTS = {
                     "crt_w1": 5.0, "crt_d1": 4.0, "crt_wedpo3": 3.0,
-                    "crt_h4": 3.0, "crt_m15": 2.0,
+                    "crt_sessioncrt": 3.0, "crt_h4": 3.0, "crt_m15": 2.0,
                 }
                 bonus = 0.0
                 for f in result.advanced_factors:

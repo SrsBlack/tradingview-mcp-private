@@ -306,6 +306,28 @@ def _multi_tf_crt(a: Any) -> bool:
     return "crt_d1" in factors and "crt_h4" in factors
 
 
+def _has_session_crt(a: Any) -> bool:
+    """SessionCRT (Asian/London/NY fractal) factor present in this cycle."""
+    factors = " ".join(getattr(a, "advanced_factors", []) or []).lower()
+    return "crt_sessioncrt" in factors
+
+
+def _in_ny_kill_zone(a: Any) -> bool:
+    """
+    True when we're inside an NY kill zone (NY AM 7-10 or London-Close
+    10-12). Distinguishes from the broad _has_kill_zone helper which
+    also fires for London KZ (2-5 NY) and Asian KZ.
+
+    SessionCRT pairs specifically with NY kill zones because NY is the
+    distribution leg of the fractal — the entry window after London's
+    manipulation. London-KZ triggers would be premature.
+    """
+    if not bool(getattr(a, "is_kill_zone", False)):
+        return False
+    sess = (getattr(a, "session_type", "") or "").upper()
+    return any(tag in sess for tag in ("NY_OPEN", "NY_AM", "NY_PM", "OVERLAP"))
+
+
 def _has_micro_smt(a: Any) -> bool:
     """Check for micro SMT divergence (same-candle divergence on M15).
 
@@ -495,6 +517,12 @@ _SYNERGY_CHECKS: list[tuple[str, Any, float, str]] = [
         lambda a: _multi_tf_crt(a),
         5.0,
         "MultiTF_CRT",
+    ),
+    (
+        "SessionCRT + NY kill zone (London-Asian sweep + NY distribution window)",
+        lambda a: _has_session_crt(a) and _in_ny_kill_zone(a),
+        4.0,
+        "SessionCRT+KillZone",
     ),
 ]
 

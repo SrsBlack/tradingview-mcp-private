@@ -126,9 +126,25 @@ Net effect: CRT now spans the full institutional fractal — weekly swing revers
 
 ### Findings still open after Followup A + C (2026-04-26)
 
-1. **Session-candle-as-CRT** (#2 above) — still unimplemented. Needs new `detect_session_crt` since session candles aren't time-equispaced bars; would emit `SessionCRT_LBuy(N)` / `SessionCRT_LSell(N)` factors with a `SessionCRT+KillZone` synergy. Save for a session where trading-ai-v2's working tree is clean.
+1. ~~**Session-candle-as-CRT**~~ — **RESOLVED 2026-04-26 (Followup B)**. `detect_session_crt` (Desktop/trading-ai-v2/analysis/ict/advanced.py ~line 308) is a separate engine that aggregates Asian (20:00–24:00 NY prev day) + London (02:00–10:00 NY today) by NY-hour math directly (the existing `get_session_range` won't work because `_classify_session` tags 02:00–05:00 NY as `LONDON_OPEN` and 05:00–07:00 NY as `OFF_HOURS`, so the broader `LONDON` tag never lands on the early-London bars). Emits 0 or 1 `SessionCRTSetup` per call when London swept exactly one Asian extreme AND closed back inside the Asian range; both-side sweeps and outside-range closes return empty. Bridge calls only during NY-window cycles (NY_OPEN/NY_AM/NY_PM/OVERLAP) over the trailing 96 M15 bars. Factor emits as `CRT_SessionCRT(N)` at +3.0 weight. New synergy `SessionCRT+KillZone` (+4 in synergy_scorer.py) fires when SessionCRT factor present AND we're in an NY kill zone — explicitly NOT London KZ, since SessionCRT is the distribution-leg signal. Concept injector priority chain reordered to `W1 > D1 > WedPO3 > SessionCRT > H4 > M15`. Bench (`scripts/bench_session_crt.py`, 2912 NY-window cycles across 5 symbols): aggregate fire rate 22.0%, balanced bullish/bearish split (no systemic directional bias), Asian range averages 0.26%–2.33% of last close depending on volatility class.
 2. **MultiTF_CRT_W1_D1 super-synergy** — would fire when both `crt_w1` AND `crt_d1` present (~1% of cycles); deferred until backtest can confirm it's not flat inflation.
-3. **Counter-D1-CRT trade gate** (#4 above) — behavioral change, needs explicit backtest evidence.
+3. **Counter-D1-CRT trade gate** (#4 above) — behavioral change, needs explicit backtest evidence. Defer until ≥30 counter-CRT trades accumulate in journal.
+
+---
+
+## Completed 2026-04-26 (SessionCRT — Followup B)
+
+One commit closed the session-candle-as-CRT gap:
+
+- **`<pending hash>` — feat(ict): session-candle CRT detector (Asian/London/NY fractal).** Adds `SessionCRTSetup` dataclass + `detect_session_crt` to `Desktop/trading-ai-v2/analysis/ict/advanced.py`. The detector slices Asian and London sessions by NY-hour math (can't reuse `get_session_range` for the broad `LONDON` tag — see finding above for why), pairs the most-recent Asian session to the same trading date's London session, and fires only when London swept exactly one Asian extreme AND closed back inside the Asian range. Both-side sweeps and outside-range closes are explicitly suppressed. Bridge wires it in `bridge/ict_pipeline.py` step 8f (~line 935) gated on `session_info.session in {NY_OPEN, NY_AM, NY_PM, OVERLAP}` over the trailing 96 M15 bars. `_CRT_TF_WEIGHTS` gains `"crt_sessioncrt": 3.0`. New synergy `SessionCRT+KillZone` (+4) at `synergy_scorer.py` predicated on the new `_has_session_crt` and `_in_ny_kill_zone` helpers (the latter distinguishes NY kill zones from London KZ — the synergy is specifically about NY distribution, not London manipulation). Concept injector priority chain reordered. KB: `CRT_candle_range_theory.json` `session_candle_theory` block rewritten with file:line citations and explicit detector contract; `bridge_integration` extended. Backtest `scripts/bench_session_crt.py` (5 symbols × 2912 NY-window cycles): 22.0% aggregate fire rate, balanced bullish/bearish, no symbol-class outliers — within the 5–30% sane band.
+
+Net effect: CRT now spans the full institutional fractal AT THE SESSION LEVEL too. Weekly swing reversal at the top (W1 +5), daily/H4/M15 intrabar tiers, Wednesday manipulation as day-specific gate (+3), and Asian/London/NY session fractal as intraday gate (+3). Two of the three findings open after Followup A+C are now closed; only the deferred MultiTF_CRT_W1_D1 super-synergy and the evidence-first counter-D1-CRT trade gate remain.
+
+### Findings surfaced during Followup B (NOT yet acted on)
+
+1. **`get_session_range` is incomplete for broad sessions** — `_classify_session` tags bars in 02:00–05:00 NY as `LONDON_OPEN` and 05:00–07:00 NY as `OFF_HOURS`, so calling `get_session_range(SessionType.LONDON, ...)` returns only the 07:00–10:00 NY portion (which itself overlaps with `NY_OPEN`). Anyone reaching for the broad London aggregate has to slice by hour math directly. Worth a follow-up either to (a) add a `get_broad_session_range` helper that uses interval math, or (b) document the caveat clearly in `sessions.py`. Currently `detect_session_crt` does the hour-math itself.
+2. **No SessionCRT-vs-HTF direction conflict gate** — if SessionCRT direction (NY draw) opposes daily_bias / HTF Alignment, the bridge will still emit the factor. Could add a -2 anti-synergy when those disagree. Defer until trade journal shows the asymmetry.
+3. **No session-CRT TP/SL anchoring** — `target` and `midpoint` fields on SessionCRTSetup carry the asian extreme + 50% but no downstream code uses them for TP placement or partial-TP anchoring. Currently advisory only.
 
 ---
 
