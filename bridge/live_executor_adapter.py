@@ -1033,28 +1033,18 @@ class LiveExecutorAdapter:
         except Exception:
             return None
 
-    def _get_h4_bias(self, ftmo_symbol: str) -> str:
-        """Query MT5 for H4 candles and determine bias via ICT swing structure.
+    def _get_tf_bias(self, ftmo_symbol: str, timeframe_name: str) -> str:
+        """Compute structural bias on one timeframe using ICT swing analysis.
 
-        Returns BULLISH/BEARISH/NEUTRAL using the same `analysis.structure` engine
-        the pre-trade pipeline uses (`bridge/ict_pipeline.py:374-376`):
+        Returns BULLISH/BEARISH/NEUTRAL using `analysis.structure`:
+          detect_swings(lookback=N) → classify_structure → get_current_bias
 
-          detect_swings(lookback=5) → classify_structure → get_current_bias
+        Same engine as the pre-trade pipeline (`bridge/ict_pipeline.py:374-454`).
+        Pre-trade entry bias and post-entry HTF invalidation use one engine.
 
-        This walks confirmed swing pivots, emits BOS/CHoCH events, and only declares
-        direction when there's structural majority (per `get_current_bias` rules:
-        bull_bos >= bear_bos + 2, OR a CHoCH that aligns with dominant BOS).
+        timeframe_name: "H4" | "D1" | "W1" — picks lookback + bar count per TF.
 
-        Why this matters:
-          The previous max/min over fixed 5-bar windows version would flip BEARISH
-          on a 0.34% lower-high + 0.03% lower-low (ETH 2026-04-26: closed +$38 trade).
-          A 0.5% threshold helped but was still arithmetic-only; consolidation chop
-          could still produce false signals.
-
-          Real ICT bias requires confirmed swings + structural breaks, not raw bar
-          extremes. This function and the pre-trade pipeline now agree on bias —
-          a trade entered as bullish will not be killed as bearish by a different
-          method 30 minutes later.
+        Failure mode: any exception → NEUTRAL (fail-safe; no invalidation fires).
         """
         try:
             import MetaTrader5 as mt5
@@ -1064,30 +1054,30 @@ class LiveExecutorAdapter:
             from analysis.structure import detect_swings, classify_structure, get_current_bias
             from core.types import Direction
 
-            # Pull enough H4 history for swing detection (lookback=5 needs 11 bars
-            # to confirm one swing). 30 bars finds only 2-3 swings, often 0 events;
-            # 100 bars (~17 days) consistently finds 10+ swings and 2-4 BOS/CHoCH
-            # events — enough for `get_current_bias` to render a confident verdict
-            # rather than defaulting to NEUTRAL on insufficient data.
-            rates = mt5.copy_rates_from_pos(ftmo_symbol, mt5.TIMEFRAME_H4, 0, 100)
-            if rates is None or len(rates) < 30:
+            # Per-TF tuning matches ict_pipeline.py:435 (D1 lookback=3) and 451 (W1 lookback=2)
+            tf_config = {
+                "H4": (mt5.TIMEFRAME_H4, 100, 5),  # ~17 days
+                "D1": (mt5.TIMEFRAME_D1, 60,  3),  # ~2 months
+                "W1": (mt5.TIMEFRAME_W1, 30,  2),  # ~7 months
+            }
+            if timeframe_name not in tf_config:
+                return "NEUTRAL"
+            tf, n_bars, lookback = tf_config[timeframe_name]
+
+            rates = mt5.copy_rates_from_pos(ftmo_symbol, tf, 0, n_bars)
+            if rates is None or len(rates) < 15:
                 return "NEUTRAL"
 
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
             df = df.set_index("time")
-            df = df.rename(columns={
-                "open": "open", "high": "high", "low": "low", "close": "close",
-                "tick_volume": "volume",
-            })
+            df = df.rename(columns={"tick_volume": "volume"})
 
-            # Drop the forming candle — same pattern as ict_pipeline.py:371.
-            # A forming H4 candle takes 4 hours to close; including it produces
-            # phantom swings/structure events that don't yet exist.
+            # Drop forming candle — phantom swings/events come from incomplete bars.
             if len(df) > 15:
                 df = df.iloc[:-1]
 
-            swings = detect_swings(df, lookback=5)
+            swings = detect_swings(df, lookback=lookback)
             _, events = classify_structure(swings, df=df)
             bias = get_current_bias(events)
 
@@ -1097,24 +1087,52 @@ class LiveExecutorAdapter:
                 return "BEARISH"
             return "NEUTRAL"
         except Exception as e:
-            # Fail safe — NEUTRAL means no HTF invalidation will fire, which is the
-            # conservative outcome for a profitable trade. We log the error so it's
-            # visible in the .bat console.
-            print(f"  [_get_h4_bias] {ftmo_symbol}: {type(e).__name__}: {e}", flush=True)
+            print(f"  [_get_tf_bias {timeframe_name}] {ftmo_symbol}: {type(e).__name__}: {e}", flush=True)
             return "NEUTRAL"
 
-    def _check_htf_invalidation(self) -> list[dict]:
-        """Close non-scalp positions that now oppose H4 bias.
+    def _get_mtf_bias(self, ftmo_symbol: str) -> dict:
+        """Multi-timeframe bias snapshot. Returns {"H4": str, "D1": str, "W1": str}.
 
-        Winners (R>=1.0 or tp1_hit) and scalps are exempt.
-        Only runs the MT5 H4 query once per symbol per cycle.
+        Mirrors the pre-trade MTF alignment computed in
+        `bridge/ict_pipeline.py:425-478` (W1, D1, H4 each via `get_current_bias`).
+
+        Used by `_check_htf_invalidation` to require structural confirmation
+        across at least two timeframes before closing a position. A single TF flip
+        is normal market noise; D1+H4 agreement on opposition is structural.
+        """
+        return {
+            "H4": self._get_tf_bias(ftmo_symbol, "H4"),
+            "D1": self._get_tf_bias(ftmo_symbol, "D1"),
+            "W1": self._get_tf_bias(ftmo_symbol, "W1"),
+        }
+
+    def _get_h4_bias(self, ftmo_symbol: str) -> str:
+        """Backward-compat wrapper. Prefer _get_mtf_bias for new logic."""
+        return self._get_tf_bias(ftmo_symbol, "H4")
+
+    def _check_htf_invalidation(self) -> list[dict]:
+        """Close non-scalp losing positions when D1 + H4 both oppose direction.
+
+        Multi-timeframe gate (2026-04-26): a single H4 flip is normal noise
+        (consolidation, retraces). Requiring D1 confirmation means we only close
+        when the daily trend has rotated AND H4 reflects it — that's structural,
+        not noise. Matches the pre-trade MTF alignment in `bridge/ict_pipeline.py`.
+
+        Exemptions:
+          - Profitable trades (r_multiple >= 0): SL/TP handles them
+          - TP1 already hit: trade is in management mode
+          - Scalps: don't need HTF alignment by design
+          - Adopted/young trades (<2h): give swings time to confirm post-restart
+
+        W1 is read for context but is not used as a close trigger — too slow
+        for invalidation, useful for entry filtering only.
         """
         from bridge.config import tv_to_ftmo_symbol
         from bridge.risk_bridge import calculate_pnl
 
         events = []
         to_close: list[tuple[int, "PaperPosition", str]] = []
-        htf_cache: dict[str, str] = {}
+        htf_cache: dict[str, dict] = {}
 
         if not self.open_positions:
             return events
@@ -1148,24 +1166,35 @@ class LiveExecutorAdapter:
 
                 ftmo_sym = tv_to_ftmo_symbol(pos.symbol.split(":")[-1])
                 if ftmo_sym not in htf_cache:
-                    htf_cache[ftmo_sym] = self._get_h4_bias(ftmo_sym)
-                h4_bias = htf_cache[ftmo_sym]
+                    htf_cache[ftmo_sym] = self._get_mtf_bias(ftmo_sym)
+                biases = htf_cache[ftmo_sym]
+                h4_bias = biases.get("H4", "NEUTRAL")
+                d1_bias = biases.get("D1", "NEUTRAL")
+                w1_bias = biases.get("W1", "NEUTRAL")
 
-                if h4_bias == "NEUTRAL" or h4_bias == "MIXED":
-                    continue
-
-                opposes = (
+                # Require structural confirmation across H4 + D1 before closing.
+                # A single H4 flip is normal market noise (consolidation, retraces).
+                # D1 + H4 agreement on opposition = the daily trend has rotated AND
+                # H4 reflects it — that's worth respecting.
+                # W1 alone is too slow to use for invalidation (price would hit SL
+                # or TP long before W1 flips). W1 is for entry filtering, not exit.
+                opposes_h4 = (
                     (pos.direction == "BUY" and h4_bias == "BEARISH") or
                     (pos.direction == "SELL" and h4_bias == "BULLISH")
                 )
-                if opposes:
-                    to_close.append((ticket, pos, h4_bias))
+                opposes_d1 = (
+                    (pos.direction == "BUY" and d1_bias == "BEARISH") or
+                    (pos.direction == "SELL" and d1_bias == "BULLISH")
+                )
+                if opposes_h4 and opposes_d1:
+                    bias_str = f"H4={h4_bias} D1={d1_bias} W1={w1_bias}"
+                    to_close.append((ticket, pos, bias_str))
 
         # Execute closes outside lock
-        for ticket, pos, h4_bias in to_close:
+        for ticket, pos, bias_str in to_close:
             print(
-                f"  [HTF INVALIDATION] #{ticket} {pos.symbol} {pos.direction} opposes H4 {h4_bias} "
-                f"(r={pos.r_multiple:.2f}, trade_type={pos.trade_type}) — closing",
+                f"  [HTF INVALIDATION] #{ticket} {pos.symbol} {pos.direction} opposes MTF "
+                f"({bias_str}) (r={pos.r_multiple:.2f}, trade_type={pos.trade_type}) — closing",
                 flush=True,
             )
             pnl = pos.floating_pnl
