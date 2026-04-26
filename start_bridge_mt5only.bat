@@ -16,6 +16,14 @@ echo   Reasoning gate ACTIVE (Apr 24 2026)
 echo  ===========================================
 echo.
 
+REM Pre-flight: run lint to surface memory/code drift. Visibility only —
+REM does not block startup (use the git pre-push hook for hard enforcement).
+if exist "scripts\lint_memory.py" (
+    echo  [LINT] Pre-flight memory + code drift check...
+    python scripts\lint_memory.py 2>&1 | findstr /R "Summary: \[FAIL\] \[WARN\]"
+    echo.
+)
+
 :loop
 python auto_trade.py --mode live %*
 set EXITCODE=%ERRORLEVEL%

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Pre-push lint gate. Blocks pushes when scripts/lint_memory.py reports FAIL.
+# WARN findings don't block (visible but not gating).
+#
+# Install via: bash scripts/git-hooks/install.sh
+# Bypass via:  git push --no-verify  (use sparingly; means you accept drift)
+
+set -e
+
+# Find repo root regardless of where the hook is invoked from
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+LINT_SCRIPT="$REPO_ROOT/scripts/lint_memory.py"
+
+if [ ! -f "$LINT_SCRIPT" ]; then
+    # Fresh clone or older revision without the lint script — let push through
+    exit 0
+fi
+
+# Run lint. The script returns 0 for pass/warn-only, 1 for any FAIL.
+echo "→ Running scripts/lint_memory.py before push..."
+if python "$LINT_SCRIPT"; then
+    echo "  Lint OK — pushing."
+    exit 0
+else
+    echo
+    echo "✗ Lint reported FAIL — push blocked."
+    echo "  Fix the failures above, or bypass with: git push --no-verify"
+    echo "  (only bypass if you've already decided the drift is acceptable)"
+    exit 1
+fi
