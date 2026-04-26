@@ -165,6 +165,31 @@ Net effect: CRT now spans the full institutional fractal AT THE SESSION LEVEL to
 
 ---
 
+## Completed 2026-04-26 (W1+SessionCRT super-synergy bench — Option 3, gate REJECTED)
+
+One commit shipped the evidence-gathering harness without touching live behavior:
+
+- **(commit pending)** — feat(bench): W1+SessionCRT super-synergy fire-rate bench. Adds `scripts/bench_w1_session_crt.py` + frozen first-run output `scripts/bench_w1_session_crt_2026-04-26.txt`. Walks cached M15 in 4h steps over 7 symbols (XAUUSD/EURUSD/GBPUSD/BTCUSD/ETHUSD/SOLUSD/US500.cash), resamples to W1 (Mon-anchored), and at each NY-window cycle calls `detect_session_crt` on the trailing 96 M15 bars + `detect_crt(df_w1[:-1], lookback=1, tf_label="W1")` on the visible W1 history. Tracks two W1-active definitions in parallel: ANY (any setup in window — matches the bridge's `CRT_W1(N)` factor emission and substring-based synergy predicates like `_multi_tf_crt`) and FRESH (most-recent setup's `sweep_bar_index` points to the last index in `df_w1[:-1]`).
+
+Decision rule per `project_kb_next_session_prompt.md`: SHIP +6 `W1+SessionCRT_aligned` synergy iff aligned-rate is in [0.5%, 3.0%]. <0.5% defer (too rare); >3% defer (flat inflation / double-count).
+
+**First run (3565 NY-window cycles aggregated):**
+- ANY view: W1 fires in 100% of cycles (any 5-week window contains some weekly CRT). Both fire in 22.52%. Aligned in **11.00%** — far above the 3% ceiling.
+- FRESH view: W1 fires in 36.72% (a fresh weekly CRT just printed). Both fire in 7.10%. Aligned in **3.45%** — just barely above the 3% ceiling.
+- **P(directions agree | both fire) = 48.8% (ANY view), 48.6% (FRESH view).** Both are statistically indistinguishable from coin-flip — W1 CRT direction has no observable correlation with SessionCRT direction in this data.
+
+**Verdict: GATE REJECTED. No synergy added.** The "alignment" in 3.45–11% of cycles is exactly what random independence between two ~22%-and-~37% binary signals predicts (0.225 × 0.367 × 0.5 ≈ 4.1%). There is no directional edge to capture. A +6 super-synergy would be flat inflation that fires in cycles where the underlying direction agreement is no better than random.
+
+This is a healthy outcome — the evidence-first gate worked exactly as designed: a plausible-sounding fractal-alignment hypothesis was tested honestly and rejected before any score weight changed. No commit to `synergy_scorer.py`. Frozen artifact preserves the rationale so future sessions don't re-litigate.
+
+### Findings surfaced during Option 3 (NOT yet acted on)
+
+1. **Bridge's `CRT_W1(N)` factor emission is "any setup in 5-week window," not "fresh setup."** This means substring-based synergy predicates like the existing `_multi_tf_crt` ("crt_d1" in factors AND "crt_h4" in factors) will fire on stale CRTs as much as fresh ones. For W1 in particular this is near-100% noise. If a future synergy wants W1 conviction specifically, it should query `crt_setups[i].sweep_bar_index == len(df_w1_crt)-1` directly, not substring-match on the factor string. Tracking as a future design question — does NOT block any current synergy because the existing ones (MultiTF_CRT D1+H4) operate on shorter timeframes where ANY-vs-FRESH skew is much smaller.
+2. **`(N)` count in `CRT_W1(N)` is misleading for synergy reasoning.** N includes every setup in the lookback window, weighted equally. A 5-week-old CRT and a fresh-this-week CRT both contribute. Concept-injector hint distinguishes by highest-TF firing but not by recency.
+3. **W1+D1 super-synergy (item #2 in "Findings still open after Followup A+C") is even more suspect.** With W1 ANY at 100% and D1 ANY likely also high, "W1+D1 both fire" is almost tautological in the ANY view. Recommend: do NOT bench until the ANY-vs-FRESH issue (finding #1) has a design decision.
+
+---
+
 ## How this list will shrink
 
 Each work session that touches the KB:

@@ -1,0 +1,68 @@
+========================================================================
+W1 + SessionCRT super-synergy fire-rate bench
+========================================================================
+  symbols: ['XAUUSD', 'EURUSD', 'GBPUSD', 'BTCUSD', 'ETHUSD', 'SOLUSD', 'US500.cash']
+  M15 window: 96 bars (24h)  step: 16 M15 (4h)
+  decision: 0.5%-3% aligned -> ship +6, else defer
+
+[XAUUSD] running...
+  ny_cycles=360  session_fires=111 (30.83%)
+  ANY view:   w1_fires=360 (100.00%) both=111 (30.83%) aligned=52 (14.44%) opposed=59 (16.39%)
+  FRESH view: w1_fires=109 (30.28%) both=21 (5.83%) aligned=7 (1.94%) opposed=14 (3.89%)
+[EURUSD] running...
+  ny_cycles=676  session_fires=117 (17.31%)
+  ANY view:   w1_fires=676 (100.00%) both=117 (17.31%) aligned=55 (8.14%) opposed=62 (9.17%)
+  FRESH view: w1_fires=216 (31.95%) both=32 (4.73%) aligned=14 (2.07%) opposed=18 (2.66%)
+[GBPUSD] running...
+  ny_cycles=676  session_fires=111 (16.42%)
+  ANY view:   w1_fires=676 (100.00%) both=111 (16.42%) aligned=51 (7.54%) opposed=60 (8.88%)
+  FRESH view: w1_fires=263 (38.91%) both=34 (5.03%) aligned=16 (2.37%) opposed=18 (2.66%)
+[BTCUSD] running...
+  ny_cycles=362  session_fires=107 (29.56%)
+  ANY view:   w1_fires=362 (100.00%) both=107 (29.56%) aligned=64 (17.68%) opposed=43 (11.88%)
+  FRESH view: w1_fires=147 (40.61%) both=36 (9.94%) aligned=19 (5.25%) opposed=17 (4.70%)
+[ETHUSD] running...
+  ny_cycles=362  session_fires=91 (25.14%)
+  ANY view:   w1_fires=362 (100.00%) both=91 (25.14%) aligned=53 (14.64%) opposed=38 (10.50%)
+  FRESH view: w1_fires=147 (40.61%) both=38 (10.50%) aligned=22 (6.08%) opposed=16 (4.42%)
+[SOLUSD] running...
+  ny_cycles=773  session_fires=190 (24.58%)
+  ANY view:   w1_fires=773 (100.00%) both=190 (24.58%) aligned=82 (10.61%) opposed=108 (13.97%)
+  FRESH view: w1_fires=294 (38.03%) both=66 (8.54%) aligned=37 (4.79%) opposed=29 (3.75%)
+[US500.cash] running...
+  ny_cycles=356  session_fires=76 (21.35%)
+  ANY view:   w1_fires=356 (100.00%) both=76 (21.35%) aligned=35 (9.83%) opposed=41 (11.52%)
+  FRESH view: w1_fires=133 (37.36%) both=26 (7.30%) aligned=8 (2.25%) opposed=18 (5.06%)
+
+========================================================================
+Aggregate
+========================================================================
+  total NY cycles:        3565
+  SessionCRT fires:       803 (22.52%)
+
+  ANY view (any W1 setup in df_w1[:-1] — matches bridge CRT_W1(N) emission):
+    w1_fires     3565 (100.00%)
+    both          803 (22.52%)
+    aligned       392 (11.00%)
+    opposed       411 (11.53%)
+
+  FRESH view (most-recent W1 setup is on the latest closed weekly bar):
+    w1_fires     1309 (36.72%)
+    both          253 (7.10%)
+    aligned       123 (3.45%)
+    opposed       130 (3.65%)
+
+========================================================================
+Decision
+========================================================================
+  ANY-view aligned   = 11.00%  (substring-match predicate)
+  FRESH-view aligned = 3.45%  (just-printed W1 CRT)
+
+  Decision rule: 0.5%-3.0% -> SHIP +6, else DEFER
+
+  ANY view  : 11.00% > 3.0% -> DEFER (probably flat inflation / double-count)
+  FRESH view: 3.45% > 3.0% -> DEFER (probably flat inflation / double-count)
+
+  P(directions agree | both fire, ANY view)   = 48.8%
+  P(directions agree | both fire, FRESH view) = 48.6%
+  (50%/50% = random; >55% = real directional signal worth a synergy)
