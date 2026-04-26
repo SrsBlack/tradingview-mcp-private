@@ -1,0 +1,37 @@
+========================================================================
+Counter-D1-CRT trade-gate evidence bench
+========================================================================
+Closed ICT_Bridge trades: 36
+  skipped (no cache for symbol):   10
+  skipped (insufficient history): 0
+  classified:                      26
+
+Bucket breakdown
+------------------------------------------------------------------------
+ALL classified N= 26 W= 10 L= 16 sc= 0 WR= 38.5% meanR=+0.02 P&L=$+338.53
+aligned        N= 16 W=  7 L=  9 sc= 0 WR= 43.8% meanR=+0.08 P&L=$-617.79
+counter        N= 10 W=  3 L=  7 sc= 0 WR= 30.0% meanR=-0.08 P&L=$+956.32
+no_crt         N=  0 W=  0 L=  0 sc= 0 WR=  0.0% meanR=+0.00 P&L=$+0.00
+
+Counter sample (entry_time, symbol, dir, active_CRT, R, P&L):
+  2026-04-14T06:17:21 XAUUSD   SELL vs BULLISH   R=-0.89  $-0.87
+  2026-04-14T06:17:22 XAUUSD   SELL vs BULLISH   R=-0.39  $-0.38
+  2026-04-15T06:33:35 ETHUSD   SELL vs BULLISH   R=-1.05  $-76.78
+  2026-04-20T02:23:38 XAUUSD   BUY  vs BEARISH   R=-0.93  $-605.96
+  2026-04-20T17:31:48 ETHUSD   SELL vs BULLISH   R=+0.29  $+159.12
+  2026-04-23T13:12:56 SOLUSD   BUY  vs BEARISH   R=-0.11  $-35.50
+  2026-04-23T14:04:47 EURUSD   BUY  vs BEARISH   R=+1.94  $+350.00
+  2026-04-23T16:33:50 SOLUSD   BUY  vs BEARISH   R=-0.33  $-92.04
+  2026-04-24T07:00:23 XAUUSD   BUY  vs BEARISH   R=+2.45  $+1872.26
+  2026-04-25T04:15:22 SOLUSD   BUY  vs BEARISH   R=-1.76  $-613.53
+
+Decision
+------------------------------------------------------------------------
+Sample size required (N_MIN):           30
+Counter-CRT trades observed:             10
+Min WR delta required (pp):              10.0
+Observed WR delta (all - counter):       +8.5 pp
+
+DEFER: sample size insufficient. Need 20 more counter-CRT
+trades before this bench has the statistical power to ship a gate.
+Re-run after every ~10 new live trades.
