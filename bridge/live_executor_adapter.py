@@ -1034,41 +1034,73 @@ class LiveExecutorAdapter:
             return None
 
     def _get_h4_bias(self, ftmo_symbol: str) -> str:
-        """Query MT5 for H4 candles and determine bias. Returns BULLISH/BEARISH/NEUTRAL.
+        """Query MT5 for H4 candles and determine bias via ICT swing structure.
 
-        Requires a meaningful structural break before declaring direction:
-        recent extreme must move at least MIN_BIAS_BREAK_PCT (0.5%) vs prior extreme.
-        Without this, sub-tick differences during consolidation flip the bias
-        and kill valid trades (ETH 2026-04-26: +$38 closed at 0.34% lower-high
-        and 0.025% lower-low — basically a tie, called BEARISH).
+        Returns BULLISH/BEARISH/NEUTRAL using the same `analysis.structure` engine
+        the pre-trade pipeline uses (`bridge/ict_pipeline.py:374-376`):
+
+          detect_swings(lookback=5) → classify_structure → get_current_bias
+
+        This walks confirmed swing pivots, emits BOS/CHoCH events, and only declares
+        direction when there's structural majority (per `get_current_bias` rules:
+        bull_bos >= bear_bos + 2, OR a CHoCH that aligns with dominant BOS).
+
+        Why this matters:
+          The previous max/min over fixed 5-bar windows version would flip BEARISH
+          on a 0.34% lower-high + 0.03% lower-low (ETH 2026-04-26: closed +$38 trade).
+          A 0.5% threshold helped but was still arithmetic-only; consolidation chop
+          could still produce false signals.
+
+          Real ICT bias requires confirmed swings + structural breaks, not raw bar
+          extremes. This function and the pre-trade pipeline now agree on bias —
+          a trade entered as bullish will not be killed as bearish by a different
+          method 30 minutes later.
         """
-        MIN_BIAS_BREAK_PCT = 0.005  # 0.5% structural break required
         try:
             import MetaTrader5 as mt5
-            rates = mt5.copy_rates_from_pos(ftmo_symbol, mt5.TIMEFRAME_H4, 0, 20)
-            if rates is None or len(rates) < 10:
+            import pandas as pd
+            from bridge.config import ensure_trading_ai_path
+            ensure_trading_ai_path()
+            from analysis.structure import detect_swings, classify_structure, get_current_bias
+            from core.types import Direction
+
+            # Pull enough H4 history for swing detection (lookback=5 needs 11 bars
+            # to confirm one swing). 30 bars finds only 2-3 swings, often 0 events;
+            # 100 bars (~17 days) consistently finds 10+ swings and 2-4 BOS/CHoCH
+            # events — enough for `get_current_bias` to render a confident verdict
+            # rather than defaulting to NEUTRAL on insufficient data.
+            rates = mt5.copy_rates_from_pos(ftmo_symbol, mt5.TIMEFRAME_H4, 0, 100)
+            if rates is None or len(rates) < 30:
                 return "NEUTRAL"
 
-            highs = [float(r[2]) for r in rates[-10:]]
-            lows = [float(r[3]) for r in rates[-10:]]
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
+            df = df.set_index("time")
+            df = df.rename(columns={
+                "open": "open", "high": "high", "low": "low", "close": "close",
+                "tick_volume": "volume",
+            })
 
-            recent_high = max(highs[-5:])
-            prev_high = max(highs[:5])
-            recent_low = min(lows[-5:])
-            prev_low = min(lows[:5])
+            # Drop the forming candle — same pattern as ict_pipeline.py:371.
+            # A forming H4 candle takes 4 hours to close; including it produces
+            # phantom swings/structure events that don't yet exist.
+            if len(df) > 15:
+                df = df.iloc[:-1]
 
-            # Require meaningful break, not bar-arithmetic equality
-            high_break_up = recent_high > prev_high * (1 + MIN_BIAS_BREAK_PCT)
-            low_break_up = recent_low > prev_low * (1 + MIN_BIAS_BREAK_PCT)
-            high_break_dn = recent_high < prev_high * (1 - MIN_BIAS_BREAK_PCT)
-            low_break_dn = recent_low < prev_low * (1 - MIN_BIAS_BREAK_PCT)
+            swings = detect_swings(df, lookback=5)
+            _, events = classify_structure(swings, df=df)
+            bias = get_current_bias(events)
 
-            if high_break_up and low_break_up:
+            if bias == Direction.BULLISH:
                 return "BULLISH"
-            elif high_break_dn and low_break_dn:
+            if bias == Direction.BEARISH:
                 return "BEARISH"
             return "NEUTRAL"
-        except Exception:
+        except Exception as e:
+            # Fail safe — NEUTRAL means no HTF invalidation will fire, which is the
+            # conservative outcome for a profitable trade. We log the error so it's
+            # visible in the .bat console.
+            print(f"  [_get_h4_bias] {ftmo_symbol}: {type(e).__name__}: {e}", flush=True)
             return "NEUTRAL"
 
     def _check_htf_invalidation(self) -> list[dict]:
