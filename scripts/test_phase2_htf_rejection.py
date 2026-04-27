@@ -81,10 +81,28 @@ def _check(name: str, ok: bool, detail: str = "") -> None:
 
 def test_synergy_helper_fires():
     a = _StubAnalysis(
+        advanced_factors=["HTF_REJ_M15_H4_BEARISH"],
+        displacement_confirmed=True,
+    )
+    _check("helper fires when factor + displacement present (new format)",
+           _has_htf_rejection_with_displacement(a) is True)
+
+
+def test_synergy_helper_fires_old_format():
+    a = _StubAnalysis(
         advanced_factors=["HTF_REJ_H4_BEARISH"],
         displacement_confirmed=True,
     )
-    _check("helper fires when factor + displacement present",
+    _check("helper fires on legacy HTF_REJ_<TF>_<DIR> format",
+           _has_htf_rejection_with_displacement(a) is True)
+
+
+def test_synergy_helper_recognises_h4_trigger():
+    a = _StubAnalysis(
+        advanced_factors=["HTF_REJ_H4_D1_BEARISH"],
+        displacement_confirmed=True,
+    )
+    _check("helper fires for H4 trigger + D1 zone",
            _has_htf_rejection_with_displacement(a) is True)
 
 
@@ -169,6 +187,8 @@ def test_feature_flag_default_off():
 def main() -> int:
     print("Phase 2 HTF rejection wiring tests:")
     test_synergy_helper_fires()
+    test_synergy_helper_fires_old_format()
+    test_synergy_helper_recognises_h4_trigger()
     test_synergy_helper_no_displacement()
     test_synergy_helper_no_htf_factor()
     test_synergy_recognises_d1_factor()

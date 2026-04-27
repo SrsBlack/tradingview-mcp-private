@@ -313,22 +313,18 @@ def _has_session_crt(a: Any) -> bool:
 
 
 def _has_htf_rejection_with_displacement(a: Any) -> bool:
-    """HTF FVG/OB rejection setup (H4 or D1 zone tagged + rejected) with
+    """HTF FVG/OB rejection setup (H4/D1 zone tagged + rejected) with
     M15 displacement_confirmed.
 
-    The pipeline emits HTF_REJ_<TF>_<DIR> advanced_factors when the
-    rejection detector fires. Pairing those with M15 displacement_confirmed
-    (sweep + opposing-direction FVG) is the textbook ICT 2022 short
-    trigger: HTF imbalance + sweep of liquidity + displacement candle.
-
-    Substring search on advanced_factors keeps this independent of the
-    HTFRejection dataclass shape. Direction match between detector and
+    The pipeline emits factors in either format:
+      - new: HTF_REJ_<TRIG>_<ZONE>_<DIR>  e.g. HTF_REJ_H4_D1_BEARISH
+      - old: HTF_REJ_<TF>_<DIR>           e.g. HTF_REJ_H4_BEARISH
+    Substring 'htf_rej_' covers both. Direction match between detector and
     bridge bias is enforced by the pipeline's bias-override step before
-    synergies are evaluated, so any HTF_REJ_* factor present here is
-    aligned with `direction`.
+    synergies are evaluated.
     """
     factors = " ".join(getattr(a, "advanced_factors", []) or []).lower()
-    has_rej = any(f"htf_rej_{tf}" in factors for tf in ("h4", "d1", "w1"))
+    has_rej = "htf_rej_" in factors
     return has_rej and bool(getattr(a, "displacement_confirmed", False))
 
 

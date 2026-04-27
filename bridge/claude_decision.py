@@ -679,9 +679,10 @@ class ClaudeDecisionMaker:
             _factors_lower = " ".join(
                 getattr(analysis, "advanced_factors", []) or []
             ).lower()
-            htf_rej_present = any(
-                f"htf_rej_{tf}" in _factors_lower for tf in ("h4", "d1", "w1")
-            )
+            # Match both old (HTF_REJ_<TF>_<DIR>) and new
+            # (HTF_REJ_<TRIG>_<ZONE>_<DIR>) factor formats. Substring is
+            # sufficient — any HTF_REJ_* present means a rejection fired.
+            htf_rej_present = "htf_rej_" in _factors_lower
             htf_rejection_high_conviction = (
                 original_grade == "A"
                 and htf_rej_present

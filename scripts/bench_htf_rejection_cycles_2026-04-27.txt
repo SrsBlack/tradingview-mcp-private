@@ -3,36 +3,36 @@ HTF rejection detector — cycle-log replay bench
 ==============================================================================
 
 Parsing log: C:\Users\User\tradingview-mcp-jackson\logs\trading.log
-Parsed cycle x symbol records: 554
-Cacheable (one of 7 symbols): 343
+Parsed cycle x symbol records: 610
+Cacheable (one of 7 symbols): 363
 
 Detector params: lookback=12, disp=1.5, body=0.55
 Forward-price window: 16 M15 bars (4h), threshold=0.5*ATR
 
---- BITSTAMP:BTCUSD (n=72) ---
-   buckets: {'QUIET': 42, 'FLIP_AGREE': 14, 'CONFIRM': 16}
---- CAPITALCOM:US500 (n=74) ---
-   buckets: {'QUIET': 73, 'CONFIRM': 1}
---- COINBASE:ETHUSD (n=84) ---
-   buckets: {'FLIP_DISAGREE': 4, 'QUIET': 56, 'CONFIRM': 24}
---- COINBASE:SOLUSD (n=67) ---
-   buckets: {'CONFIRM': 16, 'QUIET': 36, 'FLIP_AGREE': 13, 'FLIP_DISAGREE': 2}
---- OANDA:EURUSD (n=2) ---
-   buckets: {'QUIET': 2}
---- OANDA:GBPUSD (n=2) ---
-   buckets: {'QUIET': 2}
---- OANDA:XAUUSD (n=42) ---
-   buckets: {'QUIET': 20, 'CONFIRM': 11, 'FLIP_DISAGREE': 3, 'FLIP_UNKNOWN': 8}
+--- BITSTAMP:BTCUSD (n=74) ---
+   buckets: {'QUIET': 44, 'FLIP_AGREE': 14, 'CONFIRM': 16}
+--- CAPITALCOM:US500 (n=77) ---
+   buckets: {'QUIET': 76, 'CONFIRM': 1}
+--- COINBASE:ETHUSD (n=87) ---
+   buckets: {'FLIP_DISAGREE': 4, 'QUIET': 57, 'CONFIRM': 24, 'FLIP_UNKNOWN': 2}
+--- COINBASE:SOLUSD (n=70) ---
+   buckets: {'CONFIRM': 16, 'QUIET': 37, 'FLIP_AGREE': 13, 'FLIP_DISAGREE': 2, 'FLIP_UNKNOWN': 2}
+--- OANDA:EURUSD (n=5) ---
+   buckets: {'QUIET': 5}
+--- OANDA:GBPUSD (n=5) ---
+   buckets: {'QUIET': 5}
+--- OANDA:XAUUSD (n=45) ---
+   buckets: {'QUIET': 20, 'CONFIRM': 11, 'FLIP_DISAGREE': 3, 'FLIP_UNKNOWN': 11}
 
 ==============================================================================
 Aggregate
 ==============================================================================
-Total: 343  skipped=0  replayed=343
-  FLIP_AGREE      27/343 (  7.9%)
-  FLIP_DISAGREE    9/343 (  2.6%)
-  FLIP_UNKNOWN     8/343 (  2.3%)
-  CONFIRM         68/343 ( 19.8%)
-  QUIET          231/343 ( 67.3%)
+Total: 363  skipped=0  replayed=363
+  FLIP_AGREE      27/363 (  7.4%)
+  FLIP_DISAGREE    9/363 (  2.5%)
+  FLIP_UNKNOWN    15/363 (  4.1%)
+  CONFIRM         68/363 ( 18.7%)
+  QUIET          244/363 ( 67.2%)
 
   Flip accuracy (FLIP_AGREE / (FLIP_AGREE+FLIP_DISAGREE)): 75.0%
 
@@ -71,3 +71,6 @@ Spotlight: COINBASE:ETHUSD cycles on 2026-04-27
   06:58:19 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
   07:13:31 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
   07:29:47 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
+  07:46:02 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
+  08:02:11 bridge=bullish  grade=B -> FLIP_UNKNOWN   fired=bearish fwd=None
+  08:08:26 bridge=bullish  grade=B -> FLIP_UNKNOWN   fired=bearish fwd=None

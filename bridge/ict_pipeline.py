@@ -762,67 +762,96 @@ class ICTPipeline:
                         )
                         break
 
-            # -- Step 8b4: HTF FVG/OB rejection detection --
-            # Detects when M15 price has tagged an H4/D1 zone, rejected with
-            # displacement, and is now back outside it. Drives a bias-override
-            # path for the case where M15 swing structure lags an HTF reversal.
-            # See feedback_htf_rejection_not_caught.md for the motivating bug
-            # (ETH 2026-04-27 H4 chart).
+            # -- Step 8b4: Multi-TF HTF FVG/OB rejection detection --
+            # Runs the rejection detector on three trigger timeframes (M15/H1/
+            # H4) against zones from the next-higher TFs. Single-candle H4
+            # rejections (the kind clearly visible on H4 charts) are caught
+            # by the H4-trigger path; multi-bar M15 reconstructions still get
+            # the M15-trigger path. See feedback_htf_rejection_not_caught.md
+            # for the motivating bug.
             #
-            # Behavior is feature-gated: emitting advanced_factors is always
-            # safe; bias-override is gated by config.htf_rejection_enabled.
+            # Always emits advanced_factors as HTF_REJ_<TRIG>_<ZONE>_<DIR>.
+            # Bias override is gated by config.htf_rejection_enabled.
             htf_rejections: list[HTFRejection] = []
+
+            def _local_atr(df_local: pd.DataFrame | None, period: int = 14) -> float:
+                if df_local is None or len(df_local) < period + 1:
+                    return 0.0
+                _h = df_local["high"].astype(float)
+                _l = df_local["low"].astype(float)
+                _c = df_local["close"].astype(float)
+                _tr = pd.concat([
+                    _h - _l,
+                    (_h - _c.shift(1)).abs(),
+                    (_l - _c.shift(1)).abs(),
+                ], axis=1).max(axis=1)
+                return float(_tr.iloc[-period:].mean())
+
+            def _safe_detect(*, df_trig, trigger_tf, zones, zone_tf, atr_val):
+                """Wrap detect_htf_rejection with a try/except + log."""
+                if df_trig is None or len(df_trig) < 20 or atr_val <= 0:
+                    return []
+                if not zones:
+                    return []
+                try:
+                    return detect_htf_rejection(
+                        df_trigger=df_trig.tail(60),
+                        htf_fvgs=zones,
+                        htf_obs=None,
+                        atr=atr_val,
+                        displacement_min=1.5,
+                        body_min_pct=0.55,
+                        htf_timeframe=zone_tf,
+                        trigger_tf=trigger_tf,
+                    )
+                except Exception as e:
+                    print(
+                        f"  [{symbol}] HTF rejection detect error "
+                        f"(trig={trigger_tf} zone={zone_tf}): {e}",
+                        flush=True,
+                    )
+                    return []
+
             try:
-                if (
-                    df_primary is not None and len(df_primary) >= 30
-                    and (htf_fvgs or d1_fvgs)
-                ):
-                    # Local M15 ATR — pipeline's own ATR is computed later (step
-                    # at end-of-method), so we compute one here just for this
-                    # check. Cheap; ~14-bar mean of TR.
-                    _m15_highs = df_primary["high"].astype(float)
-                    _m15_lows = df_primary["low"].astype(float)
-                    _m15_closes = df_primary["close"].astype(float)
-                    _tr = pd.concat([
-                        _m15_highs - _m15_lows,
-                        (_m15_highs - _m15_closes.shift(1)).abs(),
-                        (_m15_lows - _m15_closes.shift(1)).abs(),
-                    ], axis=1).max(axis=1)
-                    _atr_local = float(_tr.iloc[-14:].mean()) if len(_tr) >= 15 else 0.0
+                # M15 trigger — multi-bar tag-and-displace
+                _atr_m15_local = _local_atr(df_primary)
+                # H1 trigger — single H1 candle rejection clearly visible on H1
+                _atr_h1_local = _local_atr(df_itf)
+                # H4 trigger — single H4 candle rejection (the user's chart case)
+                _atr_h4_local = _local_atr(df_htf_closed)
 
-                    if _atr_local > 0:
-                        # H4 zones — reuse already-computed htf_fvgs from step 3b.
-                        htf_rejections.extend(detect_htf_rejection(
-                            df_m15=df_primary.tail(60),
-                            htf_fvgs=htf_fvgs,
-                            htf_obs=None,  # H4 OBs not pre-computed; FVGs cover most cases
-                            atr_m15=_atr_local,
-                            lookback_m15=12,
-                            displacement_min=1.5,
-                            body_min_pct=0.55,
-                            htf_timeframe="H4",
-                            max_displacement_age_minutes=60,
-                        ))
-                        # D1 zones — reuse d1_fvgs from step 2b.
-                        htf_rejections.extend(detect_htf_rejection(
-                            df_m15=df_primary.tail(60),
-                            htf_fvgs=d1_fvgs,
-                            htf_obs=None,
-                            atr_m15=_atr_local,
-                            lookback_m15=12,
-                            displacement_min=1.5,
-                            body_min_pct=0.55,
-                            htf_timeframe="D1",
-                            max_displacement_age_minutes=60,
-                        ))
+                # M15 against H4 + D1 zones
+                htf_rejections.extend(_safe_detect(
+                    df_trig=df_primary, trigger_tf="M15",
+                    zones=htf_fvgs, zone_tf="H4", atr_val=_atr_m15_local,
+                ))
+                htf_rejections.extend(_safe_detect(
+                    df_trig=df_primary, trigger_tf="M15",
+                    zones=d1_fvgs, zone_tf="D1", atr_val=_atr_m15_local,
+                ))
+                # H1 against H4 + D1 zones
+                htf_rejections.extend(_safe_detect(
+                    df_trig=df_itf, trigger_tf="H1",
+                    zones=htf_fvgs, zone_tf="H4", atr_val=_atr_h1_local,
+                ))
+                htf_rejections.extend(_safe_detect(
+                    df_trig=df_itf, trigger_tf="H1",
+                    zones=d1_fvgs, zone_tf="D1", atr_val=_atr_h1_local,
+                ))
+                # H4 against D1 zones (H4-on-H4 isn't useful — same TF)
+                htf_rejections.extend(_safe_detect(
+                    df_trig=df_htf_closed, trigger_tf="H4",
+                    zones=d1_fvgs, zone_tf="D1", atr_val=_atr_h4_local,
+                ))
 
-                        # Always emit advanced_factors (informational; safe).
-                        for rej in htf_rejections:
-                            result.advanced_factors.append(
-                                f"HTF_REJ_{rej.htf_timeframe}_{rej.direction.name}"
-                            )
+                # Emit advanced_factors with both trigger and zone TF.
+                # Format: HTF_REJ_<TRIG>_<ZONE>_<DIR> e.g. HTF_REJ_H4_D1_BEARISH.
+                for rej in htf_rejections:
+                    result.advanced_factors.append(
+                        f"HTF_REJ_{rej.trigger_tf}_{rej.htf_timeframe}_{rej.direction.name}"
+                    )
             except Exception as _e:
-                print(f"  [{symbol}] HTF rejection detect error: {_e}", flush=True)
+                print(f"  [{symbol}] HTF rejection multi-TF detect error: {_e}", flush=True)
 
             # -- Step 8b5: Bias override (feature-flagged) --
             # If the strongest HTF rejection direction opposes the current
