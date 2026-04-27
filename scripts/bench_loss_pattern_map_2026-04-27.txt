@@ -1,0 +1,101 @@
+====================================================================================================
+Loss-pattern map — diagnostic features per closed trade
+====================================================================================================
+
+Total closed ICT_Bridge trades: 53
+
+Analyzed: 53 trades
+
+tag   sym            side        pnl bias_d1   bias_h1    trnd_d1  trnd_h4  ipda  opp_d opp_n forming     
+--------------------------------------------------------------------------------------------------------------
+ ✗    ETHUSD         BUY   $ -373.40 NEUTRAL   BEARISH      +8.5%    -1.2%   71%  1.94%   0 against     
+ ✗    BTCUSD         BUY   $ -235.80 NEUTRAL   NEUTRAL      +9.5%    +0.7%   76%  1.46%   0 against     
+ ✓    US500.cash     BUY   $ +138.04 BEARISH   BULLISH      +7.8%    +1.6%   91%  0.04%   1 with_trade  
+ ✓    BTCUSD         BUY   $ +456.80 BULLISH   NEUTRAL     +11.7%    -1.2%   67%  0.87%   0 against     
+ ✗    XAUUSD         BUY   $ -628.24 BEARISH   BULLISH      +9.2%    -1.0%   89% 99.00%   0 with_trade  
+ ✗    GBPUSD         BUY   $ -151.90 BEARISH   BEARISH      +0.9%    -0.5%   81%  0.27%   1 against     
+ ✓    GER40.cash     BUY   $ +163.65 BULLISH   BULLISH     +10.4%    +1.4%   86%  0.24%   2 against     
+ ✓    UKOIL.cash     BUY   $ +835.50 NEUTRAL   BEARISH      -4.6%    -0.6%   29%  2.06%   0 with_trade  
+ ✗    ETHUSD         SELL  $ -113.55 BULLISH   BEARISH      +8.8%    -4.7%   67%  1.66%   0 against     
+ ✗    USDJPY         SELL  $ -771.06 NEUTRAL   NEUTRAL      +0.1%    -0.0%   43%  0.02%   2 against     
+ ✗    SOLUSD         SELL  $ -470.00 BULLISH   NEUTRAL      +8.0%    -2.9%   64%  0.18%   1 against     
+ ✓    UKOIL.cash     BUY   $ +639.25 NEUTRAL   NEUTRAL      +0.0%    -0.7%   31%  1.44%   0 with_trade  
+ ✗    GER40.cash     BUY   $ -222.56 BULLISH   BULLISH      +6.0%    +1.9%   93% 99.00%   0 with_trade  
+ ✗    GBPUSD         SELL  $ -271.22 BEARISH   BEARISH      +1.1%    -0.3%   80%  0.14%   3 against     
+ ✗    ETHUSD         BUY   $  -21.50 BULLISH   NEUTRAL     +12.0%    -2.1%   66%  2.96%   0 against     
+ ✗    USDJPY         SELL  $ -350.06 NEUTRAL   BEARISH      -0.1%    +0.2%   53%  0.07%   4 against     
+ ✓    AUDUSD         SELL  $ +270.00 BEARISH   BULLISH      +3.0%    -0.3%   88%  0.09%   2 with_trade  
+ ✗    NZDUSD         SELL  $  -25.20 BEARISH   BULLISH      +1.5%    +0.0%   92%  0.11%   5 with_trade  
+ ✗    US500.cash     BUY   $   -2.25 BEARISH   BULLISH      +7.6%    +0.7%   96% 99.00%   0 against     
+ ✗    BTCUSD         BUY   $   -8.96 BULLISH   BULLISH     +13.1%    -0.6%   80%  0.79%   0 against     
+ ✓    SOLUSD         SELL  $  +25.50 BULLISH   BULLISH      +8.0%    -1.4%   66%  0.42%   1 against     
+ ✓    US500.cash     BUY   $  +17.70 BEARISH   BULLISH      +7.6%    +0.7%   93% 99.00%   0 against     
+ ✗    GER40.cash     BUY   $ -236.80 BULLISH   BULLISH      +6.0%    -0.1%   83%  0.59%   0 against     
+ ✗    US30.cash      BUY   $  -12.13 BEARISH   BULLISH      +6.2%    +1.5%   90% 99.00%   0 against     
+ ✗    US500.cash     BUY   $  -13.65 BEARISH   BULLISH      +7.6%    +0.7%   93% 99.00%   0 against     
+ ✗    US100.cash     BUY   $  -52.00 BEARISH   BULLISH     +10.0%    +1.0%   96% 99.00%   0 against     
+ ✗    BTCUSD         BUY   $  -18.16 BULLISH   BULLISH     +13.1%    -0.6%   81%  0.49%   1 against     
+ ✗    SOLUSD         BUY   $   -1.71 BULLISH   BULLISH      +8.0%    -1.4%   66%  2.01%   0 with_trade  
+ ✗    US500.cash     BUY   $   -7.05 BEARISH   BULLISH      +7.6%    +0.7%   93%  0.01%   1 against     
+ ✗    GER40.cash     BUY   $ -385.71 BULLISH   BULLISH      +6.0%    +0.3%   77%  0.52%   0 against     
+ ✗    XAGUSD         BUY   $  -54.25 BULLISH   BULLISH      +8.0%    -2.5%   61%  0.89%   0 with_trade  
+ ✓    BTCUSD         BUY   $  +69.60 BULLISH   BULLISH     +13.1%    -0.3%   76%  1.43%   0 against     
+ ✗    US500.cash     BUY   $  -25.50 BEARISH   BULLISH      +7.6%    +0.8%   92%  0.07%   2 with_trade  
+ ✗    USDJPY         SELL  $ -179.35 NEUTRAL   BEARISH      -0.1%    +0.1%   60%  0.01%   7 with_trade  
+ ✗    XAGUSD         BUY   $  -81.60 BULLISH   BULLISH      +8.0%    -2.5%   62%  0.61%   0 with_trade  
+ ✗    NZDUSD         BUY   $ -112.00 BEARISH   BULLISH      +1.5%    +0.1%   83%  0.16%   1 with_trade  
+ ✗    US30.cash      BUY   $  -89.59 BEARISH   BULLISH      +6.2%    +1.7%   87%  0.42%   1 with_trade  
+ ✗    GER40.cash     BUY   $ -672.37 BULLISH   NEUTRAL      +5.9%    +0.6%   81%  0.02%   1 with_trade  
+ ✗    ETHUSD         BUY   $  -12.77 BULLISH   NEUTRAL     +12.7%    +1.5%   66%  2.88%   0 against     
+ ✓    SOLUSD         BUY   $  +30.60 BULLISH   BULLISH      +6.1%    +1.5%   60%  2.13%   0 with_trade  
+ ✗    ETHUSD         BUY   $ -361.30 BULLISH   NEUTRAL     +12.7%    +0.3%   70%  2.17%   0 against     
+ ✗    SOLUSD         BUY   $  -75.00 BULLISH   BULLISH      +6.1%    +0.6%   61%  2.04%   0 against     
+ ✓    EURUSD         BUY   $ +322.00 NEUTRAL   BEARISH      +1.5%    -0.5%   61%  0.56%   0 with_trade  
+ ✗    SOLUSD         BUY   $ -287.92 BULLISH   NEUTRAL      +6.1%    +0.6%   63%  1.75%   0 against     
+ ✓    ETHUSD         BUY   $ +142.00 BULLISH   BEARISH     +12.4%    +0.0%   65%  3.08%   0 with_trade  
+ ✓    XAUUSD         BUY   $ +835.24 BULLISH   BEARISH      +4.6%    -2.1%   58%  0.16%   1 with_trade  
+ ✗    EURJPY         SELL  $ -473.56 NEUTRAL   BEARISH      +2.0%    -0.3%   73%  0.40%   2 against     
+ ✗    GBPJPY         SELL  $  -93.43 BULLISH   BULLISH      +2.4%    +0.2%   92%  0.15%   5 against     
+ ✓    ETHUSD         BUY   $  +38.60 BULLISH   BEARISH     +12.4%    +0.4%   66%  2.87%   0 against     
+ ✗    SOLUSD         BUY   $ -120.30 BULLISH   BULLISH      +4.7%    -0.2%   65%  1.39%   0 indecisive  
+ ✓    SOLUSD         BUY   $ +110.00 BULLISH   BULLISH      +4.7%    -0.5%   64%  1.60%   0 with_trade  
+ ✗    UKOIL.cash     SELL  $ -222.00 BEARISH   BULLISH      -4.0%    +8.7%   76%  0.91%   0 against     
+ ✗    GBPJPY         SELL  $ -208.04 BULLISH   BULLISH      +2.9%    +0.2%   92%  0.05%   5 against     
+
+Winners: 15  Losers: 38
+
+pattern                                                   win-fire  lose-fire   edge
+------------------------------------------------------------------------------------------
+Trade direction disagrees with D1 bias                  3/15 (  20%) 14/38 (  37%)   +17%
+Trade direction disagrees with H1 bias                  7/15 (  47%) 6/38 (  16%)   -31%
+D1 trend strongly opposes trade (>1.5%)                 3/15 (  20%) 6/38 (  16%)    -4%
+H4 trend strongly opposes trade (>1.5%)                 1/15 (   7%) 4/38 (  11%)    +4%
+Stacked opposing HTF FVG within 0.5%                    2/15 (  13%) 9/38 (  24%)   +10%
+Entry H4 bar forming AGAINST trade dir                  6/15 (  40%) 26/38 (  68%)   +28%  ★
+Trade fades IPDA 20d extreme (>80% or <20%)             3/15 (  20%) 14/38 (  37%)   +17%
+
+★ = candidate gate (>=20% loser-edge, >=3 loser hits)
+
+====================================================================================================
+Dollar impact if each pattern was used as a HARD-SKIP gate
+====================================================================================================
+pattern                                                  winners $ blocked   losers $ saved        NET
+---------------------------------------------------------------------------------------------------------
+Trade direction disagrees with D1 bias                             +181.24         +1979.33   +1798.09
+Trade direction disagrees with H1 bias                            +2468.84         +1073.97   -1394.87
+D1 trend strongly opposes trade (>1.5%)                           +1131.00         +1383.78    +252.78
+H4 trend strongly opposes trade (>1.5%)                            +835.24          +379.35    -455.89
+Stacked opposing HTF FVG within 0.5%                               +433.65         +2397.42   +1963.77
+Entry H4 bar forming AGAINST trade dir                             +771.85         +5229.22   +4457.37
+Trade fades IPDA 20d extreme (>80% or <20%)                        +319.39         +2244.20   +1924.81
+
+====================================================================================================
+Combined patterns — multiple conditions firing together
+====================================================================================================
+
+pattern                                                   win-fire  lose-fire   edge
+------------------------------------------------------------------------------------------
+vs_h1_disagree + forming_against                        2/15 (  13%) 5/38 (  13%)    -0%
+strong_opposing_d1_trend + stacked_opposing_fvg         1/15 (   7%) 4/38 (  11%)    +4%
+any_strong_opposing_trend                               4/15 (  27%) 10/38 (  26%)    -0%
+forming_against + ipda_fade_extreme                     2/15 (  13%) 8/38 (  21%)    +8%
