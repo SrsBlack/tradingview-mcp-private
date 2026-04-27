@@ -1140,6 +1140,20 @@ Max allowed risk_pct for this call: {max_risk:.4f}"""
         "reduced conviction to b/c",
         "b/c threshold",
         "grade b/c execution",
+        # "C-equivalent" variants — Claude's softer way of saying the same
+        # thing. Added 2026-04-27 after UKOIL SELL -$222 loss: Claude wrote
+        # "Grade A signal downgraded to C-equivalent conviction due to macro
+        # zone conflict, W1 bullish MTF conflict, partial structure (18/30),
+        # and IPDA at 73%" then took the trade with confidence=72.
+        # Backtest scan over all logged Claude entries: 1 match (the UKOIL
+        # loss). 0 false positives on winners. See bench_c_equivalent_phrase.py.
+        "c-equivalent",
+        "to c-equivalent",
+        "downgraded to c",
+        "downgrade to c",
+        "grade reduction to c",
+        "force grade reduction to c",
+        "reduction to c-equivalent",
         # PO3 accumulation — trade is early, price hasn't started directional move.
         # "distribution not yet started" is specific enough to be safe.
         "distribution not yet started",
