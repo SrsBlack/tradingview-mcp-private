@@ -21,7 +21,7 @@ Replaying each clean trade against today's pre-gates...
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [CAPITALCOM:US500] OHLCV: H4=500 H1=500 M15=500 bars
   [CAPITALCOM:US500] GRADE CAP A->B: BULLISH in H4 premium — letting Claude evaluate with reduced conviction
-  [ 1/10] 2026-04-20T01:54:56 US500.cash   BUY   pnl=  +138.04 -> BLOCK [KILL_ZONE] gate_bias=BULLISH | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only <-- REAL FALSE-BLOCK
+  [ 1/10] 2026-04-20T01:54:56 US500.cash   BUY   pnl=  +138.04 -> PASS new_score=79 new_grade=B
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -34,12 +34,12 @@ Replaying each clean trade against today's pre-gates...
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [COINBASE:SOLUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [ 6/10] 2026-04-23T15:00:18 SOLUSD       BUY   pnl=   +30.60 -> PASS new_score=86.4 new_grade=A
+  [ 6/10] 2026-04-23T15:00:18 SOLUSD       BUY   pnl=   +30.60 -> PASS new_score=90.6 new_grade=A
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [OANDA:EURUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [ 7/10] 2026-04-23T17:04:29 EURUSD       BUY   pnl=  +322.00 -> BLOCK [OTHER] gate_bias=BEARISH | Grade C (61/100) below minimum for API call
+  [ 7/10] 2026-04-23T17:04:29 EURUSD       BUY   pnl=  +322.00 -> PASS new_score=65.6 new_grade=B
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -50,7 +50,7 @@ Replaying each clean trade against today's pre-gates...
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [OANDA:XAUUSD] OHLCV: H4=500 H1=500 M15=500 bars
   [OANDA:XAUUSD] GRADE CAP A->B: HTF data missing (W1=NEUTRAL D1=BULLISH H4=NEUTRAL)
-  [ 9/10] 2026-04-24T10:00:08 XAUUSD       BUY   pnl=  +835.24 -> BLOCK [KILL_ZONE] gate_bias=BULLISH | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only <-- REAL FALSE-BLOCK
+  [ 9/10] 2026-04-24T10:00:08 XAUUSD       BUY   pnl=  +835.24 -> PASS new_score=79 new_grade=B
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -74,12 +74,13 @@ Replaying each clean trade against today's pre-gates...
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [OANDA:XAUUSD] OHLCV: H4=500 H1=500 M15=500 bars
   [OANDA:XAUUSD] GRADE CAP A->B: BULLISH in H4 premium — letting Claude evaluate with reduced conviction
-  [ 3/25] 2026-04-20T05:22:20 XAUUSD       BUY   pnl=  -628.24 -> BLOCK [KILL_ZONE] gate_bias=BULLISH | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only <-- REAL FALSE-BLOCK
+  [ 3/25] 2026-04-20T05:22:20 XAUUSD       BUY   pnl=  -628.24 -> PASS new_score=79 new_grade=B
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [OANDA:GBPUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [ 4/25] 2026-04-20T10:24:08 GBPUSD       BUY   pnl=  -151.90 -> BLOCK [KILL_ZONE] gate_bias=BULLISH | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only <-- REAL FALSE-BLOCK
+  [OANDA:GBPUSD] GRADE CAP A->B: BULLISH in H4 premium — letting Claude evaluate with reduced conviction
+  [ 4/25] 2026-04-20T10:24:08 GBPUSD       BUY   pnl=  -151.90 -> PASS new_score=79 new_grade=B
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -110,7 +111,7 @@ Replaying each clean trade against today's pre-gates...
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [CAPITALCOM:US500] OHLCV: H4=500 H1=500 M15=500 bars
   [CAPITALCOM:US500] GRADE CAP A->B: BULLISH in H4 premium — letting Claude evaluate with reduced conviction
-  [12/25] 2026-04-21T18:46:24 US500.cash   BUY   pnl=   -13.65 -> BLOCK [KILL_ZONE] gate_bias=BULLISH | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only <-- REAL FALSE-BLOCK
+  [12/25] 2026-04-21T18:46:24 US500.cash   BUY   pnl=   -13.65 -> PASS new_score=79 new_grade=B
   [13/25] 2026-04-21T19:21:18 US100.cash   BUY   pnl=   -52.00 -> SKIP (no cache mapping)
   [14/25] 2026-04-21T21:05:35 USDJPY       SELL  pnl=  -179.35 -> SKIP (no cache mapping)
   [15/25] 2026-04-21T21:11:13 XAGUSD       BUY   pnl=   -81.60 -> SKIP (no cache mapping)
@@ -121,6 +122,7 @@ Replaying each clean trade against today's pre-gates...
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [COINBASE:ETHUSD] OHLCV: H4=500 H1=500 M15=500 bars
+  [COINBASE:ETHUSD] GRADE CAP A->B: HTF data missing (W1=BEARISH D1=BULLISH H4=NEUTRAL)
   [19/25] 2026-04-23T13:20:52 ETHUSD       BUY   pnl=   -12.77 -> BLOCK [PD_ZONE] gate_bias=BEARISH | ZONE VIOLATION: BEARISH in discount — ICT rule: BUY in discount only, SELL in pr
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
@@ -131,7 +133,7 @@ Replaying each clean trade against today's pre-gates...
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [COINBASE:SOLUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [21/25] 2026-04-23T16:12:38 SOLUSD       BUY   pnl=   -75.00 -> PASS new_score=88.8 new_grade=A
+  [21/25] 2026-04-23T16:12:38 SOLUSD       BUY   pnl=   -75.00 -> PASS new_score=93.0 new_grade=A
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -148,31 +150,25 @@ Replaying each clean trade against today's pre-gates...
 ==============================================================================
 Aggregate
 ==============================================================================
-  WINNERS: total=10  skipped=3  replayed=7  pass=4  blocked=3  real_blocked=2
-     all_block_rate  = 42.9%
-     real_block_rate = 28.6%  (target for winners: 0%)
-     all gates fired:  {'KILL_ZONE': 2, 'OTHER': 1}
-     real-block gates: {'KILL_ZONE': 2}
-     blocked P&L:       $+1295.28  (real-block subset: $+973.28)
+  WINNERS: total=10  skipped=3  replayed=7  pass=7  blocked=0  real_blocked=0
+     all_block_rate  = 0.0%
+     real_block_rate = 0.0%  (target for winners: 0%)
+     blocked P&L:       $+0.00  (real-block subset: $+0.00)
 
-  LOSERS : total=25  skipped=11  replayed=14  pass=6  blocked=8  real_blocked=4
-     all_block_rate  = 57.1%
-     real_block_rate = 28.6%  (target for winners: 0%)
-     all gates fired:  {'KILL_ZONE': 3, 'PD_ZONE': 5}
-     real-block gates: {'KILL_ZONE': 3, 'PD_ZONE': 1}
-     blocked P&L:       $-1682.83  (real-block subset: $-1065.01)
+  LOSERS : total=25  skipped=11  replayed=14  pass=9  blocked=5  real_blocked=1
+     all_block_rate  = 35.7%
+     real_block_rate = 7.1%  (target for winners: 0%)
+     all gates fired:  {'PD_ZONE': 5}
+     real-block gates: {'PD_ZONE': 1}
+     blocked P&L:       $-889.04  (real-block subset: $-271.22)
 
   Net dollar impact if today's gates had been live:
-    Lost (winners blocked):      $-973.28
-    Saved (losers blocked):      $+1065.01
-    Net effect on real money:    $+91.73
+    Lost (winners blocked):      $+0.00
+    Saved (losers blocked):      $+271.22
+    Net effect on real money:    $+271.22
 
 ==============================================================================
 Verdict
 ==============================================================================
-  FAIL — 2 of 7 replayable winners would have been
-         REAL-blocked by today's pre-gates. Investigate each:
-         - 2026-04-20T01:54:56 US500.cash BUY pnl=+138.04 bias=BULLISH | gate=KILL_ZONE | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only trade during London (2-5AM ET), NY AM (
-         - 2026-04-24T10:00:08 XAUUSD BUY pnl=+835.24 bias=BULLISH | gate=KILL_ZONE | KILL ZONE GATE: Not in a kill zone or Silver Bullet window. ICT 2022 model: only trade during London (2-5AM ET), NY AM (
-
-  For reference: losers had 4/14 = 29% real-block rate.
+  PASS — 0 of 7 replayable winners would have been REAL-blocked.
+         For reference: losers had 1/14 = 7% real-block rate.

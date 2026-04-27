@@ -360,24 +360,34 @@ class PaperExecutor:
         return events
 
     def _update_trailing_stop(self, pos: PaperPosition) -> None:
-        """Move trailing stop based on R-multiple progress."""
+        """Move trailing stop based on R-multiple progress.
+
+        Mirrors the live-executor algorithm (REVISED 2026-04-26). See
+        bridge/live_executor_adapter.py::_update_trailing_stop for full
+        rationale — short version: hold off trailing until R >= 1.5 to
+        let ICT shake-out retraces complete, then lock +0.5R / +1R /
+        (R-1) as R grows.
+        """
         r = pos.r_multiple
         risk = abs(pos.entry_price - pos.sl_price)
+        if risk == 0 or r < 1.5:
+            return
 
-        if r >= 1.0:
-            # Move to breakeven at 1R
-            new_sl = pos.entry_price
-            if pos.direction == "BUY":
-                # Trail at 0.5R increments above breakeven
-                trail_level = pos.entry_price + (r - 0.5) * risk
-                new_sl = max(new_sl, trail_level)
-                if new_sl > pos.trailing_sl:
-                    pos.trailing_sl = round(new_sl, 5)
-            else:
-                trail_level = pos.entry_price - (r - 0.5) * risk
-                new_sl = min(new_sl, trail_level)
-                if new_sl < pos.trailing_sl:
-                    pos.trailing_sl = round(new_sl, 5)
+        if r < 2.0:
+            floor_r = 0.5
+        elif r < 3.0:
+            floor_r = 1.0
+        else:
+            floor_r = r - 1.0
+
+        if pos.direction == "BUY":
+            new_sl = pos.entry_price + floor_r * risk
+            if new_sl > pos.trailing_sl:
+                pos.trailing_sl = round(new_sl, 5)
+        else:
+            new_sl = pos.entry_price - floor_r * risk
+            if new_sl < pos.trailing_sl:
+                pos.trailing_sl = round(new_sl, 5)
 
     # ------------------------------------------------------------------
     # Close position

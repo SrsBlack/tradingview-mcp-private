@@ -938,28 +938,47 @@ class LiveExecutorAdapter:
         return events
 
     def _update_trailing_stop(self, pos: PaperPosition) -> None:
-        """Trail SL using ICT swing structure — behind successive higher-lows (BUY)
-        or lower-highs (SELL). Falls back to R-multiple if no swing data available.
+        """Trail SL with ICT-aware retracement room.
 
-        ICT method: Trail behind swing structure, NOT tight R-multiple.
-        Give the trade room to breathe through normal retracements.
+        Why this looks the way it does:
+        ETH H1 + SOL H1 charts on 2026-04-25/26 showed the prior algorithm
+        (BE at 1R) getting hit at the retrace bottom of normal ICT
+        shake-out cycles, then watching price run to TP without us. ICT
+        entries are sized for displacement-then-retrace-then-continuation;
+        a TS that doesn't respect the retrace eats the move.
 
-        Trailing stages:
-        - 1.0R: Move SL to breakeven (entry price)
-        - 2.0R: Move SL to 1.0R (lock in 1R profit)
-        - 3.0R: Move SL to 2.0R (lock in 2R profit)
-        - Each stage only trails 1R behind current R-multiple
+        Trailing stages (REVISED 2026-04-26):
+        - R <  1.5:  do NOT trail. Original SL stands. Let the FVG-fill /
+                     OTE retrace breathe past entry without exiting.
+        - R 1.5-2.0: lock +0.5R (not breakeven — leave a real cushion).
+        - R 2.0-3.0: lock +1.0R.
+        - R >  3.0:  trail 1.0R behind current R-multiple.
 
-        Swing trail (when available) takes priority but must also be
-        at least breakeven after 1R.
+        Swing trail (when available) takes priority but must respect the
+        same R-floor at each stage. Buffer below the swing low (BUY) /
+        above the swing high (SELL) widened from 10% to 50% of original
+        risk — ICT swing pivots get retested deeper than 10% on real
+        moves.
         """
         r = pos.r_multiple
         risk = abs(pos.entry_price - pos.sl_price)
-        if risk == 0 or r < 1.0:
+        # NEW: hold off all trailing until R >= 1.5 — give the retrace
+        # cycle room to complete before we start moving the stop.
+        if risk == 0 or r < 1.5:
             return
 
-        # Minimum: breakeven after 1R
-        min_trail = pos.entry_price
+        # R-floor by stage. Each stage locks a real cushion, not BE.
+        if r < 2.0:
+            floor_r = 0.5
+        elif r < 3.0:
+            floor_r = 1.0
+        else:
+            floor_r = r - 1.0  # always 1R behind once past 3R
+
+        if pos.direction == "BUY":
+            min_trail = pos.entry_price + floor_r * risk
+        else:
+            min_trail = pos.entry_price - floor_r * risk
 
         # Try swing-based trailing first (ICT preferred method)
         swing_trail = self._get_swing_trail_level(pos)
@@ -967,16 +986,9 @@ class LiveExecutorAdapter:
         if swing_trail is not None:
             new_sl = swing_trail
         else:
-            # Fallback: conservative R-multiple trailing
-            # Trail 1R behind current R — gives room to breathe
-            # At 1.0R -> breakeven, at 2.0R -> 1R locked, at 3.0R -> 2R locked
-            trail_r = max(0, r - 1.0)  # Always 1R behind
-            if pos.direction == "BUY":
-                new_sl = pos.entry_price + trail_r * risk
-            else:
-                new_sl = pos.entry_price - trail_r * risk
+            new_sl = min_trail
 
-        # Ensure minimum breakeven after 1R
+        # Enforce R-floor regardless of which path produced new_sl
         if pos.direction == "BUY":
             new_sl = max(new_sl, min_trail)
             if new_sl > pos.trailing_sl:
@@ -1016,7 +1028,11 @@ class LiveExecutorAdapter:
                    high > float(rates[i+1]['high']) and high > float(rates[i+2]['high']):
                     swing_highs.append(high)
 
-            atr_buffer = abs(pos.entry_price - pos.sl_price) * 0.1  # 10% of original risk as buffer
+            # Buffer widened 2026-04-26 from 10% -> 50% of original risk.
+            # ICT swing pivots get retested deeper than 10% on real moves —
+            # the original 10% was too tight and shook out trades on routine
+            # retests of the swing low (BUY) / swing high (SELL).
+            atr_buffer = abs(pos.entry_price - pos.sl_price) * 0.5
 
             if pos.direction == "BUY" and swing_lows:
                 # For buys: trail behind the most recent swing low above entry

@@ -637,9 +637,23 @@ class ClaudeDecisionMaker:
             and not is_crypto
             and not is_tokyo_kz_for_jpy
         ):
-            # Allow Grade A with confirmed sweep + displacement outside kill zone
-            # (strong enough signal that timing is less critical)
-            if analysis.grade != "A" or not analysis.displacement_confirmed:
+            # Allow Grade A trades outside the kill zone IF either:
+            #   (a) displacement_confirmed (the strict ICT criterion: sweep
+            #       + reversal FVG), OR
+            #   (b) sweep_detected (upstream condition — some clean
+            #       continuation Grade A trades have a sweep but the FVG
+            #       didn't materialize in the lookback; still strong enough
+            #       to let Claude evaluate)
+            #
+            # Loosened 2026-04-26 from displacement-only to (displacement OR
+            # sweep). Empirical: the displacement-only bypass blocked
+            # XAUUSD +$835 (real Grade A winner outside canonical KZ). See
+            # memory/feedback_kill_zone_too_strict.md and the broker-truth
+            # bench at scripts/bench_winners_not_blocked_2026-04-26.txt.
+            grade_a_high_conviction = analysis.grade == "A" and (
+                analysis.displacement_confirmed or analysis.sweep_detected
+            )
+            if not grade_a_high_conviction:
                 return (
                     f"KILL ZONE GATE: Not in a kill zone or Silver Bullet window. "
                     f"ICT 2022 model: only trade during London (2-5AM ET), NY AM (7-10AM ET), "
