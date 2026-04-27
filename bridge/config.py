@@ -262,6 +262,16 @@ class BridgeConfig:
     # Flags
     has_trading_ai: bool = False
 
+    # Feature flag — HTF FVG/OB rejection bias override.
+    # When True, the pipeline overrides M15-derived `direction` with the
+    # strongest HTF rejection direction (only when they disagree). Detector
+    # itself runs unconditionally and always emits HTF_REJ_* advanced_factors;
+    # this flag controls whether those factors actually flip bias. Default
+    # False — ship dark, validate against fresh post-flag-flip cycles before
+    # promoting to True. See feedback_htf_rejection_not_caught.md and
+    # project_htf_rejection_fix_plan.md.
+    htf_rejection_enabled: bool = False
+
     @property
     def symbol_map(self) -> dict[str, str]:
         return SYMBOL_MAP

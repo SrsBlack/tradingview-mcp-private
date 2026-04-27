@@ -66,6 +66,7 @@ from analysis.smt import detect_smt_divergence, SMT_PAIRS
 from analysis.ict.scorer import score_ict_setup, ICTScoreBreakdown, get_pd_zone, pd_aligned_with_bias
 from analysis.ict.core import detect_cisd, get_latest_cisd, detect_po3_phase, PO3Phase, detect_judas_swing, JudasSwing
 from analysis.ict.advanced import run_advanced_analysis, AdvancedAnalysis, detect_market_maker_model, detect_suspension_blocks, get_quarterly_bias
+from analysis.htf_rejection import detect_htf_rejection, strongest_rejection_direction, HTFRejection
 from analysis.sessions import get_asian_range, get_ndog, get_cbdr, get_midnight_range, get_weekly_bias, is_seek_and_destroy
 from analysis.volume_profile import build_volume_profile
 from core.types import Direction, SignalGrade, FVGQuality, SessionType
@@ -760,6 +761,102 @@ class ICTPipeline:
                             f"near_D1_FVG({fvg.direction.name} CE={ce:.2f}, {dist_pct:.1f}% away)"
                         )
                         break
+
+            # -- Step 8b4: HTF FVG/OB rejection detection --
+            # Detects when M15 price has tagged an H4/D1 zone, rejected with
+            # displacement, and is now back outside it. Drives a bias-override
+            # path for the case where M15 swing structure lags an HTF reversal.
+            # See feedback_htf_rejection_not_caught.md for the motivating bug
+            # (ETH 2026-04-27 H4 chart).
+            #
+            # Behavior is feature-gated: emitting advanced_factors is always
+            # safe; bias-override is gated by config.htf_rejection_enabled.
+            htf_rejections: list[HTFRejection] = []
+            try:
+                if (
+                    df_primary is not None and len(df_primary) >= 30
+                    and (htf_fvgs or d1_fvgs)
+                ):
+                    # Local M15 ATR — pipeline's own ATR is computed later (step
+                    # at end-of-method), so we compute one here just for this
+                    # check. Cheap; ~14-bar mean of TR.
+                    _m15_highs = df_primary["high"].astype(float)
+                    _m15_lows = df_primary["low"].astype(float)
+                    _m15_closes = df_primary["close"].astype(float)
+                    _tr = pd.concat([
+                        _m15_highs - _m15_lows,
+                        (_m15_highs - _m15_closes.shift(1)).abs(),
+                        (_m15_lows - _m15_closes.shift(1)).abs(),
+                    ], axis=1).max(axis=1)
+                    _atr_local = float(_tr.iloc[-14:].mean()) if len(_tr) >= 15 else 0.0
+
+                    if _atr_local > 0:
+                        # H4 zones — reuse already-computed htf_fvgs from step 3b.
+                        htf_rejections.extend(detect_htf_rejection(
+                            df_m15=df_primary.tail(60),
+                            htf_fvgs=htf_fvgs,
+                            htf_obs=None,  # H4 OBs not pre-computed; FVGs cover most cases
+                            atr_m15=_atr_local,
+                            lookback_m15=12,
+                            displacement_min=1.5,
+                            body_min_pct=0.55,
+                            htf_timeframe="H4",
+                            max_displacement_age_minutes=60,
+                        ))
+                        # D1 zones — reuse d1_fvgs from step 2b.
+                        htf_rejections.extend(detect_htf_rejection(
+                            df_m15=df_primary.tail(60),
+                            htf_fvgs=d1_fvgs,
+                            htf_obs=None,
+                            atr_m15=_atr_local,
+                            lookback_m15=12,
+                            displacement_min=1.5,
+                            body_min_pct=0.55,
+                            htf_timeframe="D1",
+                            max_displacement_age_minutes=60,
+                        ))
+
+                        # Always emit advanced_factors (informational; safe).
+                        for rej in htf_rejections:
+                            result.advanced_factors.append(
+                                f"HTF_REJ_{rej.htf_timeframe}_{rej.direction.name}"
+                            )
+            except Exception as _e:
+                print(f"  [{symbol}] HTF rejection detect error: {_e}", flush=True)
+
+            # -- Step 8b5: Bias override (feature-flagged) --
+            # If the strongest HTF rejection direction opposes the current
+            # M15-derived `direction`, optionally flip bias. Gated by
+            # config.htf_rejection_enabled (default False) so it ships dark.
+            if htf_rejections and getattr(self.config, "htf_rejection_enabled", False):
+                rej_dir = strongest_rejection_direction(htf_rejections)
+                if (
+                    rej_dir is not None
+                    and direction != Direction.NEUTRAL
+                    and rej_dir != direction
+                ):
+                    # Pick the strongest rejection for logging.
+                    _strongest = max(
+                        (r for r in htf_rejections if r.direction == rej_dir),
+                        key=lambda r: r.rejection_displacement,
+                    )
+                    print(
+                        f"  [{symbol}] HTF REJECTION OVERRIDE: M15={direction.name} -> "
+                        f"{rej_dir.name} ({_strongest.htf_timeframe} {_strongest.htf_zone_type} "
+                        f"{_strongest.htf_zone_low:.2f}-{_strongest.htf_zone_high:.2f}, "
+                        f"disp={_strongest.rejection_displacement:.2f}x ATR)",
+                        flush=True,
+                    )
+                    direction = rej_dir
+                    result.advanced_factors.append(
+                        f"HTF_rejection_override({_strongest.htf_timeframe})"
+                    )
+                    # Recompute bias-dependent fields against the new direction.
+                    # PD alignment depends on direction:
+                    if range_high > range_low:
+                        result.pd_aligned = pd_aligned_with_bias(
+                            result.current_price, range_high, range_low, direction
+                        )
 
             # -- Step 8c: Macro time check --
             result.is_macro_time = getattr(session_info, 'is_macro_time', False)
