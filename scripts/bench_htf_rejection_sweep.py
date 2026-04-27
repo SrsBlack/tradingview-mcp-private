@@ -120,12 +120,14 @@ def replay_one(trade: dict, lookback: int, disp_min: float, body_min: float) -> 
             atr_m15=atr_m15, lookback_m15=lookback,
             displacement_min=disp_min, body_min_pct=body_min,
             htf_timeframe="H4",
+            as_of_ts=entry_ts, max_displacement_age_minutes=60,
         )
         + detect_htf_rejection(
             df_m15=df_m15.tail(60), htf_fvgs=d1_fvgs, htf_obs=d1_obs,
             atr_m15=atr_m15, lookback_m15=lookback,
             displacement_min=disp_min, body_min_pct=body_min,
             htf_timeframe="D1",
+            as_of_ts=entry_ts, max_displacement_age_minutes=60,
         )
     )
     fired = strongest_rejection_direction(rejections)

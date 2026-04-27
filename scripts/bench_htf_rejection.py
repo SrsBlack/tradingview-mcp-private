@@ -282,6 +282,7 @@ def replay_one(trade: dict) -> dict:
         displacement_min=DISPLACEMENT_MIN,
         body_min_pct=BODY_MIN_PCT,
         htf_timeframe="H4",
+        as_of_ts=entry_ts, max_displacement_age_minutes=60,
     )
     rejections_d1 = detect_htf_rejection(
         df_m15=df_m15.tail(60),
@@ -291,6 +292,7 @@ def replay_one(trade: dict) -> dict:
         displacement_min=DISPLACEMENT_MIN,
         body_min_pct=BODY_MIN_PCT,
         htf_timeframe="D1",
+        as_of_ts=entry_ts, max_displacement_age_minutes=60,
     )
 
     all_rej = rejections_h4 + rejections_d1

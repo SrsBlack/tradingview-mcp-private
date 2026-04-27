@@ -3,38 +3,38 @@ HTF rejection detector — cycle-log replay bench
 ==============================================================================
 
 Parsing log: C:\Users\User\tradingview-mcp-jackson\logs\trading.log
-Parsed cycle x symbol records: 553
-Cacheable (one of 7 symbols): 342
+Parsed cycle x symbol records: 554
+Cacheable (one of 7 symbols): 343
 
 Detector params: lookback=12, disp=1.5, body=0.55
 Forward-price window: 16 M15 bars (4h), threshold=0.5*ATR
 
---- BITSTAMP:BTCUSD (n=71) ---
-   buckets: {'QUIET': 41, 'FLIP_AGREE': 14, 'CONFIRM': 16}
+--- BITSTAMP:BTCUSD (n=72) ---
+   buckets: {'QUIET': 42, 'FLIP_AGREE': 14, 'CONFIRM': 16}
 --- CAPITALCOM:US500 (n=74) ---
    buckets: {'QUIET': 73, 'CONFIRM': 1}
 --- COINBASE:ETHUSD (n=84) ---
    buckets: {'FLIP_DISAGREE': 4, 'QUIET': 56, 'CONFIRM': 24}
 --- COINBASE:SOLUSD (n=67) ---
-   buckets: {'CONFIRM': 18, 'QUIET': 33, 'FLIP_AGREE': 14, 'FLIP_DISAGREE': 2}
+   buckets: {'CONFIRM': 16, 'QUIET': 36, 'FLIP_AGREE': 13, 'FLIP_DISAGREE': 2}
 --- OANDA:EURUSD (n=2) ---
    buckets: {'QUIET': 2}
 --- OANDA:GBPUSD (n=2) ---
    buckets: {'QUIET': 2}
 --- OANDA:XAUUSD (n=42) ---
-   buckets: {'FLIP_DISAGREE': 21, 'CONFIRM': 12, 'FLIP_UNKNOWN': 8, 'QUIET': 1}
+   buckets: {'QUIET': 20, 'CONFIRM': 11, 'FLIP_DISAGREE': 3, 'FLIP_UNKNOWN': 8}
 
 ==============================================================================
 Aggregate
 ==============================================================================
-Total: 342  skipped=0  replayed=342
-  FLIP_AGREE      28/342 (  8.2%)
-  FLIP_DISAGREE   27/342 (  7.9%)
-  FLIP_UNKNOWN     8/342 (  2.3%)
-  CONFIRM         71/342 ( 20.8%)
-  QUIET          208/342 ( 60.8%)
+Total: 343  skipped=0  replayed=343
+  FLIP_AGREE      27/343 (  7.9%)
+  FLIP_DISAGREE    9/343 (  2.6%)
+  FLIP_UNKNOWN     8/343 (  2.3%)
+  CONFIRM         68/343 ( 19.8%)
+  QUIET          231/343 ( 67.3%)
 
-  Flip accuracy (FLIP_AGREE / (FLIP_AGREE+FLIP_DISAGREE)): 50.9%
+  Flip accuracy (FLIP_AGREE / (FLIP_AGREE+FLIP_DISAGREE)): 75.0%
 
 ==============================================================================
 Spotlight: COINBASE:ETHUSD cycles on 2026-04-27

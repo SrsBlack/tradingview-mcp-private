@@ -293,12 +293,14 @@ def replay_cycle(cycle: dict) -> dict:
             atr_m15=atr_m15, lookback_m15=LOOKBACK_M15,
             displacement_min=DISPLACEMENT_MIN, body_min_pct=BODY_MIN_PCT,
             htf_timeframe="H4",
+            as_of_ts=ts, max_displacement_age_minutes=60,
         )
         + detect_htf_rejection(
             df_m15=df_at.tail(60), htf_fvgs=d1_fvgs, htf_obs=d1_obs,
             atr_m15=atr_m15, lookback_m15=LOOKBACK_M15,
             displacement_min=DISPLACEMENT_MIN, body_min_pct=BODY_MIN_PCT,
             htf_timeframe="D1",
+            as_of_ts=ts, max_displacement_age_minutes=60,
         )
     )
     fired = strongest_rejection_direction(rejections)
