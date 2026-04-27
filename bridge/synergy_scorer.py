@@ -312,6 +312,26 @@ def _has_session_crt(a: Any) -> bool:
     return "crt_sessioncrt" in factors
 
 
+def _has_htf_rejection_with_displacement(a: Any) -> bool:
+    """HTF FVG/OB rejection setup (H4 or D1 zone tagged + rejected) with
+    M15 displacement_confirmed.
+
+    The pipeline emits HTF_REJ_<TF>_<DIR> advanced_factors when the
+    rejection detector fires. Pairing those with M15 displacement_confirmed
+    (sweep + opposing-direction FVG) is the textbook ICT 2022 short
+    trigger: HTF imbalance + sweep of liquidity + displacement candle.
+
+    Substring search on advanced_factors keeps this independent of the
+    HTFRejection dataclass shape. Direction match between detector and
+    bridge bias is enforced by the pipeline's bias-override step before
+    synergies are evaluated, so any HTF_REJ_* factor present here is
+    aligned with `direction`.
+    """
+    factors = " ".join(getattr(a, "advanced_factors", []) or []).lower()
+    has_rej = any(f"htf_rej_{tf}" in factors for tf in ("h4", "d1", "w1"))
+    return has_rej and bool(getattr(a, "displacement_confirmed", False))
+
+
 def _in_ny_kill_zone(a: Any) -> bool:
     """
     True when we're inside an NY kill zone (NY AM 7-10 or London-Close
@@ -396,6 +416,12 @@ _SYNERGY_CHECKS: list[tuple[str, Any, float, str]] = [
         lambda a: _has_ob(a) and _has_fvg(a),
         10.0,
         "OB+FVG_stack",
+    ),
+    (
+        "HTF rejection + M15 displacement",
+        _has_htf_rejection_with_displacement,
+        6.0,
+        "HTF_rejection_with_displacement",
     ),
     (
         "Liquidity sweep + SMT divergence",
