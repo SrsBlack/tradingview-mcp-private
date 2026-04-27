@@ -1,0 +1,130 @@
+================================================================================
+WR by signal class — broker-truth + ledger join (Tier 1) + log (Tier 2)
+================================================================================
+
+Loading ledger...
+  ICT_Bridge rows in ledger: 50
+
+Loading broker history...
+  Broker positions: 57  (closed: 52, open: 5)
+
+Joining broker -> ledger by ticket...
+  Joined: 31 (Tier 1)
+
+  Tier 1 closed trades: 26  WR=42.3%  total=$-988.53
+
+================================================================================
+TIER 1 — full broker history (50 trades)
+================================================================================
+
+=== WR by trade direction (side) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  BUY                      20  55.0%    11      9    +47.81    +956.29 *  (3 open)
+  SELL                      6   0.0%     0      6   -324.14   -1944.82 *  (2 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Grade (ledger) (signal_grade) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  A                        24  41.7%    10     14    -18.93    -454.20 *  (2 open)
+  B                         2  50.0%     1      1   -267.17    -534.33    (3 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Score band (score_band) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  95+                      15  40.0%     6      9    -22.11    -331.60 *  (2 open)
+  70-84                     5  20.0%     1      4   -143.36    -716.82 *  (1 open)
+  85-94                     5  60.0%     3      2    -15.63     -78.15 *  (2 open)
+  <70                       1 100.0%     1      0   +138.04    +138.04  
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Symbol class (symbol_class) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  crypto                   11  45.5%     5      6    -37.81    -415.87 *  (1 open)
+  fx                        6  16.7%     1      5   -239.86   -1439.17 *  (3 open)
+  index                     4  50.0%     2      2   -148.31    -593.24    (1 open)
+  oil                       3  66.7%     2      1   +417.58   +1252.75  
+  metal                     2  50.0%     1      1   +103.50    +207.00  
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Symbol (symbol) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  SOLUSD                    5  40.0%     2      3    -68.52    -342.62 *  (1 open)
+  ETHUSD                    4  50.0%     2      2    -73.56    -294.25  
+  GER40.cash                3  33.3%     1      2   -243.76    -731.28    (1 open)
+  UKOIL.cash                3  66.7%     2      1   +417.58   +1252.75  
+  BTCUSD                    2  50.0%     1      1   +110.50    +221.00  
+  GBPUSD                    2   0.0%     0      2   -211.56    -423.12    (1 open)
+  XAUUSD                    2  50.0%     1      1   +103.50    +207.00  
+  EURJPY                    1   0.0%     0      1   -473.56    -473.56  
+  EURUSD                    1 100.0%     1      0   +322.00    +322.00  
+  GBPJPY                    1   0.0%     0      1    -93.43     -93.43    (1 open)
+  US500.cash                1 100.0%     1      0   +138.04    +138.04  
+  USDJPY                    1   0.0%     0      1   -771.06    -771.06  
+  USDCAD                    0   0.0%     0      0     +0.00      +0.00    (1 open)
+  (* = N>=5 closed, statistically meaningful)
+
+================================================================================
+TIER 2 — current log only (smaller N, richer features)
+================================================================================
+
+Log OPENED entries parseable: 5
+  Joined to log entries: 7 (Tier 2)
+
+=== WR by trade direction (side) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  SELL                      3   0.0%     0      3   -195.55    -586.65    (2 open)
+  BUY                       0   0.0%     0      0     +0.00      +0.00    (2 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Grade (raw log) (original_grade) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  A                         3   0.0%     0      3   -195.55    -586.65    (4 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by PD alignment (pd_alignment) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  aligned                   2   0.0%     0      2   -246.61    -493.22    (3 open)
+  misaligned                1   0.0%     0      1    -93.43     -93.43    (1 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Kill zone (kill_zone) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  Y                         3   0.0%     0      3   -195.55    -586.65    (4 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Sweep (sweep) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  Y                         3   0.0%     0      3   -195.55    -586.65    (4 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Displacement (disp) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  Y                         3   0.0%     0      3   -195.55    -586.65    (4 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by MTF conflict in reason (mtf_conflict) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  Y                         2   0.0%     0      2   -157.72    -315.43    (2 open)
+  N                         1   0.0%     0      1   -271.22    -271.22    (2 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by HTF rejection direction (htf_rej_class) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  NONE                      3   0.0%     0      3   -195.55    -586.65    (3 open)
+  OPPOSING                  0   0.0%     0      0     +0.00      +0.00    (1 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Confidence band (confidence_band) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  60-69                     2   0.0%     0      2   -182.33    -364.65    (3 open)
+  70-79                     1   0.0%     0      1   -222.00    -222.00    (1 open)
+  (* = N>=5 closed, statistically meaningful)
+
+=== WR by Model (model) ===
+  class                     N    WR%  wins losses   avg_pnl    tot_pnl
+  claude-sonnet-4-6         3   0.0%     0      3   -195.55    -586.65    (3 open)
+  claude-haiku-4-5-20251001    0   0.0%     0      0     +0.00      +0.00    (1 open)
+  (* = N>=5 closed, statistically meaningful)
+
+================================================================================
+Done.
