@@ -1,0 +1,67 @@
+==============================================================================
+HTF rejection detector — cycle-log replay bench
+==============================================================================
+
+Parsing log: C:\Users\User\tradingview-mcp-jackson\logs\trading.log
+Parsed cycle x symbol records: 515
+Cacheable (one of 7 symbols): 328
+
+Detector params: lookback=12, disp=1.5, body=0.55
+Forward-price window: 16 M15 bars (4h), threshold=0.5*ATR
+
+--- BITSTAMP:BTCUSD (n=69) ---
+   buckets: {'QUIET': 42, 'FLIP_AGREE': 14, 'CONFIRM': 13}
+--- CAPITALCOM:US500 (n=72) ---
+   buckets: {'QUIET': 72}
+--- COINBASE:ETHUSD (n=82) ---
+   buckets: {'FLIP_DISAGREE': 1, 'CONFIRM': 60, 'QUIET': 21}
+--- COINBASE:SOLUSD (n=65) ---
+   buckets: {'QUIET': 42, 'FLIP_AGREE': 14, 'CONFIRM': 9}
+--- OANDA:XAUUSD (n=40) ---
+   buckets: {'CONFIRM': 21, 'FLIP_AGREE': 1, 'FLIP_DISAGREE': 5, 'QUIET': 13}
+
+==============================================================================
+Aggregate
+==============================================================================
+Total: 328  skipped=0  replayed=328
+  FLIP_AGREE      29/328 (  8.8%)
+  FLIP_DISAGREE    6/328 (  1.8%)
+  FLIP_UNKNOWN     0/328 (  0.0%)
+  CONFIRM        103/328 ( 31.4%)
+  QUIET          190/328 ( 57.9%)
+
+  Flip accuracy (FLIP_AGREE / (FLIP_AGREE+FLIP_DISAGREE)): 82.9%
+
+==============================================================================
+Spotlight: COINBASE:ETHUSD cycles on 2026-04-27
+==============================================================================
+  00:12:34 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  00:27:44 bridge=bullish  grade=A -> QUIET          fired=None fwd=bullish
+  00:43:06 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=bullish
+  00:58:19 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  01:13:31 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  01:28:45 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=bullish
+  01:43:59 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  01:59:11 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  02:14:26 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  02:29:39 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  02:44:57 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  03:00:14 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
+  03:15:27 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
+  03:30:43 bridge=bullish  grade=B -> QUIET          fired=None fwd=bearish
+  03:33:10 bridge=bullish  grade=B -> QUIET          fired=None fwd=bearish
+  03:48:22 bridge=bullish  grade=B -> QUIET          fired=None fwd=bearish
+  04:03:35 bridge=bullish  grade=C -> CONFIRM        fired=bullish fwd=bearish
+  04:11:23 bridge=bullish  grade=C -> CONFIRM        fired=bullish fwd=bearish
+  04:22:49 bridge=bullish  grade=C -> CONFIRM        fired=bullish fwd=bearish
+  04:37:50 bridge=bullish  grade=C -> CONFIRM        fired=bullish fwd=bearish
+  04:52:51 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bearish
+  04:56:27 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=bearish
+  05:11:30 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=None
+  05:26:52 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=None
+  05:42:10 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
+  05:57:22 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
+  06:12:42 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
+  06:27:53 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
+  06:43:05 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
+  06:58:19 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=None
