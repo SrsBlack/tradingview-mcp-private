@@ -3,52 +3,52 @@ HTF rejection detector — cycle-log replay bench
 ==============================================================================
 
 Parsing log: C:\Users\User\tradingview-mcp-jackson\logs\trading.log
-Parsed cycle x symbol records: 534
-Cacheable (one of 7 symbols): 335
+Parsed cycle x symbol records: 553
+Cacheable (one of 7 symbols): 342
 
 Detector params: lookback=12, disp=1.5, body=0.55
 Forward-price window: 16 M15 bars (4h), threshold=0.5*ATR
 
---- BITSTAMP:BTCUSD (n=70) ---
-   buckets: {'QUIET': 43, 'FLIP_AGREE': 14, 'CONFIRM': 13}
---- CAPITALCOM:US500 (n=73) ---
-   buckets: {'QUIET': 73}
---- COINBASE:ETHUSD (n=83) ---
-   buckets: {'FLIP_DISAGREE': 1, 'CONFIRM': 61, 'QUIET': 21}
---- COINBASE:SOLUSD (n=66) ---
-   buckets: {'CONFIRM': 18, 'FLIP_AGREE': 15, 'QUIET': 32, 'FLIP_DISAGREE': 1}
---- OANDA:EURUSD (n=1) ---
-   buckets: {'QUIET': 1}
---- OANDA:GBPUSD (n=1) ---
-   buckets: {'QUIET': 1}
---- OANDA:XAUUSD (n=41) ---
-   buckets: {'CONFIRM': 29, 'FLIP_AGREE': 1, 'FLIP_DISAGREE': 3, 'FLIP_UNKNOWN': 7, 'QUIET': 1}
+--- BITSTAMP:BTCUSD (n=71) ---
+   buckets: {'QUIET': 41, 'FLIP_AGREE': 14, 'CONFIRM': 16}
+--- CAPITALCOM:US500 (n=74) ---
+   buckets: {'QUIET': 73, 'CONFIRM': 1}
+--- COINBASE:ETHUSD (n=84) ---
+   buckets: {'FLIP_DISAGREE': 4, 'QUIET': 56, 'CONFIRM': 24}
+--- COINBASE:SOLUSD (n=67) ---
+   buckets: {'CONFIRM': 18, 'QUIET': 33, 'FLIP_AGREE': 14, 'FLIP_DISAGREE': 2}
+--- OANDA:EURUSD (n=2) ---
+   buckets: {'QUIET': 2}
+--- OANDA:GBPUSD (n=2) ---
+   buckets: {'QUIET': 2}
+--- OANDA:XAUUSD (n=42) ---
+   buckets: {'FLIP_DISAGREE': 21, 'CONFIRM': 12, 'FLIP_UNKNOWN': 8, 'QUIET': 1}
 
 ==============================================================================
 Aggregate
 ==============================================================================
-Total: 335  skipped=0  replayed=335
-  FLIP_AGREE      30/335 (  9.0%)
-  FLIP_DISAGREE    5/335 (  1.5%)
-  FLIP_UNKNOWN     7/335 (  2.1%)
-  CONFIRM        121/335 ( 36.1%)
-  QUIET          172/335 ( 51.3%)
+Total: 342  skipped=0  replayed=342
+  FLIP_AGREE      28/342 (  8.2%)
+  FLIP_DISAGREE   27/342 (  7.9%)
+  FLIP_UNKNOWN     8/342 (  2.3%)
+  CONFIRM         71/342 ( 20.8%)
+  QUIET          208/342 ( 60.8%)
 
-  Flip accuracy (FLIP_AGREE / (FLIP_AGREE+FLIP_DISAGREE)): 85.7%
+  Flip accuracy (FLIP_AGREE / (FLIP_AGREE+FLIP_DISAGREE)): 50.9%
 
 ==============================================================================
 Spotlight: COINBASE:ETHUSD cycles on 2026-04-27
 ==============================================================================
   00:12:34 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
   00:27:44 bridge=bullish  grade=A -> QUIET          fired=None fwd=bullish
-  00:43:06 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=bullish
-  00:58:19 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
-  01:13:31 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
-  01:28:45 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=bullish
-  01:43:59 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
-  01:59:11 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
-  02:14:26 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
-  02:29:39 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
+  00:43:06 bridge=bullish  grade=A -> FLIP_DISAGREE  fired=bearish fwd=bullish
+  00:58:19 bridge=bullish  grade=B -> FLIP_DISAGREE  fired=bearish fwd=bullish
+  01:13:31 bridge=bullish  grade=B -> FLIP_DISAGREE  fired=bearish fwd=bullish
+  01:28:45 bridge=bullish  grade=A -> QUIET          fired=None fwd=bullish
+  01:43:59 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
+  01:59:11 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
+  02:14:26 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
+  02:29:39 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
   02:44:57 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=bullish
   03:00:14 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
   03:15:27 bridge=bullish  grade=B -> QUIET          fired=None fwd=bullish
@@ -68,5 +68,6 @@ Spotlight: COINBASE:ETHUSD cycles on 2026-04-27
   06:12:42 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
   06:27:53 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
   06:43:05 bridge=bullish  grade=B -> CONFIRM        fired=bullish fwd=None
-  06:58:19 bridge=bullish  grade=A -> CONFIRM        fired=bullish fwd=None
+  06:58:19 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
   07:13:31 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
+  07:29:47 bridge=bullish  grade=A -> QUIET          fired=None fwd=None
