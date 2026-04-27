@@ -101,6 +101,18 @@ class LiveExecutorAdapter:
         self._global_loss_cooldown_until: str | None = None
         self._global_loss_cooldown_minutes: int = 60  # 1 hour cooldown after a loss
 
+        # Persisted decision cooldowns — mirror of analysis_pipeline's
+        # CooldownState.decisions{symbol: epoch_seconds}. The bridge already
+        # has a 30-min per-symbol decision cooldown (decision_types.py:188)
+        # but it lived only in memory, so a restart wiped it and the next
+        # cycle re-fired on every recently-decided symbol. This is the
+        # "restart causes repeated entries" bug — see
+        # memory/feedback_restart_causes_repeated_entries.md (2026-04-21
+        # cluster of 22 entries in 4h cost ~$733). We persist the dict
+        # here and the orchestrator wires it back into CooldownState on
+        # startup via get_persisted_cooldowns() / set_persisted_cooldowns().
+        self._persisted_cooldowns: dict[str, float] = {}
+
         # Persisted per-ticket trailing SL state (populated by _load_safety_state;
         # consumed by position_manager.reconcile_mt5_on_startup).
         self._persisted_trail_state: dict[str, dict[str, Any]] = {}
@@ -118,6 +130,7 @@ class LiveExecutorAdapter:
             "daily_trade_date": self._daily_trade_date,
             "global_loss_cooldown_until": self._global_loss_cooldown_until,
             "symbol_loss_cooldowns": self._symbol_loss_cooldowns,
+            "decision_cooldowns": self._persisted_cooldowns,
             "consecutive_losses": self.consecutive_losses,
             "consecutive_wins": self._consecutive_wins,
             "grade_a_signals_today": self._grade_a_signals_today,
@@ -199,6 +212,26 @@ class LiveExecutorAdapter:
             if self._symbol_loss_cooldowns:
                 print(
                     f"[SAFETY] Restored {len(self._symbol_loss_cooldowns)} symbol cooldown(s)",
+                    flush=True,
+                )
+
+            # Restore decision cooldowns (prune entries older than 60 min —
+            # the analysis_pipeline cooldown window is 30 min, with a 60-min
+            # safety margin for clock skew). Without this, a restart wipes
+            # the in-memory CooldownState and the next cycle re-enters
+            # every recently-decided symbol — the 2026-04-21 cluster bug.
+            now_epoch = datetime.now(timezone.utc).timestamp()
+            for sym, ts in state.get("decision_cooldowns", {}).items():
+                try:
+                    ts_f = float(ts)
+                    if now_epoch - ts_f < 3600:  # within last hour
+                        self._persisted_cooldowns[sym] = ts_f
+                except (ValueError, TypeError):
+                    pass
+            if self._persisted_cooldowns:
+                print(
+                    f"[SAFETY] Restored {len(self._persisted_cooldowns)} decision cooldown(s) — "
+                    f"will be wired into CooldownState by orchestrator",
                     flush=True,
                 )
 
@@ -342,6 +375,18 @@ class LiveExecutorAdapter:
             return False
         remaining = (expiry - now).total_seconds() / 60
         return True
+
+    def get_persisted_cooldowns(self) -> dict[str, float]:
+        """Return the restored {symbol: epoch_seconds} dict so the
+        orchestrator can populate CooldownState.decisions on startup."""
+        return dict(self._persisted_cooldowns)
+
+    def set_persisted_cooldowns(self, decisions: dict[str, float]) -> None:
+        """Snapshot the current CooldownState.decisions for save_safety_state
+        to persist. Called by the orchestrator each cycle when decisions
+        update."""
+        self._persisted_cooldowns = dict(decisions)
+        self._save_safety_state()
 
     def set_symbol_loss_cooldown(self, symbol: str) -> None:
         """Set a graduated cooldown on a symbol after a loss.

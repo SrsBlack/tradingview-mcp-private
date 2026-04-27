@@ -612,6 +612,10 @@ class AnalysisPipeline:
                 self.executor.increment_daily_trade_count()
             # Set cooldown after successful live execution
             self.cooldown.decisions[symbol] = time.time()
+            # Persist cooldown across restarts (prevents 2026-04-21
+            # restart-causes-repeated-entries cluster from recurring).
+            if hasattr(self.executor, 'set_persisted_cooldowns'):
+                self.executor.set_persisted_cooldowns(self.cooldown.decisions)
             print(f"  [{symbol}] OPENED: {result['message']}", flush=True)
             self.session.log_trade({
                 "event": "OPEN",

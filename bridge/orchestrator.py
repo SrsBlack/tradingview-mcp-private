@@ -132,6 +132,20 @@ class Orchestrator:
         self._cooldown = CooldownState()
         self._signal_anchor = SignalAnchorState()
 
+        # Restore decision cooldowns from persisted safety state (live mode).
+        # Without this, restart wipes the in-memory cooldown and the next
+        # cycle re-fires every recently-decided symbol — the 2026-04-21
+        # "restart causes repeated entries" bug. See
+        # memory/feedback_restart_causes_repeated_entries.md.
+        if hasattr(self.executor, 'get_persisted_cooldowns'):
+            restored = self.executor.get_persisted_cooldowns()
+            if restored:
+                self._cooldown.decisions.update(restored)
+                print(
+                    f"[ORCH] Restored {len(restored)} decision cooldown(s) from previous run",
+                    flush=True,
+                )
+
         # --- Decomposed managers ---
         self.drawings = TradeDrawingManager(self.tv_client)
 
