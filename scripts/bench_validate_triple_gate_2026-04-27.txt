@@ -1,0 +1,63 @@
+==============================================================================================================
+Compound-gate split validation + per-trade detail
+==============================================================================================================
+
+==============================================================================================================
+  G1_forming_against_AND_sell
+==============================================================================================================
+
+  Trades blocked by gate (full dataset):
+    ✗ LOSS 04-20 20:23  ETHUSD         SELL  pnl=$ -113.55
+    ✗ LOSS 04-20 21:48  USDJPY         SELL  pnl=$ -771.06
+    ✗ LOSS 04-21 10:48  SOLUSD         SELL  pnl=$ -470.00
+    ✗ LOSS 04-21 14:05  GBPUSD         SELL  pnl=$ -271.22
+    ✗ LOSS 04-21 17:46  USDJPY         SELL  pnl=$ -350.06
+    ✓ WIN 04-21 18:00  SOLUSD         SELL  pnl=$  +25.50
+    ✗ LOSS 04-24 10:15  EURJPY         SELL  pnl=$ -473.56
+    ✗ LOSS 04-24 18:59  GBPJPY         SELL  pnl=$  -93.43
+    ✗ LOSS 04-27 10:14  UKOIL.cash     SELL  pnl=$ -222.00
+    ✗ LOSS 04-27 10:30  GBPJPY         SELL  pnl=$ -208.04
+  TRAIN:  winners 1/8 (12%) $+26  losers 5/18 (28%) $+1976  edge +15%  net $+1950
+  TEST :  winners 0/7 (0%) $+0  losers 4/20 (20%) $+997  edge +20%  net $+997
+
+==============================================================================================================
+  G2_forming_against_AND_sell_AND_stacked_fvg
+==============================================================================================================
+
+  Trades blocked by gate (full dataset):
+    ✗ LOSS 04-20 21:48  USDJPY         SELL  pnl=$ -771.06
+    ✗ LOSS 04-21 14:05  GBPUSD         SELL  pnl=$ -271.22
+    ✗ LOSS 04-21 17:46  USDJPY         SELL  pnl=$ -350.06
+    ✗ LOSS 04-24 10:15  EURJPY         SELL  pnl=$ -473.56
+    ✗ LOSS 04-24 18:59  GBPJPY         SELL  pnl=$  -93.43
+    ✗ LOSS 04-27 10:30  GBPJPY         SELL  pnl=$ -208.04
+  TRAIN:  winners 0/8 (0%) $+0  losers 3/18 (17%) $+1392  edge +17%  net $+1392
+  TEST :  winners 0/7 (0%) $+0  losers 3/20 (15%) $+775  edge +15%  net $+775
+
+==============================================================================================================
+  G3_jpy_AND_sell
+==============================================================================================================
+
+  Trades blocked by gate (full dataset):
+    ✗ LOSS 04-20 21:48  USDJPY         SELL  pnl=$ -771.06
+    ✗ LOSS 04-21 17:46  USDJPY         SELL  pnl=$ -350.06
+    ✗ LOSS 04-21 21:05  USDJPY         SELL  pnl=$ -179.35
+    ✗ LOSS 04-24 10:15  EURJPY         SELL  pnl=$ -473.56
+    ✗ LOSS 04-24 18:59  GBPJPY         SELL  pnl=$  -93.43
+    ✗ LOSS 04-27 10:30  GBPJPY         SELL  pnl=$ -208.04
+  TRAIN:  winners 0/8 (0%) $+0  losers 2/18 (11%) $+1121  edge +11%  net $+1121
+  TEST :  winners 0/7 (0%) $+0  losers 4/20 (20%) $+954  edge +20%  net $+954
+
+==============================================================================================================
+  G4_jpy_AND_sell_AND_stacked_fvg
+==============================================================================================================
+
+  Trades blocked by gate (full dataset):
+    ✗ LOSS 04-20 21:48  USDJPY         SELL  pnl=$ -771.06
+    ✗ LOSS 04-21 17:46  USDJPY         SELL  pnl=$ -350.06
+    ✗ LOSS 04-21 21:05  USDJPY         SELL  pnl=$ -179.35
+    ✗ LOSS 04-24 10:15  EURJPY         SELL  pnl=$ -473.56
+    ✗ LOSS 04-24 18:59  GBPJPY         SELL  pnl=$  -93.43
+    ✗ LOSS 04-27 10:30  GBPJPY         SELL  pnl=$ -208.04
+  TRAIN:  winners 0/8 (0%) $+0  losers 2/18 (11%) $+1121  edge +11%  net $+1121
+  TEST :  winners 0/7 (0%) $+0  losers 4/20 (20%) $+954  edge +20%  net $+954

@@ -740,6 +740,38 @@ class ClaudeDecisionMaker:
                 f"Grade A exempt. Grade {analysis.grade} blocked."
             )
 
+        # G2 COMPOUND GATE: SELL into stacked support during bullish forming H4.
+        # The standalone forming-H4-against-trade gate failed bench_winners_not_blocked
+        # (blocked BTCUSD +$456 + ETHUSD +$38). G2 adds two bypass conditions:
+        #   - is_sell:                only block SELLs (BUY winners protected)
+        #   - stacked_opposing_fvg:   require >=2 opposing HTF FVGs within 0.5%
+        # Validation (scripts/bench_validate_triple_gate.py, 2026-04-27):
+        #   train: 0/8 winners blocked, 3/18 losers caught, +$1,392
+        #   test:  0/7 winners blocked, 3/20 losers caught, +$775
+        #   full:  0/15 winners blocked, 6/38 losers caught, +$2,167
+        forming_o = getattr(analysis, 'forming_h4_open', 0.0)
+        forming_c = getattr(analysis, 'forming_h4_close', 0.0)
+        forming_h = getattr(analysis, 'forming_h4_high', 0.0)
+        forming_l = getattr(analysis, 'forming_h4_low', 0.0)
+        atr_h4 = getattr(analysis, 'atr_h4', 0.0)
+        opposing_fvg_count = getattr(analysis, 'htf_opposing_fvg_count_05pct', 0)
+
+        if (forming_o > 0 and forming_c > 0 and atr_h4 > 0 and forming_h > 0):
+            forming_range = forming_h - forming_l
+            forming_bull = forming_c > forming_o
+            # Direction (string-safe — analysis.direction may be enum or name)
+            dir_str = str(getattr(analysis.direction, "name", analysis.direction))
+            is_sell = (dir_str == "BEARISH")
+            # G2: SELL + bullish forming H4 (>=0.5*ATR range) + stacked support (>=2 FVGs <0.5%)
+            if (is_sell and forming_bull and forming_range >= 0.5 * atr_h4
+                    and opposing_fvg_count >= 2):
+                return (
+                    f"G2 COMPOUND GATE: SELL into stacked support during bullish forming H4. "
+                    f"Forming H4: O={forming_o:.4f} C={forming_c:.4f}, range={forming_range:.4f} "
+                    f"= {forming_range/atr_h4:.1f}x ATR. {opposing_fvg_count} bullish HTF FVGs "
+                    f"within 0.5% below price. (Validated: 0/15 winners, 6/38 losers, +$2,167.)"
+                )
+
         return None
 
     # ------------------------------------------------------------------

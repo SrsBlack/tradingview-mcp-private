@@ -146,6 +146,24 @@ class SymbolAnalysis:
     # Volatility (ATR-14 on M15)
     atr_m15: float = 0.0
 
+    # Forming H4 bar + ATR — exposed so the pre-gate can check whether
+    # the current (un-closed) H4 candle is moving against the trade
+    # direction. Populated each cycle from df_htf.iloc[-1] (unclosed).
+    # Used by G2 compound gate (forming_against + sell + stacked_opposing_fvg).
+    # See scripts/bench_validate_triple_gate_2026-04-27.txt:
+    #   train: 0/8 winners blocked, 3/18 losers caught, +$1,392
+    #   test:  0/7 winners blocked, 3/20 losers caught, +$775
+    forming_h4_open: float = 0.0
+    forming_h4_high: float = 0.0
+    forming_h4_low: float = 0.0
+    forming_h4_close: float = 0.0
+    atr_h4: float = 0.0
+
+    # Count of HTF (H4) FVGs that OPPOSE the trade direction within 0.5%
+    # of current price. SELL with bullish FVGs below, or BUY with bearish
+    # FVGs above. Used in G2 compound gate.
+    htf_opposing_fvg_count_05pct: int = 0
+
     # Advanced ICT concepts
     has_cisd: bool = False
     po3_phase: str = ""  # accumulation, manipulation, distribution
@@ -396,6 +414,28 @@ class ICTPipeline:
                 return result
 
             result.current_price = float(df_primary["close"].iloc[-1])
+
+            # Capture the FORMING (still-unclosed) H4 bar + H4 ATR for the
+            # G2 compound pre-gate. See scripts/bench_validate_triple_gate.py.
+            try:
+                if df_htf is not None and len(df_htf) >= 15:
+                    forming = df_htf.iloc[-1]
+                    result.forming_h4_open = float(forming["open"])
+                    result.forming_h4_high = float(forming["high"])
+                    result.forming_h4_low = float(forming["low"])
+                    result.forming_h4_close = float(forming["close"])
+                    h4_h = df_htf["high"].astype(float)
+                    h4_l = df_htf["low"].astype(float)
+                    h4_c = df_htf["close"].astype(float)
+                    h4_tr = pd.concat([
+                        h4_h - h4_l,
+                        (h4_h - h4_c.shift(1)).abs(),
+                        (h4_l - h4_c.shift(1)).abs(),
+                    ], axis=1).max(axis=1)
+                    # Use closed bars for ATR baseline
+                    result.atr_h4 = float(h4_tr.iloc[-15:-1].mean()) if len(h4_tr) >= 15 else 0.0
+            except Exception:
+                pass  # non-fatal — pre-gate just skips when fields are 0.0
 
             # -- Step 2: Structure analysis (on H4 for bias) --
             # Exclude the last H4 bar (still forming) to prevent phantom
@@ -731,6 +771,30 @@ class ICTPipeline:
                                 result.htf_fvg_obstacle_zone = f"APPROACHING bearish H4 FVG {fvg.bottom:.2f}-{fvg.top:.2f} ({proximity_pct:.2f}% away)"
                                 result.advanced_factors.append("HTF_FVG_nearby")
                                 break
+
+            # Count of opposing HTF FVGs within 0.5% of current price.
+            # Used by G2 compound gate. Bullish FVGs below price (= support
+            # if SELLing). Bearish FVGs above price (= resistance if BUYing).
+            try:
+                if htf_fvgs and direction != Direction.NEUTRAL and result.current_price > 0:
+                    cp = result.current_price
+                    count = 0
+                    for fvg in htf_fvgs:
+                        if direction == Direction.BEARISH and fvg.direction == Direction.BULLISH:
+                            # Bullish FVG below price = stacked support
+                            if fvg.top < cp:
+                                dist_pct = (cp - fvg.top) / cp * 100
+                                if dist_pct < 0.5:
+                                    count += 1
+                        elif direction == Direction.BULLISH and fvg.direction == Direction.BEARISH:
+                            # Bearish FVG above price = stacked resistance
+                            if fvg.bottom > cp:
+                                dist_pct = (fvg.bottom - cp) / cp * 100
+                                if dist_pct < 0.5:
+                                    count += 1
+                    result.htf_opposing_fvg_count_05pct = count
+            except Exception:
+                pass
 
             # -- Step 8b3: Daily FVG check --
             # D1 FVGs are the MOST important macro zones in ICT. Price gravitates

@@ -1,0 +1,95 @@
+====================================================================================================
+Compound-gate explorer — find 2-feature AND gates that block 0$ winners
+====================================================================================================
+
+Closed ICT_Bridge trades: 53
+
+Extracting features per trade (this fetches OHLCV)...
+Feature rows built: 53
+Winners: 15 (total $+4094.48)
+Losers:  38 (total $-7441.89)
+Boolean features: 22
+
+====================================================================================================
+SINGLE FEATURES — fire rates + dollar impact
+====================================================================================================
+
+feature                              winN      win$  losN      los$      NET$
+--------------------------------------------------------------------------------
+forming_h4_against                      6      +772    26     +5229     +4457
+is_sell                                 2      +296    11     +3177     +2882
+is_jpy_pair                             0        +0     6     +2076     +2076
+stacked_opposing_fvg                    2      +434     9     +2397     +1964
+ipda_extreme_fade                       3      +319    14     +2244     +1925
+bias_d1_oppose                          3      +181    14     +1979     +1798
+forming_h4_strong_against               5      +733    15     +2435     +1702
+is_index                                3      +319    11     +1720     +1400
+is_crypto                               7      +873    13     +2100     +1227
+stacked_opposing_fvg_3plus              0        +0     6     +1127     +1127
+h1_trend_oppose_strong                  2      +487     7      +986      +499
+is_buy                                 13     +3799    27     +4264      +465
+d1_trend_oppose_strong                  3     +1131     6     +1384      +253
+mtf_2plus_oppose                        0        +0     3      +195      +195
+ipda_extreme_chase                      2      +156     7      +335      +179
+bias_w1_oppose                          0        +0     2      +102      +102
+m15_sweep_recent                        0        +0     0        +0        +0
+mtf_all_oppose                          0        +0     0        +0        +0
+h4_trend_oppose_strong                  1      +835     4      +379      -456
+bias_h1_oppose                          7     +2469     6     +1074     -1395
+bias_h4_oppose                          3     +1638     2      +119     -1520
+h4_trend_oppose_mild                    6     +3199    10     +1562     -1637
+
+====================================================================================================
+2-FEATURE AND combinations — top 25 by NET dollar impact
+(filter: winner $ blocked <= $200 to give it a chance vs winners-bench)
+====================================================================================================
+
+pair                                                                    wN    win$  lN   lose$     NET$
+---------------------------------------------------------------------------------------------------------
+forming_h4_against AND is_sell                                           1     +26   9   +2973    +2947
+is_jpy_pair AND is_sell                                                  0      +0   6   +2076    +2076
+is_jpy_pair AND stacked_opposing_fvg                                     0      +0   6   +2076    +2076
+forming_h4_against AND stacked_opposing_fvg                              1    +164   6   +2167    +2004
+forming_h4_against AND is_jpy_pair                                       0      +0   5   +1896    +1896
+d1_trend_oppose_strong AND forming_h4_against                            1     +26   5   +1359    +1333
+is_sell AND stacked_opposing_fvg_3plus                                   0      +0   6   +1127    +1127
+stacked_opposing_fvg AND stacked_opposing_fvg_3plus                      0      +0   6   +1127    +1127
+bias_d1_oppose AND forming_h4_against                                    2     +43  10   +1124    +1081
+bias_h1_oppose AND forming_h4_against                                    2     +64   5   +1049     +985
+bias_d1_oppose AND ipda_extreme_fade                                     2    +156  10   +1094     +939
+bias_d1_oppose AND is_buy                                                2    +156  10   +1094     +939
+forming_h4_against AND stacked_opposing_fvg_3plus                        0      +0   4    +923     +923
+forming_h4_strong_against AND is_sell                                    1     +26   3    +937     +912
+bias_d1_oppose AND d1_trend_oppose_strong                                1     +26   4    +885     +860
+bias_d1_oppose AND is_sell                                               1     +26   4    +885     +860
+is_jpy_pair AND stacked_opposing_fvg_3plus                               0      +0   4    +831     +831
+forming_h4_strong_against AND is_jpy_pair                                0      +0   2    +824     +824
+h4_trend_oppose_mild AND ipda_extreme_fade                               0      +0   3    +798     +798
+bias_d1_oppose AND h4_trend_oppose_mild                                  0      +0   2    +780     +780
+d1_trend_oppose_strong AND is_jpy_pair                                   0      +0   3    +775     +775
+forming_h4_strong_against AND stacked_opposing_fvg                       1    +164   2    +824     +660
+d1_trend_oppose_strong AND forming_h4_strong_against                     1     +26   2    +587     +562
+bias_d1_oppose AND is_crypto                                             1     +26   2    +584     +558
+d1_trend_oppose_strong AND is_crypto                                     1     +26   2    +584     +558
+
+====================================================================================================
+3-FEATURE AND combinations — top 15 by NET (winners blocked <= $50)
+====================================================================================================
+
+triple                                                                                      wN    win$  lN   lose$     NET$
+-----------------------------------------------------------------------------------------------------------------------------
+forming_h4_against AND is_sell AND stacked_opposing_fvg                                      0      +0   6   +2167    +2167
+is_jpy_pair AND is_sell AND stacked_opposing_fvg                                             0      +0   6   +2076    +2076
+forming_h4_against AND is_jpy_pair AND is_sell                                               0      +0   5   +1896    +1896
+forming_h4_against AND is_jpy_pair AND stacked_opposing_fvg                                  0      +0   5   +1896    +1896
+d1_trend_oppose_strong AND forming_h4_against AND is_sell                                    1     +26   5   +1359    +1333
+is_sell AND stacked_opposing_fvg AND stacked_opposing_fvg_3plus                              0      +0   6   +1127    +1127
+forming_h4_against AND is_sell AND stacked_opposing_fvg_3plus                                0      +0   4    +923     +923
+forming_h4_against AND stacked_opposing_fvg AND stacked_opposing_fvg_3plus                   0      +0   4    +923     +923
+forming_h4_against AND forming_h4_strong_against AND is_sell                                 1     +26   3    +937     +912
+bias_d1_oppose AND d1_trend_oppose_strong AND forming_h4_against                             1     +26   4    +885     +860
+bias_d1_oppose AND d1_trend_oppose_strong AND is_sell                                        1     +26   4    +885     +860
+bias_d1_oppose AND forming_h4_against AND is_sell                                            1     +26   4    +885     +860
+is_jpy_pair AND is_sell AND stacked_opposing_fvg_3plus                                       0      +0   4    +831     +831
+is_jpy_pair AND stacked_opposing_fvg AND stacked_opposing_fvg_3plus                          0      +0   4    +831     +831
+forming_h4_against AND forming_h4_strong_against AND is_jpy_pair                             0      +0   2    +824     +824
