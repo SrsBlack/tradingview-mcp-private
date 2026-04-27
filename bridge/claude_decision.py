@@ -669,7 +669,25 @@ class ClaudeDecisionMaker:
             grade_a_high_conviction = original_grade == "A" and (
                 analysis.displacement_confirmed or analysis.sweep_detected
             )
-            if not grade_a_high_conviction:
+            # HTF rejection bypass: an HTF FVG/OB rejection setup (textbook
+            # ICT 2022 short trigger when paired with M15 displacement) is
+            # higher-conviction than ordinary M15 sweep. Allow it through
+            # the KZ gate even outside canonical kill zones, on the same
+            # original_grade=A footing as the existing bypass — but the
+            # detector itself is feature-flagged in ict_pipeline.py so this
+            # only fires when htf_rejection_enabled=True.
+            _factors_lower = " ".join(
+                getattr(analysis, "advanced_factors", []) or []
+            ).lower()
+            htf_rej_present = any(
+                f"htf_rej_{tf}" in _factors_lower for tf in ("h4", "d1", "w1")
+            )
+            htf_rejection_high_conviction = (
+                original_grade == "A"
+                and htf_rej_present
+                and analysis.displacement_confirmed
+            )
+            if not (grade_a_high_conviction or htf_rejection_high_conviction):
                 return (
                     f"KILL ZONE GATE: Not in a kill zone or Silver Bullet window. "
                     f"ICT 2022 model: only trade during London (2-5AM ET), NY AM (7-10AM ET), "
