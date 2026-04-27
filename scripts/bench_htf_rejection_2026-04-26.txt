@@ -1,0 +1,74 @@
+==============================================================================
+HTF rejection detector — historical-catch bench (broker-truth)
+==============================================================================
+
+Pulling FTMO broker history 2026-04-01 -> 2026-04-28...
+Closed ICT_Bridge positions on broker: 51
+  Restart-cluster trades dropped: 15
+  Clean trades for analysis:      36
+
+  Longs:  29  total=$+187.65
+  Shorts: 7  total=$-2372.17
+
+Detector params: lookback_m15=6, displacement_min=1.5, body_min_pct=0.55
+
+--- LONGS ---
+  [ 1/29] 2026-04-19T17:19:17 ETHUSD       BUY   pnl=  -373.40 -> MISSED fired=None tf=- n=0
+  [ 2/29] 2026-04-19T20:28:55 BTCUSD       BUY   pnl=  -235.80 -> MISSED fired=None tf=- n=0
+  [ 3/29] 2026-04-20T01:54:56 US500.cash   BUY   pnl=  +138.04 -> MISSED fired=None tf=- n=0
+  [ 4/29] 2026-04-20T03:16:02 BTCUSD       BUY   pnl=  +456.80 -> MISSED fired=None tf=- n=0
+  [ 5/29] 2026-04-20T05:22:20 XAUUSD       BUY   pnl=  -628.24 -> CAUGHT fired=bullish tf=H4 n=2
+  [ 6/29] 2026-04-20T10:24:08 GBPUSD       BUY   pnl=  -151.90 -> CAUGHT fired=bullish tf=H4 n=2
+  [ 7/29] 2026-04-20T10:31:05 GER40.cash   BUY   pnl=  +163.65 -> SKIP (no cache mapping)
+  [ 8/29] 2026-04-20T17:03:44 UKOIL.cash   BUY   pnl=  +835.50 -> SKIP (no cache mapping)
+  [ 9/29] 2026-04-21T11:20:17 UKOIL.cash   BUY   pnl=  +639.25 -> SKIP (no cache mapping)
+  [10/29] 2026-04-21T11:51:44 GER40.cash   BUY   pnl=  -222.56 -> SKIP (no cache mapping)
+  [11/29] 2026-04-21T16:45:22 ETHUSD       BUY   pnl=   -21.50 -> WRONG fired=bearish tf=H4 n=1
+  [12/29] 2026-04-21T18:45:22 US30.cash    BUY   pnl=   -12.13 -> SKIP (no cache mapping)
+  [13/29] 2026-04-21T18:46:24 US500.cash   BUY   pnl=   -13.65 -> WRONG fired=bearish tf=H4 n=1
+  [14/29] 2026-04-21T19:21:18 US100.cash   BUY   pnl=   -52.00 -> SKIP (no cache mapping)
+  [15/29] 2026-04-21T21:11:13 XAGUSD       BUY   pnl=   -81.60 -> SKIP (no cache mapping)
+  [16/29] 2026-04-21T21:43:03 NZDUSD       BUY   pnl=  -112.00 -> SKIP (no cache mapping)
+  [17/29] 2026-04-21T21:43:54 US30.cash    BUY   pnl=   -89.59 -> SKIP (no cache mapping)
+  [18/29] 2026-04-22T11:32:17 GER40.cash   BUY   pnl=  -672.37 -> SKIP (no cache mapping)
+  [19/29] 2026-04-23T13:20:52 ETHUSD       BUY   pnl=   -12.77 -> WRONG fired=bearish tf=H4 n=2
+  [20/29] 2026-04-23T15:00:18 SOLUSD       BUY   pnl=   +30.60 -> MISSED fired=None tf=- n=0
+  [21/29] 2026-04-23T16:05:04 ETHUSD       BUY   pnl=  -361.30 -> MISSED fired=None tf=- n=0
+  [22/29] 2026-04-23T16:12:38 SOLUSD       BUY   pnl=   -75.00 -> MISSED fired=None tf=- n=0
+  [23/29] 2026-04-23T17:04:29 EURUSD       BUY   pnl=  +322.00 -> MISSED fired=None tf=- n=0
+  [24/29] 2026-04-23T19:33:33 SOLUSD       BUY   pnl=  -287.92 -> MISSED fired=None tf=- n=0
+  [25/29] 2026-04-24T09:59:39 ETHUSD       BUY   pnl=  +142.00 -> MISSED fired=None tf=- n=0
+  [26/29] 2026-04-24T10:00:08 XAUUSD       BUY   pnl=  +835.24 -> MISSED fired=None tf=- n=0
+  [27/29] 2026-04-24T19:45:02 ETHUSD       BUY   pnl=   +38.60 -> MISSED fired=None tf=- n=0
+  [28/29] 2026-04-25T07:15:08 SOLUSD       BUY   pnl=  -120.30 -> MISSED fired=None tf=- n=0
+  [29/29] 2026-04-25T10:27:08 SOLUSD       BUY   pnl=  +110.00 -> MISSED fired=None tf=- n=0
+--- SHORTS ---
+  [ 1/7] 2026-04-20T20:23:23 ETHUSD       SELL  pnl=  -113.55 -> MISSED fired=None tf=- n=0
+  [ 2/7] 2026-04-20T21:48:25 USDJPY       SELL  pnl=  -771.06 -> SKIP (no cache mapping)
+  [ 3/7] 2026-04-21T10:48:06 SOLUSD       SELL  pnl=  -470.00 -> WRONG fired=bullish tf=H4 n=3
+  [ 4/7] 2026-04-21T14:05:39 GBPUSD       SELL  pnl=  -271.22 -> MISSED fired=None tf=- n=0
+  [ 5/7] 2026-04-21T21:05:35 USDJPY       SELL  pnl=  -179.35 -> SKIP (no cache mapping)
+  [ 6/7] 2026-04-24T10:15:51 EURJPY       SELL  pnl=  -473.56 -> SKIP (no cache mapping)
+  [ 7/7] 2026-04-24T18:59:01 GBPJPY       SELL  pnl=   -93.43 -> SKIP (no cache mapping)
+
+==============================================================================
+Aggregate
+==============================================================================
+
+LONGS: total=29 skipped=10 replayed=19
+  CAUGHT     2/19 ( 10.5%)  pnl=$-780.14
+  WRONG      3/19 ( 15.8%)  pnl=$-47.92
+  MISSED    14/19 ( 73.7%)  pnl=$+619.56
+
+SHORTS: total=7 skipped=4 replayed=3
+  CAUGHT     0/3 (  0.0%)  pnl=$+0.00
+  WRONG      1/3 ( 33.3%)  pnl=$-470.00
+  MISSED     2/3 ( 66.7%)  pnl=$-384.77
+
+==============================================================================
+Phase 1 gate metrics
+==============================================================================
+  LONGS   catch_rate= 10.5%  wrong_rate= 15.8%  caught=2  wrong=3  missed=14  N=19
+  SHORTS  catch_rate=  0.0%  wrong_rate= 33.3%  caught=0  wrong=1  missed=2  N=3
+
+  ETH 2026-04-27 SHORT: NOT in broker history (may have been considered but not entered, or filtered by restart cluster).
