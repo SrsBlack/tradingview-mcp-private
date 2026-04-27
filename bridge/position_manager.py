@@ -377,8 +377,27 @@ class PositionManager:
                         flush=True,
                     )
 
-                    self.executor.balance += local_pnl
-                    if local_pnl >= 0:
+                    # Prefer broker-truth P&L over locally recomputed P&L
+                    # for both balance bookkeeping and the emitted event.
+                    # local_pnl ignores commission/swap/slippage and gets
+                    # cross-contaminated when exit_price is wrong (the
+                    # ledger had 36/36 mismatches with broker history —
+                    # see memory/feedback_ledger_unreliable.md).
+                    # Use mt5_pnl when available; fall back to local_pnl
+                    # only if broker history wasn't accessible.
+                    authoritative_pnl = mt5_pnl if mt5_pnl is not None else local_pnl
+                    if mt5_pnl is not None and abs(authoritative_pnl - local_pnl) > 1.0:
+                        print(
+                            f"  [PNL] #{ticket} broker={mt5_pnl:+.2f} local={local_pnl:+.2f} "
+                            f"delta={authoritative_pnl - local_pnl:+.2f} — using broker",
+                            flush=True,
+                        )
+                    # Recompute r_multiple from authoritative pnl too
+                    if risk_pnl > 0:
+                        r_multiple = round(authoritative_pnl / risk_pnl, 2)
+
+                    self.executor.balance += authoritative_pnl
+                    if authoritative_pnl >= 0:
                         self.executor.wins += 1
                     else:
                         self.executor.losses += 1
@@ -401,11 +420,12 @@ class PositionManager:
                     "direction": pos.direction,
                     "entry": pos.entry_price,
                     "exit_price": exit_price,
-                    "pnl": round(local_pnl, 2),
+                    "pnl": round(authoritative_pnl, 2),
                     "r_multiple": r_multiple,
                     "reason": reason,
                     "balance": round(self.executor.balance, 2),
-                    "mt5_pnl": round(mt5_pnl, 2) if mt5_pnl else None,
+                    "mt5_pnl": round(mt5_pnl, 2) if mt5_pnl is not None else None,
+                    "local_pnl": round(local_pnl, 2),
                 })
             if events:
                 # Re-sync balance from MT5 to correct for tick_value drift

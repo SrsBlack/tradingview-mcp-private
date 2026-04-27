@@ -496,18 +496,52 @@ class LiveExecutorAdapter:
         if pos is None:
             return None
 
-        pnl = pos.floating_pnl
+        # `pos.floating_pnl` is locally tracked from current_price ticks
+        # — close enough for an immediate event, but ignores commission,
+        # swap, and real broker fill price. After MT5 closes, query
+        # broker history for the authoritative P&L.
+        local_pnl = pos.floating_pnl
         r_mult = pos.r_multiple
         closed_at = datetime.now(timezone.utc).isoformat()
+        local_exit_price = pos.current_price
 
         # Close on MT5
-        self._mt5_close_position(ticket, pnl, reason)
+        self._mt5_close_position(ticket, local_pnl, reason)
+
+        # Pull broker-truth P&L + actual fill price from the close deal.
+        # If broker history isn't available yet (rare race condition),
+        # fall back to local values. See feedback_ledger_unreliable.md
+        # for why this matters — without this query the ledger gets
+        # cross-contaminated exit_prices and missing commission/swap.
+        broker_pnl: float | None = None
+        broker_exit_price: float | None = None
+        try:
+            import MetaTrader5 as mt5  # noqa: PLC0415
+            now = datetime.now(timezone.utc)
+            deals = mt5.history_deals_get(now - timedelta(minutes=5), now, position=ticket)
+            if deals:
+                close_deals = [d for d in deals if d.entry == 1]  # entry=1 = closing deal
+                if close_deals:
+                    broker_pnl = sum(d.profit for d in close_deals)
+                    broker_exit_price = close_deals[-1].price
+        except Exception:
+            pass  # fall back to local values
+
+        pnl = broker_pnl if broker_pnl is not None else local_pnl
+        exit_price = broker_exit_price if broker_exit_price is not None else local_exit_price
+        # Recompute r_multiple from authoritative pnl
+        risk = abs(pos.entry_price - pos.sl_price)
+        if risk > 0 and pos.lot_size > 0:
+            from bridge.risk_bridge import calculate_pnl as _calc_pnl
+            risk_dollars = abs(_calc_pnl(pos.symbol, pos.entry_price, pos.sl_price, pos.lot_size, pos.direction))
+            if risk_dollars > 0:
+                r_mult = round(pnl / risk_dollars, 2)
 
         # Remove from state
         with self._positions_lock:
             self.open_positions.pop(ticket, None)
 
-        # Update stats
+        # Update stats with authoritative pnl
         self.balance += pnl
         self.peak_balance = max(self.peak_balance, self.balance)
         if pnl >= 0:
@@ -524,8 +558,8 @@ class LiveExecutorAdapter:
             "ticket": ticket, "symbol": pos.symbol,
             "direction": pos.direction,
             "entry_price": pos.entry_price,
-            "exit_price": pos.current_price,
-            "actual_trigger_price": pos.current_price,
+            "exit_price": exit_price,                  # broker-truth when available
+            "actual_trigger_price": local_exit_price,  # local tick price at close decision
             "pnl": round(pnl, 2), "r_multiple": round(r_mult, 2),
             "reason": reason, "balance": round(self.balance, 2),
             "opened_at": pos.opened_at, "closed_at": closed_at,
@@ -533,6 +567,8 @@ class LiveExecutorAdapter:
             "tp2_price": pos.tp2_price, "lot_size": pos.lot_size,
             "ict_grade": pos.ict_grade, "ict_score": pos.ict_score,
             "trailing_sl": pos.trailing_sl, "tp1_hit": pos.tp1_hit,
+            "broker_pnl": round(broker_pnl, 2) if broker_pnl is not None else None,
+            "local_pnl": round(local_pnl, 2),
         }
 
     def open_position(self, decision: TradeDecision, lot_size: float | None = None) -> dict:
