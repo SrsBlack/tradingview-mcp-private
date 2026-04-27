@@ -34,12 +34,12 @@ Replaying each clean trade against today's pre-gates...
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [COINBASE:SOLUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [ 6/10] 2026-04-23T15:00:18 SOLUSD       BUY   pnl=   +30.60 -> PASS new_score=90.6 new_grade=A
+  [ 6/10] 2026-04-23T15:00:18 SOLUSD       BUY   pnl=   +30.60 -> PASS new_score=86.4 new_grade=A
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [OANDA:EURUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [ 7/10] 2026-04-23T17:04:29 EURUSD       BUY   pnl=  +322.00 -> PASS new_score=65.6 new_grade=B
+  [ 7/10] 2026-04-23T17:04:29 EURUSD       BUY   pnl=  +322.00 -> BLOCK [OTHER] gate_bias=BEARISH | Grade C (61/100) below minimum for API call
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -122,7 +122,6 @@ Replaying each clean trade against today's pre-gates...
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [COINBASE:ETHUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [COINBASE:ETHUSD] GRADE CAP A->B: HTF data missing (W1=BEARISH D1=BULLISH H4=NEUTRAL)
   [19/25] 2026-04-23T13:20:52 ETHUSD       BUY   pnl=   -12.77 -> BLOCK [PD_ZONE] gate_bias=BEARISH | ZONE VIOLATION: BEARISH in discount — ICT rule: BUY in discount only, SELL in pr
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
@@ -133,7 +132,7 @@ Replaying each clean trade against today's pre-gates...
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
   [COINBASE:SOLUSD] OHLCV: H4=500 H1=500 M15=500 bars
-  [21/25] 2026-04-23T16:12:38 SOLUSD       BUY   pnl=   -75.00 -> PASS new_score=93.0 new_grade=A
+  [21/25] 2026-04-23T16:12:38 SOLUSD       BUY   pnl=   -75.00 -> PASS new_score=88.8 new_grade=A
 [PRICE_VERIFY] MT5/FTMO connected — primary verification for forex/indices/commodities
 [PRICE_VERIFY] Finnhub enabled — US500/US100 index verification via ETF proxy
 [ICT] Using MT5 for OHLCV data (no TradingView chart switching)
@@ -150,10 +149,11 @@ Replaying each clean trade against today's pre-gates...
 ==============================================================================
 Aggregate
 ==============================================================================
-  WINNERS: total=10  skipped=3  replayed=7  pass=7  blocked=0  real_blocked=0
-     all_block_rate  = 0.0%
+  WINNERS: total=10  skipped=3  replayed=7  pass=6  blocked=1  real_blocked=0
+     all_block_rate  = 14.3%
      real_block_rate = 0.0%  (target for winners: 0%)
-     blocked P&L:       $+0.00  (real-block subset: $+0.00)
+     all gates fired:  {'OTHER': 1}
+     blocked P&L:       $+322.00  (real-block subset: $+0.00)
 
   LOSERS : total=25  skipped=11  replayed=14  pass=9  blocked=5  real_blocked=1
      all_block_rate  = 35.7%
@@ -171,4 +171,5 @@ Aggregate
 Verdict
 ==============================================================================
   PASS — 0 of 7 replayable winners would have been REAL-blocked.
+         (1 bias-mismatch-only blocks: trade went one way, gate's bias the other.)
          For reference: losers had 1/14 = 7% real-block rate.

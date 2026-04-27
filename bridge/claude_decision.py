@@ -534,6 +534,17 @@ class ClaudeDecisionMaker:
         if analysis.current_price <= 0:
             return "Invalid price data"
 
+        # Snapshot the original grade BEFORE the HTF-data and HTF-zone
+        # downgrades mutate analysis.grade. The KILL_ZONE bypass below
+        # uses original_grade so trades that score Grade-A on raw merit
+        # but get downgraded to B for HTF-context reasons can still
+        # bypass the kill-zone gate when displacement/sweep is confirmed.
+        # Without this snapshot, the XAU +$835 (2026-04-24) winner was
+        # blocked: HTF DATA GATE downgraded A->B, then KILL_ZONE saw
+        # grade=B and rejected it. Confirmed via broker-truth bench
+        # 2026-04-26 (commit be905bf was incomplete; this commit fixes).
+        original_grade = analysis.grade
+
         # HTF DATA GATE: Grade A requires HTF context. Without W1/D1/H4 data,
         # the system can't confirm macro direction — a M15 CHoCH in a bearish
         # H4 trend looks like Grade A but is actually a counter-trend bounce.
@@ -650,7 +661,12 @@ class ClaudeDecisionMaker:
             # XAUUSD +$835 (real Grade A winner outside canonical KZ). See
             # memory/feedback_kill_zone_too_strict.md and the broker-truth
             # bench at scripts/bench_winners_not_blocked_2026-04-26.txt.
-            grade_a_high_conviction = analysis.grade == "A" and (
+            # Use ORIGINAL grade snapshot (before HTF-data / HTF-zone
+            # downgrades). A trade that scored raw Grade-A and has
+            # sweep+displacement evidence shouldn't be excluded from the
+            # KZ bypass just because we downgraded its conviction for
+            # macro-context reasons.
+            grade_a_high_conviction = original_grade == "A" and (
                 analysis.displacement_confirmed or analysis.sweep_detected
             )
             if not grade_a_high_conviction:
