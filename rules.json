@@ -37,7 +37,7 @@
     "Grade A: 1% risk per trade",
     "Grade B: 0.5% risk per trade",
     "Grade C: 0.25% risk per trade (pullback only)",
-    "Maximum 5 concurrent open positions (with risk-on/risk-off sub-cap of 4 to prevent direction over-concentration)",
+    "Maximum 8 concurrent open positions (with risk-on/risk-off sub-cap of 4 to prevent direction over-concentration)",
     "Daily loss limit: 2%",
     "Maximum drawdown: 4%"
   ],

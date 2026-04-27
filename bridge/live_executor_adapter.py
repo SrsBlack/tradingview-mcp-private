@@ -492,12 +492,19 @@ class LiveExecutorAdapter:
 
     @property
     def dynamic_max_trades(self) -> int:
-        """Dynamic daily trade limit based on signal quality."""
+        """Dynamic daily trade limit based on signal quality.
+
+        2026-04-27: bumped 3/5/7 -> 5/8/12 for data-collection mode on
+        FTMO demo. Same rationale as BRIDGE_MAX_POSITIONS bump in
+        live_executor.py — accelerate accumulation of trade signals
+        across classes for the WR-by-class audit. Revert tiers to
+        3/5/7 once signal categorisation is dialled in.
+        """
         if self._grade_a_signals_today >= 2:
-            return 7  # High conviction day
+            return 12  # High conviction day
         elif self._grade_a_signals_today >= 1:
-            return 5  # Normal day
-        return 3  # Low conviction day
+            return 8   # Normal day
+        return 5       # Low conviction day
 
     # ------------------------------------------------------------------ #
     # Phase 4.2 — Dynamic Loss Cooldown                                   #
