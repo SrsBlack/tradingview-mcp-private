@@ -94,6 +94,13 @@ BODY_MIN_PCT = 0.55
 FORWARD_BARS = 16  # 16 M15 bars = 4h forward
 ATR_MULT = 0.5     # forward move threshold
 
+# HTF zone universe — widened from 30 default so multi-day swing structures
+# (the kind that drive H4 bearish OBs after a 2-3 day rally) survive long
+# enough to be candidates for rejection. The original 30-bar window meant
+# H4 zones older than ~5 days disappeared from the detector's view.
+H4_MAX_AGE_BARS = 120   # ~20 days of H4 = full 4-week swing structure
+D1_MAX_AGE_BARS = 60    # ~2 months of D1 zones
+
 
 # ---------------------------------------------------------------------------
 # Log parsing
@@ -265,16 +272,16 @@ def replay_cycle(cycle: dict) -> dict:
         return {"cycle": cycle, "skipped": True, "reason": "zero ATR"}
 
     try:
-        h4_fvgs = detect_fvgs(df_h4.tail(200), max_age_bars=30, min_quality=FVGQuality.AGGRESSIVE)
-        d1_fvgs = detect_fvgs(df_d1.tail(120), max_age_bars=30, min_quality=FVGQuality.AGGRESSIVE)
+        h4_fvgs = detect_fvgs(df_h4.tail(200), max_age_bars=H4_MAX_AGE_BARS, min_quality=FVGQuality.AGGRESSIVE)
+        d1_fvgs = detect_fvgs(df_d1.tail(120), max_age_bars=D1_MAX_AGE_BARS, min_quality=FVGQuality.AGGRESSIVE)
         h4_swings = detect_swings(df_h4.tail(200), lookback=3)
         d1_swings = detect_swings(df_d1.tail(120), lookback=2)
         h4_obs = detect_order_blocks(
-            df_h4.tail(200), fvgs=h4_fvgs, swings=h4_swings, lookback=20,
+            df_h4.tail(200), fvgs=h4_fvgs, swings=h4_swings, lookback=H4_MAX_AGE_BARS,
             require_fvg=False, require_bos=False,
         )
         d1_obs = detect_order_blocks(
-            df_d1.tail(120), fvgs=d1_fvgs, swings=d1_swings, lookback=20,
+            df_d1.tail(120), fvgs=d1_fvgs, swings=d1_swings, lookback=D1_MAX_AGE_BARS,
             require_fvg=False, require_bos=False,
         )
     except Exception as e:

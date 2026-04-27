@@ -63,6 +63,11 @@ LOOKBACK_GRID = [6, 12, 24]
 DISPLACEMENT_GRID = [1.0, 1.5]
 BODY_GRID = [0.40, 0.45, 0.55]
 
+# HTF zone universe — widened so multi-day swing structures survive (the
+# April 22-23 ETH bearish OB was outside the original 30-bar H4 window).
+H4_MAX_AGE_BARS = 120
+D1_MAX_AGE_BARS = 60
+
 
 def replay_one(trade: dict, lookback: int, disp_min: float, body_min: float) -> str:
     """Return CAUGHT / WRONG / MISSED / SKIP for a single trade + param combo."""
@@ -94,16 +99,16 @@ def replay_one(trade: dict, lookback: int, disp_min: float, body_min: float) -> 
         return "SKIP"
 
     try:
-        h4_fvgs = detect_fvgs(df_h4.tail(200), max_age_bars=30, min_quality=FVGQuality.AGGRESSIVE)
-        d1_fvgs = detect_fvgs(df_d1.tail(120), max_age_bars=30, min_quality=FVGQuality.AGGRESSIVE)
+        h4_fvgs = detect_fvgs(df_h4.tail(200), max_age_bars=H4_MAX_AGE_BARS, min_quality=FVGQuality.AGGRESSIVE)
+        d1_fvgs = detect_fvgs(df_d1.tail(120), max_age_bars=D1_MAX_AGE_BARS, min_quality=FVGQuality.AGGRESSIVE)
         h4_swings = detect_swings(df_h4.tail(200), lookback=3)
         d1_swings = detect_swings(df_d1.tail(120), lookback=2)
         h4_obs = detect_order_blocks(
-            df_h4.tail(200), fvgs=h4_fvgs, swings=h4_swings, lookback=20,
+            df_h4.tail(200), fvgs=h4_fvgs, swings=h4_swings, lookback=H4_MAX_AGE_BARS,
             require_fvg=False, require_bos=False,
         )
         d1_obs = detect_order_blocks(
-            df_d1.tail(120), fvgs=d1_fvgs, swings=d1_swings, lookback=20,
+            df_d1.tail(120), fvgs=d1_fvgs, swings=d1_swings, lookback=D1_MAX_AGE_BARS,
             require_fvg=False, require_bos=False,
         )
     except Exception:
